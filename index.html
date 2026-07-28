@@ -123,6 +123,8 @@ h1.logo{cursor:pointer}
       <span>Купить дёшево в одном городе, продать дорого в другом. С объёмами продаж города-получателя. Перевозку и риск бери на себя.</span></div>
     <div class="card" onclick="enterApp('ench')"><b>💎 Рунофикация</b>
       <span>Купить шмотку, докинуть руны/души/реликты, поднять зачарование (например 4.2 → 4.3) и продать дороже на чёрном рынке. С объёмами продаж по каждому качеству.</span></div>
+    <div class="card" onclick="enterApp('roads')"><b>🛡 Дороги в Карлеон</b>
+      <span>Стоит ли везти сейчас: живой светофор по убийствам транспортников (киллборд Europe) + расписание окон Bandit Assault с отсчётом. Данные грузятся при входе.</span></div>
   </div>
   <div id="homeStatus">Загрузка цен начнётся при входе в раздел…</div>
   <div class="foot">Данные: Albion Online Data Project (краудсорсинг) · Иконки: официальный Render API</div>
@@ -252,6 +254,7 @@ const S = {
   bm:{},               // itemId -> {qs:{q:{price,vol}}, vol, last}
   cityHist:{},         // itemId -> {city: {q: vol/день}}  (объёмы рынков городов, догружается)
   loaded:false, rows:[], flipRows:[], cityFlipRows:[], sortKey:'pool', sortDir:-1,
+  roads:{loaded:false, loading:false, kills:[], fetched:0, err:null, at:null},
 };
 // ручные правки цен ресурсов/артефактов: "MATID|Город" -> цена
 S.overrides = (()=>{ try{ return JSON.parse(localStorage.getItem('acp_ovr')||'{}'); }catch(e){ return {}; } })();
@@ -812,6 +815,11 @@ function nameCellQ(it, q, extra){
 }
 function render(){
   const wrap=$('tableWrap');
+  if(S.tab==='roads'){
+    wrap.innerHTML = roadsHTML();
+    const rb=$('roadsReload'); if(rb) rb.onclick=()=>{ S.roads.loaded=false; loadRoads(); };
+    return;
+  }
   if(!S.loaded){ wrap.innerHTML=''; return; }
   const q = $('searchInp').value.toLowerCase();
   const cat=$('catSel').value, tier=$('tierSel').value, ench=$('enchSel').value;
@@ -1112,6 +1120,97 @@ function calcRefUpd(idx){
     (r.vol?` · при объёме ${fmt(r.vol)}/д партия уйдёт за ~${(N/Math.max(1,r.vol*CFG.marketShare)).toFixed(1)} дн. (25% рынка)`:'');
   const el=$('rcalcOut'+idx); if(el) el.innerHTML=html;
 }
+// ─── Дороги в Карлеон: киллборд + окна Bandit Assault ───
+const KILL_API = 'https://gameinfo-ams.albiononline.com/api/gameinfo'; // Europe-сервер
+const TRANSPORT_MOUNTS = ['MOUNT_OX','MOUNT_MULE','MAMMOTH','DONKEY'];
+const MOUNT_RU = t => t.includes('MAMMOTH')?'мамонт':t.includes('OX')?'бык':t.includes('MULE')?'мул':t.includes('DONKEY')?'осёл':'транспорт';
+// окна броска Bandit Assault (Europe, UTC): 60% вечером, 20–40% в остальные
+const BANDIT_WINDOWS = [1,3,5,7,11,13,15,17,19,21,23];
+const BANDIT_HIGH = [17,19,21];
+async function loadRoads(){
+  S.roads.loading=true; S.roads.err=null; render();
+  try{
+    const bucket = Math.floor(Date.now()/3e5); // кэш 5 минут
+    const pages = await Promise.all([0,51,102,153].map(off =>
+      fetchJSON(`${KILL_API}/events?limit=51&offset=${off}&_b=${bucket}`).catch(()=>null)));
+    let events = pages.filter(Boolean).flat();
+    if(!events.length) throw new Error('киллборд не ответил');
+    const seen=new Set();
+    events = events.filter(e=>{ const id=e.EventId||e.TimeStamp+(e.Victim?.Name||''); if(seen.has(id)) return false; seen.add(id); return true; });
+    S.roads.fetched = events.length;
+    S.roads.kills = events.map(e=>({
+      t: new Date(e.TimeStamp).getTime(),
+      victim: e.Victim?.Name||'?', vGuild: e.Victim?.GuildName||'',
+      killer: e.Killer?.Name||'?', kGuild: e.Killer?.GuildName||'',
+      party: e.numberOfParticipants || (e.Participants||[]).length || 1,
+      fame: e.TotalVictimKillFame||0,
+      mount: e.Victim?.Equipment?.Mount?.Type||'',
+    })).filter(k=>TRANSPORT_MOUNTS.some(m=>k.mount.includes(m)));
+    S.roads.loaded=true; S.roads.at=Date.now();
+  }catch(e){ S.roads.err = 'Не удалось загрузить киллборд ('+e.message+'). Возможно, API недоступен из твоей сети — попробуй «Обновить» или VPN.'; }
+  S.roads.loading=false;
+  if(S.tab==='roads') render();
+}
+function banditInfo(){
+  const now=new Date();
+  const h=now.getUTCHours(), m=now.getUTCMinutes();
+  const inWindow = BANDIT_WINDOWS.includes(h);
+  let nh = BANDIT_WINDOWS.find(x=>x>h);
+  let mins;
+  if(nh==null){ nh=BANDIT_WINDOWS[0]; mins=(24-h+nh)*60-m; } else { mins=(nh-h)*60-m; }
+  const chance = x => BANDIT_HIGH.includes(x)?'~60%':'~20–40%';
+  return {inWindow, h, nh, mins, chanceNow: chance(h), chanceNext: chance(nh),
+    prime: h>=17 && h<=22};
+}
+function roadsHTML(){
+  const r=S.roads;
+  let out='<div style="max-width:900px">';
+  // Bandit Assault
+  const b=banditInfo();
+  out+=`<div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px">
+    <b>⚔️ Bandit Assault (красные зоны вокруг Карлеона)</b><br>
+    <span style="color:var(--muted);font-size:12.5px">Окна запуска (Europe, UTC): ${BANDIT_WINDOWS.map(x=>BANDIT_HIGH.includes(x)?`<b style="color:var(--red)">${x}:00</b>`:`${x}:00`).join(' · ')} — красные ≈60% шанс, остальные ≈20–40%. Точный запуск виден только в игре.</span><br><br>
+    ${b.inWindow?`<span class="neg">Сейчас ${String(b.h).padStart(2,'0')}:00 UTC — окно броска (шанс ${b.chanceNow})! Если ивент запустился — дороги кипят.</span>`:
+      `Сейчас окна нет. Следующее — в ${String(b.nh).padStart(2,'0')}:00 UTC (через ~${Math.floor(b.mins/60)} ч ${b.mins%60} мин, шанс ${b.chanceNext}).`}
+    ${b.prime?'<br><span class="neg">Вечерний прайм-тайм (17–23 UTC) — максимум ганкеров на дорогах.</span>':''}
+    <br><span style="color:var(--muted);font-size:12px">Тихие часы Europe: примерно 07:00–11:00 UTC — нет окон бандитов и мало народу.</span>
+  </div>`;
+  // Киллборд
+  out+='<div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px">';
+  out+='<b>💀 Убийства транспортников (киллборд Europe, живые данные)</b> <button id="roadsReload" style="margin-left:8px;padding:3px 10px;font-size:12px">⟳</button><br>';
+  if(r.loading) out+='<span style="color:var(--muted)">Загружаю свежие килы…</span>';
+  else if(r.err) out+=`<span class="neg">${r.err}</span>`;
+  else if(!r.loaded) out+='<span style="color:var(--muted)">Данные загрузятся при входе на вкладку.</span>';
+  else {
+    const now=Date.now();
+    const span = r.kills.length? (now - Math.min(...r.kills.map(k=>k.t)))/3.6e6 : 0;
+    const k60 = r.kills.filter(k=>now-k.t<3.6e6).length;
+    const light = k60>=8?'🔴 ОЧЕНЬ ОПАСНО':k60>=3?'🟡 НЕСПОКОЙНО':'🟢 ОТНОСИТЕЛЬНО ТИХО';
+    const lightCls = k60>=8?'neg':k60>=3?'':'pos';
+    out+=`<div style="font-size:17px;margin:8px 0"><b class="${lightCls}">${light}</b> — транспортников убито за последний час: <b>${k60}</b></div>`;
+    out+=`<span style="color:var(--muted);font-size:12px">Анализ последних ${r.fetched} килов сервера (охват ~${span<1?'меньше часа':span.toFixed(1)+' ч'}), из них на транспортных маунтах: ${r.kills.length}. Обновлено ${new Date(r.at).toLocaleTimeString('ru-RU')}.</span>`;
+    // топ гильдий-ганкеров
+    const g={};
+    r.kills.forEach(k=>{ if(k.kGuild) g[k.kGuild]=(g[k.kGuild]||0)+1; });
+    const top=Object.entries(g).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    if(top.length) out+='<br><br><b>Активные охотники на транспорт:</b> '+top.map(([n,c])=>`${n} (${c})`).join(' · ');
+    // последние килы
+    if(r.kills.length){
+      out+='<table style="margin-top:10px"><tr><th>Когда</th><th class="item" style="text-align:left">Жертва</th><th>Маунт</th><th>Ганкеров</th><th>Фейм</th><th class="item" style="text-align:left">Убийца (гильдия)</th></tr>';
+      r.kills.slice(0,15).forEach(k=>{
+        const ago=(now-k.t)/6e4;
+        out+=`<tr><td>${ago<60?Math.round(ago)+' мин':(ago/60).toFixed(1)+' ч'} назад</td>
+          <td class="item">${k.victim}${k.vGuild?' <span class="fresh">['+k.vGuild+']</span>':''}</td>
+          <td>${MOUNT_RU(k.mount)}</td><td>${k.party}</td><td>${fmt(k.fame)}</td>
+          <td class="item">${k.killer}${k.kGuild?' <span class="fresh">['+k.kGuild+']</span>':''}</td></tr>`;
+      });
+      out+='</table>';
+    } else out+='<br><br><span class="pos">В выборке нет убитых транспортников — на дорогах спокойно.</span>';
+    out+='<br><span style="color:var(--muted);font-size:11.5px">⚠ Киллборд не отдаёт зону убийства, поэтому это общий пульс сервера, а не конкретно дороги в Карлеон. Светофор — ориентир, глаза на миникарте он не заменяет.</span>';
+  }
+  out+='</div></div>';
+  return out;
+}
 // ─── События ───
 ['citySel','focusChk','premChk','feeInp','qualSel'].forEach(id=>$(id).onchange=()=>{ compute(); render(); });
 ['searchInp','minMargin','minVol'].forEach(id=>$(id).oninput=()=>render());
@@ -1127,7 +1226,7 @@ $('refSel').onchange = setupRefresh;
 setupRefresh();
 $('goldBtn').onclick=()=>{ S.gold=!S.gold; $('goldBtn').classList.toggle('active',S.gold); render(); };
 $('reloadBtn').onclick=()=>loadAll(true);
-const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг Карлеон → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация'};
+const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг Карлеон → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', roads:'🛡 Дороги в Карлеон'};
 // какие контролы нужны на каждой вкладке (премиум, возраст данных, обновление и поиск — всегда)
 const TAB_CONTROLS={
   craft:   ['wrapCity','wrapFocus','wrapSelfRef','wrapQual','wrapFee','wrapCat'],
@@ -1135,6 +1234,7 @@ const TAB_CONTROLS={
   flip:    ['wrapCat'],
   cityflip:['wrapSafe','wrapCat'],
   ench:    ['wrapCity','wrapSafe','wrapCat'],
+  roads:   [],
 };
 const ALL_WRAPS=['wrapCity','wrapFocus','wrapSafe','wrapSelfRef','wrapQual','wrapFee','wrapCat','refModeWrap'];
 function setTab(t){
@@ -1142,6 +1242,8 @@ function setTab(t){
   const el=$('secName'); if(el) el.textContent=TAB_NAMES[t]||'';
   const vis=TAB_CONTROLS[t]||[];
   for(const id of ALL_WRAPS){ const w=$(id); if(w) w.style.display = vis.includes(id)?'':'none'; }
+  const flt=$('filters'); if(flt) flt.style.display = t==='roads'?'none':'';
+  if(t==='roads' && !S.roads.loaded && !S.roads.loading) loadRoads(); // ленивая загрузка при входе
   render();
 }
 $('refModeSel').onchange=()=>{ compute(); render(); };
