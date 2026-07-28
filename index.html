@@ -7,63 +7,113 @@
 <title>Albion Craft Profit — Europe</title>
 <style>
 :root{
-  --bg:#0f1115; --panel:#171a21; --panel2:#1d212b; --border:#2a2f3a;
-  --text:#d8dce5; --muted:#8b93a3; --accent:#e8b84b; --green:#5dbb63; --red:#e06c5f;
-  --blue:#5b9bd5;
+  --bg:#0b0d12; --bg2:#0f1219; --panel:#151924; --panel2:#1c2130; --panel3:#232a3d;
+  --border:#262d3f; --border2:#333c55;
+  --text:#dde2ec; --muted:#8b93a8; --accent:#eebc4e; --accent2:#f5d47e;
+  --green:#62c96f; --red:#e46f61; --blue:#6aa5e0;
+  --shadow:0 8px 28px rgba(0,0,0,.35);
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:14px;align-items:center;background:var(--panel)}
-h1{font-size:17px;margin:0;color:var(--accent);white-space:nowrap}
-h1 small{color:var(--muted);font-weight:400;font-size:12px;margin-left:6px}
-.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-select,input[type=number],input[type=text]{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:13px}
+html{scrollbar-color:var(--panel3) var(--bg)}
+body{margin:0;background:radial-gradient(1200px 600px at 70% -10%, #171d2e 0%, var(--bg) 55%) fixed, var(--bg);
+  color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Inter',sans-serif}
+::-webkit-scrollbar{height:10px;width:10px}
+::-webkit-scrollbar-thumb{background:var(--panel3);border-radius:5px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ── шапка ── */
+header{padding:12px 22px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:12px;align-items:center;
+  background:linear-gradient(180deg, rgba(28,33,48,.92), rgba(21,25,36,.96));backdrop-filter:blur(8px);
+  position:sticky;top:0;z-index:50;box-shadow:0 2px 14px rgba(0,0,0,.35)}
+h1{font-size:17px;margin:0;color:var(--accent);white-space:nowrap;letter-spacing:.2px;display:flex;align-items:center;gap:6px}
+h1 small{color:var(--muted);font-weight:400;font-size:11.5px;margin-left:6px;letter-spacing:0}
+h1.logo{cursor:pointer;transition:opacity .15s}
+h1.logo:hover{opacity:.85}
+.controls{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+select,input[type=number],input[type=text]{background:var(--bg2);color:var(--text);border:1px solid var(--border2);
+  border-radius:8px;padding:6px 9px;font-size:13px;transition:border-color .15s, box-shadow .15s;outline:none}
+select:hover,input:hover{border-color:#46516f}
+select:focus,input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(238,188,78,.12)}
 input[type=number]{width:80px}
+input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px}
 label.ctl{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);white-space:nowrap}
 .toggle{display:inline-flex;align-items:center;cursor:pointer;gap:6px}
-button{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer}
-button:hover{border-color:var(--accent)}
-button.gold{background:linear-gradient(135deg,#8a6d1f,#b8932f);color:#fff;border-color:#c9a53a;font-weight:600}
-button.gold.active{outline:2px solid var(--accent)}
-.tabs{display:flex;gap:4px;margin-left:auto}
-.tabs button{border-radius:8px 8px 0 0}
-.tabs button.active{background:var(--accent);color:#1a1a1a;font-weight:700;border-color:var(--accent)}
-main{padding:16px 20px}
-#status{margin:8px 0;color:var(--muted);font-size:13px}
-.bar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin:6px 0 14px;max-width:480px}
-.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
-table{border-collapse:collapse;width:100%;background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden}
-th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
-th{background:var(--panel2);color:var(--muted);font-weight:600;font-size:12px;cursor:pointer;user-select:none;position:sticky;top:0}
+button{background:var(--panel2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:7px 13px;
+  font-size:13px;cursor:pointer;transition:all .15s;font-weight:500}
+button:hover{border-color:var(--accent);color:var(--accent2);transform:translateY(-1px)}
+button:active{transform:translateY(0)}
+button.gold{background:linear-gradient(135deg,#a37b22,#d4a942);color:#181203;border:1px solid #e3bd58;font-weight:700;
+  box-shadow:0 2px 12px rgba(238,188,78,.25);text-shadow:0 1px 0 rgba(255,255,255,.15)}
+button.gold:hover{background:linear-gradient(135deg,#b98c28,#e8bd4d);color:#181203;transform:translateY(-1px);
+  box-shadow:0 4px 18px rgba(238,188,78,.4)}
+button.gold.active{outline:2px solid var(--accent2);outline-offset:1px}
+.tabs{display:flex;gap:10px;margin-left:auto;align-items:center}
+
+/* ── контент ── */
+main{padding:18px 22px}
+#status{margin:2px 0 8px;color:var(--muted);font-size:13px;display:flex;align-items:center;gap:8px;min-height:22px}
+body.loading #status::before{content:'';width:14px;height:14px;border:2px solid var(--panel3);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.bar{height:5px;background:var(--panel2);border-radius:3px;overflow:hidden;margin:4px 0 14px;max-width:520px}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));
+  transition:width .25s;border-radius:3px;box-shadow:0 0 8px rgba(238,188,78,.5)}
+
+/* ── скелетон загрузки ── */
+.skel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:8px;overflow:hidden}
+.skel-row{height:46px;border-radius:8px;margin:6px;background:linear-gradient(90deg,var(--panel2) 25%,var(--panel3) 45%,var(--panel2) 65%);
+  background-size:220% 100%;animation:shimmer 1.4s infinite}
+@keyframes shimmer{0%{background-position:120% 0}100%{background-position:-120% 0}}
+.skel-note{text-align:center;color:var(--muted);font-size:12.5px;padding:10px}
+
+/* ── таблицы ── */
+table{border-collapse:separate;border-spacing:0;width:100%;background:var(--panel);border:1px solid var(--border);
+  border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+th,td{padding:8px 11px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody tr:last-child td{border-bottom:none}
+th{background:var(--panel2);color:var(--muted);font-weight:600;font-size:11.5px;cursor:pointer;user-select:none;
+  position:sticky;top:0;z-index:5;text-transform:uppercase;letter-spacing:.4px}
 th:hover{color:var(--accent)}
 td.item,th.item{text-align:left}
-td.item{display:flex;align-items:center;gap:8px;min-width:260px}
-td.item img{width:40px;height:40px;flex:none}
+td.item{display:flex;align-items:center;gap:9px;min-width:260px}
+td.item img{width:42px;height:42px;flex:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))}
 .iname{overflow:hidden}
 .iname b{display:block;font-weight:600;font-size:13px;color:var(--text)}
 .iname span{font-size:11.5px;color:var(--muted)}
+tbody tr.row:nth-child(4n+1){background:rgba(255,255,255,.015)}
+tr.row{transition:background .12s}
+tr.row:hover{background:var(--panel2) !important;cursor:pointer}
 .pos{color:var(--green);font-weight:600}
 .neg{color:var(--red)}
-.badge{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:8px;margin-left:6px;vertical-align:1px}
-.b-bonus{background:#2c3b2d;color:var(--green)}
-.b-top{background:#4a3b14;color:var(--accent)}
-.b-stale{background:#3a2a2a;color:var(--red)}
-.b-ch{background:#20304a;color:var(--blue)}
-.b-warn{background:#4a3520;color:#e8a54b;cursor:help}
-.help{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;
-  background:var(--panel2);border:1px solid var(--border);color:var(--muted);font-size:10px;cursor:help;margin-left:4px;vertical-align:1px}
-.help:hover{color:var(--accent);border-color:var(--accent)}
-tr.row:hover{background:var(--panel2);cursor:pointer}
-tr.det td{background:#141822;text-align:left;white-space:normal;font-size:12.5px;color:var(--muted)}
-tr.det table{margin:6px 0;width:auto}
-tr.det td,tr.det th{padding:4px 10px}
-.filters{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0;align-items:center}
-footer{padding:14px 20px;color:var(--muted);font-size:11.5px;border-top:1px solid var(--border);margin-top:20px}
+.badge{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:20px;margin-left:6px;vertical-align:1px;font-weight:600}
+.b-bonus{background:rgba(98,201,111,.14);color:var(--green);border:1px solid rgba(98,201,111,.3)}
+.b-top{background:linear-gradient(135deg,rgba(238,188,78,.25),rgba(238,188,78,.1));color:var(--accent2);border:1px solid rgba(238,188,78,.45)}
+.b-stale{background:rgba(228,111,97,.13);color:var(--red);border:1px solid rgba(228,111,97,.3)}
+.b-ch{background:rgba(106,165,224,.13);color:var(--blue);border:1px solid rgba(106,165,224,.3)}
+.b-warn{background:rgba(232,165,75,.13);color:#e8a54b;cursor:help;border:1px solid rgba(232,165,75,.35)}
+tr.det td{background:var(--bg2);text-align:left;white-space:normal;font-size:12.5px;color:var(--muted);padding:14px 16px}
+tr.det table{margin:8px 0;width:auto;box-shadow:none;border-radius:8px}
+tr.det td,tr.det th{padding:5px 10px}
+tr.det b{color:var(--text)}
+.filters{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0;align-items:center;background:var(--panel);
+  border:1px solid var(--border);border-radius:12px;padding:10px 14px}
+footer{padding:16px 22px;color:var(--muted);font-size:11.5px;border-top:1px solid var(--border);margin-top:24px;
+  line-height:1.7;opacity:.85}
 .fresh{font-size:10.5px;color:var(--muted)}
+.help{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;
+  background:var(--panel3);border:1px solid var(--border2);color:var(--muted);font-size:10px;cursor:help;margin-left:4px;
+  vertical-align:1px;transition:all .15s}
+.help:hover{color:var(--accent);border-color:var(--accent);background:rgba(238,188,78,.1)}
+
+/* ── панели (дороги) ── */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow)}
+.panel b{color:var(--text)}
+.light-big{font-size:19px;margin:10px 0;display:flex;align-items:center;gap:10px}
+
+/* ── мобильная версия ── */
 @media (max-width:900px){td.item{min-width:180px}}
-/* ─── мобильная версия ─── */
 @media (max-width:768px){
-  header{padding:8px 10px;gap:8px}
+  header{padding:8px 10px;gap:8px;position:static}
   h1{font-size:15px}
   h1 small{display:none}
   .controls{gap:6px;width:100%}
@@ -73,13 +123,12 @@ footer{padding:14px 20px;color:var(--muted);font-size:11.5px;border-top:1px soli
   label.ctl{font-size:11.5px}
   button{padding:6px 9px;font-size:12px}
   main{padding:10px 8px}
-  .filters{gap:6px}
+  .filters{gap:6px;padding:8px}
   #searchInp{min-width:130px !important}
-  /* таблица: горизонтальная прокрутка, колонка предмета закреплена слева */
   #tableWrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  table{min-width:880px}
+  #tableWrap table{min-width:880px}
   th,td{padding:6px 7px;font-size:12px}
-  th:first-child{position:sticky;left:0;z-index:3;background:var(--panel2)}
+  th:first-child{position:sticky;left:0;z-index:6;background:var(--panel2)}
   td.item{position:sticky;left:0;z-index:2;background:var(--bg);min-width:190px;max-width:210px}
   tr.row:active td.item{background:var(--panel2)}
   td.item img{width:32px;height:32px}
@@ -92,20 +141,24 @@ footer{padding:14px 20px;color:var(--muted);font-size:11.5px;border-top:1px soli
   #home .sub{font-size:13px;text-align:center}
   .cards{grid-template-columns:1fr;width:100%;max-width:420px}
 }
-/* стартовый экран */
+
+/* ── стартовый экран ── */
 #home{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:20px}
-#home h1{font-size:42px;margin:0 0 4px;color:var(--text);font-weight:700}
-#home h1 span{color:var(--accent)}
-#home .sub{color:var(--muted);margin-bottom:28px;font-size:15px}
-.cards{display:grid;grid-template-columns:repeat(2,minmax(260px,340px));gap:14px}
+#home h1{font-size:44px;margin:0 0 4px;font-weight:800;
+  background:linear-gradient(135deg,var(--text) 30%,var(--accent) 70%);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;display:block}
+#home .sub{color:var(--muted);margin-bottom:30px;font-size:15px}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(280px,360px));gap:16px}
 @media (max-width:640px){.cards{grid-template-columns:1fr}}
-.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;cursor:pointer;text-align:left;transition:border-color .15s, transform .15s}
-.card:hover{border-color:var(--accent);transform:translateY(-2px)}
-.card b{display:block;font-size:16px;margin-bottom:6px}
-.card span{color:var(--muted);font-size:12.5px;line-height:1.4;display:block}
-#home .foot{margin-top:30px;color:var(--muted);font-size:11.5px}
-#homeStatus{margin-top:16px;color:var(--muted);font-size:12.5px}
-h1.logo{cursor:pointer}
+.card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--border);border-radius:14px;
+  padding:20px 22px;cursor:pointer;text-align:left;transition:all .18s;box-shadow:var(--shadow)}
+.card:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 10px 30px rgba(238,188,78,.12), var(--shadow)}
+.card b{display:block;font-size:16.5px;margin-bottom:7px}
+.card span{color:var(--muted);font-size:12.5px;line-height:1.5;display:block}
+#home .foot{margin-top:32px;color:var(--muted);font-size:11.5px;opacity:.7}
+#homeStatus{margin-top:18px;color:var(--muted);font-size:12.5px;display:flex;align-items:center;gap:8px}
+body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px solid var(--panel3);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .8s linear infinite;flex:none}
 </style>
 </head>
 <body>
@@ -336,6 +389,7 @@ async function pool(tasks, onOne){
 // ─── Загрузка данных ───
 async function loadAll(force){
   if(force){ try{ Object.keys(localStorage).filter(k=>k.startsWith('acp_')).forEach(k=>localStorage.removeItem(k)); }catch(e){} }
+  document.body.classList.add('loading');
   S.loaded=false; S.matPrices={}; S.cityPrices={}; S.bm={};
   const st=$('status'), pg=$('prog');
   const itemIds = [...DATA.items.map(i=>i.id), ...(DATA.ench3Ids||[])];
@@ -402,8 +456,10 @@ async function loadAll(force){
     });
   }
   st.textContent = `Загрузка цен: 0/${tasks.length} запросов…`;
+  render(); // показать скелетон, пока грузится
   const res = await pool(tasks, (d,t)=>{ pg.style.width=(d/t*100)+'%'; st.textContent=`Загрузка цен: ${d}/${t} запросов…`; });
   S.loaded=true;
+  document.body.classList.remove('loading');
   const gotData = Object.keys(S.matPrices).length>0 || Object.keys(S.bm).length>0;
   const viaProxy = apiRoute>0 ? ' · соединение через прокси-зеркало' : '';
   if(!gotData || res.ok===0){
@@ -820,7 +876,13 @@ function render(){
     const rb=$('roadsReload'); if(rb) rb.onclick=()=>{ S.roads.loaded=false; loadRoads(); };
     return;
   }
-  if(!S.loaded){ wrap.innerHTML=''; return; }
+  if(!S.loaded){
+    // скелетон: видно, что данные грузятся
+    wrap.innerHTML = '<div class="skel">'+
+      '<div class="skel-note">⏳ Загружаю живые цены с Albion Online Data Project — обычно 20–40 секунд…</div>'+
+      Array.from({length:9},()=>'<div class="skel-row"></div>').join('')+'</div>';
+    return;
+  }
   const q = $('searchInp').value.toLowerCase();
   const cat=$('catSel').value, tier=$('tierSel').value, ench=$('enchSel').value;
   let minM=+$('minMargin').value||0, minV=+$('minVol').value||0;
@@ -1167,7 +1229,7 @@ function roadsHTML(){
   let out='<div style="max-width:900px">';
   // Bandit Assault
   const b=banditInfo();
-  out+=`<div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px">
+  out+=`<div class="panel">
     <b>⚔️ Bandit Assault (красные зоны вокруг Карлеона)</b><br>
     <span style="color:var(--muted);font-size:12.5px">Окна запуска (Europe, UTC): ${BANDIT_WINDOWS.map(x=>BANDIT_HIGH.includes(x)?`<b style="color:var(--red)">${x}:00</b>`:`${x}:00`).join(' · ')} — красные ≈60% шанс, остальные ≈20–40%. Точный запуск виден только в игре.</span><br><br>
     ${b.inWindow?`<span class="neg">Сейчас ${String(b.h).padStart(2,'0')}:00 UTC — окно броска (шанс ${b.chanceNow})! Если ивент запустился — дороги кипят.</span>`:
@@ -1176,9 +1238,11 @@ function roadsHTML(){
     <br><span style="color:var(--muted);font-size:12px">Тихие часы Europe: примерно 07:00–11:00 UTC — нет окон бандитов и мало народу.</span>
   </div>`;
   // Киллборд
-  out+='<div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px">';
-  out+='<b>💀 Убийства транспортников (киллборд Europe, живые данные)</b> <button id="roadsReload" style="margin-left:8px;padding:3px 10px;font-size:12px">⟳</button><br>';
-  if(r.loading) out+='<span style="color:var(--muted)">Загружаю свежие килы…</span>';
+  out+='<div class="panel">';
+  out+='<b>💀 Убийства транспортников (киллборд Europe, живые данные)</b> <button id="roadsReload" style="margin-left:8px;padding:3px 10px;font-size:12px">⟳ Обновить</button><br>';
+  if(r.loading) out+='<div class="skel" style="margin-top:10px;box-shadow:none">'+
+    '<div class="skel-note">⏳ Опрашиваю киллборд Europe — последние ~200 убийств…</div>'+
+    Array.from({length:4},()=>'<div class="skel-row" style="height:34px"></div>').join('')+'</div>';
   else if(r.err) out+=`<span class="neg">${r.err}</span>`;
   else if(!r.loaded) out+='<span style="color:var(--muted)">Данные загрузятся при входе на вкладку.</span>';
   else {
@@ -1187,7 +1251,7 @@ function roadsHTML(){
     const k60 = r.kills.filter(k=>now-k.t<3.6e6).length;
     const light = k60>=8?'🔴 ОЧЕНЬ ОПАСНО':k60>=3?'🟡 НЕСПОКОЙНО':'🟢 ОТНОСИТЕЛЬНО ТИХО';
     const lightCls = k60>=8?'neg':k60>=3?'':'pos';
-    out+=`<div style="font-size:17px;margin:8px 0"><b class="${lightCls}">${light}</b> — транспортников убито за последний час: <b>${k60}</b></div>`;
+    out+=`<div class="light-big"><b class="${lightCls}">${light}</b> <span style="font-size:14px;color:var(--muted)">— транспортников убито за последний час: <b style="color:var(--text)">${k60}</b></span></div>`;
     out+=`<span style="color:var(--muted);font-size:12px">Анализ последних ${r.fetched} килов сервера (охват ~${span<1?'меньше часа':span.toFixed(1)+' ч'}), из них на транспортных маунтах: ${r.kills.length}. Обновлено ${new Date(r.at).toLocaleTimeString('ru-RU')}.</span>`;
     // топ гильдий-ганкеров
     const g={};
