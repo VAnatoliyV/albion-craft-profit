@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0f1115">
 <title>Albion Craft Profit — Europe</title>
 <style>
 :root{
@@ -60,6 +61,37 @@ tr.det td,tr.det th{padding:4px 10px}
 footer{padding:14px 20px;color:var(--muted);font-size:11.5px;border-top:1px solid var(--border);margin-top:20px}
 .fresh{font-size:10.5px;color:var(--muted)}
 @media (max-width:900px){td.item{min-width:180px}}
+/* ─── мобильная версия ─── */
+@media (max-width:768px){
+  header{padding:8px 10px;gap:8px}
+  h1{font-size:15px}
+  h1 small{display:none}
+  .controls{gap:6px;width:100%}
+  .tabs{margin-left:0;width:100%;justify-content:space-between}
+  select,input[type=number],input[type=text]{font-size:12px;padding:5px 6px}
+  input[type=number]{width:64px}
+  label.ctl{font-size:11.5px}
+  button{padding:6px 9px;font-size:12px}
+  main{padding:10px 8px}
+  .filters{gap:6px}
+  #searchInp{min-width:130px !important}
+  /* таблица: горизонтальная прокрутка, колонка предмета закреплена слева */
+  #tableWrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{min-width:880px}
+  th,td{padding:6px 7px;font-size:12px}
+  th:first-child{position:sticky;left:0;z-index:3;background:var(--panel2)}
+  td.item{position:sticky;left:0;z-index:2;background:var(--bg);min-width:190px;max-width:210px}
+  tr.row:active td.item{background:var(--panel2)}
+  td.item img{width:32px;height:32px}
+  .iname b{font-size:12px}
+  .iname span{font-size:10.5px;white-space:normal}
+  tr.det td{position:static;white-space:normal}
+  tr.det table{min-width:0}
+  footer{font-size:10px;padding:10px}
+  #home h1{font-size:28px}
+  #home .sub{font-size:13px;text-align:center}
+  .cards{grid-template-columns:1fr;width:100%;max-width:420px}
+}
 /* стартовый экран */
 #home{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:20px}
 #home h1{font-size:42px;margin:0 0 4px;color:var(--text);font-weight:700}
