@@ -874,6 +874,8 @@ function render(){
   if(S.tab==='roads'){
     wrap.innerHTML = roadsHTML();
     const rb=$('roadsReload'); if(rb) rb.onclick=()=>{ S.roads.loaded=false; loadRoads(); };
+    const rm=$('roadsMode'); if(rm) rm.onchange=()=>{ S.roads.mode=rm.value; render(); };
+    const rp=$('roadsParty'); if(rp) rp.onchange=()=>{ S.roads.minParty=+rp.value; render(); };
     return;
   }
   if(!S.loaded){
@@ -1200,14 +1202,18 @@ async function loadRoads(){
     const seen=new Set();
     events = events.filter(e=>{ const id=e.EventId||e.TimeStamp+(e.Victim?.Name||''); if(seen.has(id)) return false; seen.add(id); return true; });
     S.roads.fetched = events.length;
-    S.roads.kills = events.map(e=>({
+    S.roads.all = events.map(e=>({
       t: new Date(e.TimeStamp).getTime(),
       victim: e.Victim?.Name||'?', vGuild: e.Victim?.GuildName||'',
       killer: e.Killer?.Name||'?', kGuild: e.Killer?.GuildName||'',
       party: e.numberOfParticipants || (e.Participants||[]).length || 1,
       fame: e.TotalVictimKillFame||0,
       mount: e.Victim?.Equipment?.Mount?.Type||'',
-    })).filter(k=>TRANSPORT_MOUNTS.some(m=>k.mount.includes(m)));
+      vWeap: e.Victim?.Equipment?.MainHand?.Type||'',
+      kWeap: e.Killer?.Equipment?.MainHand?.Type||'',
+      ip: Math.round(e.Victim?.AverageItemPower||0),
+    }));
+    S.roads.kills = S.roads.all.filter(k=>TRANSPORT_MOUNTS.some(m=>k.mount.includes(m)));
     S.roads.loaded=true; S.roads.at=Date.now();
   }catch(e){ S.roads.err = 'Не удалось загрузить киллборд ('+e.message+'). Возможно, API недоступен из твоей сети — попробуй «Обновить» или VPN.'; }
   S.roads.loading=false;
@@ -1253,23 +1259,47 @@ function roadsHTML(){
     const lightCls = k60>=8?'neg':k60>=3?'':'pos';
     out+=`<div class="light-big"><b class="${lightCls}">${light}</b> <span style="font-size:14px;color:var(--muted)">— транспортников убито за последний час: <b style="color:var(--text)">${k60}</b></span></div>`;
     out+=`<span style="color:var(--muted);font-size:12px">Анализ последних ${r.fetched} килов сервера (охват ~${span<1?'меньше часа':span.toFixed(1)+' ч'}), из них на транспортных маунтах: ${r.kills.length}. Обновлено ${new Date(r.at).toLocaleTimeString('ru-RU')}.</span>`;
-    // топ гильдий-ганкеров
+    // фильтры: кого показываем
+    const mode = S.roads.mode||'transport', minP = S.roads.minParty||1;
+    out+=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0">
+      <label class="ctl">Показывать
+        <select id="roadsMode">
+          <option value="transport"${mode==='transport'?' selected':''}>Только транспортников</option>
+          <option value="gank"${mode==='gank'?' selected':''}>Ганки (3+ на одного)</option>
+          <option value="all"${mode==='all'?' selected':''}>Все килы</option>
+        </select></label>
+      <label class="ctl">Ганкеров ≥
+        <select id="roadsParty">
+          <option value="1"${minP==1?' selected':''}>любое</option>
+          <option value="2"${minP==2?' selected':''}>2</option>
+          <option value="3"${minP==3?' selected':''}>3</option>
+          <option value="5"${minP==5?' selected':''}>5</option>
+        </select></label>
+    </div>`;
+    let list = mode==='transport' ? r.kills : mode==='gank' ? r.all.filter(k=>k.party>=3) : r.all;
+    list = list.filter(k=>k.party>=minP);
+    // топ гильдий по отфильтрованному
     const g={};
-    r.kills.forEach(k=>{ if(k.kGuild) g[k.kGuild]=(g[k.kGuild]||0)+1; });
+    list.forEach(k=>{ if(k.kGuild) g[k.kGuild]=(g[k.kGuild]||0)+1; });
     const top=Object.entries(g).sort((a,b)=>b[1]-a[1]).slice(0,5);
-    if(top.length) out+='<br><br><b>Активные охотники на транспорт:</b> '+top.map(([n,c])=>`${n} (${c})`).join(' · ');
-    // последние килы
-    if(r.kills.length){
-      out+='<table style="margin-top:10px"><tr><th>Когда</th><th class="item" style="text-align:left">Жертва</th><th>Маунт</th><th>Ганкеров</th><th>Фейм</th><th class="item" style="text-align:left">Убийца (гильдия)</th></tr>';
-      r.kills.slice(0,15).forEach(k=>{
+    if(top.length) out+='<b>Активные охотники:</b> '+top.map(([n,c])=>`${n} (${c})`).join(' · ');
+    // последние килы: с иконками маунта и оружия (как на киллбордах)
+    const gearIcon = (t,title) => t?`<img loading="lazy" src="https://render.albiononline.com/v1/item/${enc(t)}.png?size=32" title="${title||t}" style="width:30px;height:30px;vertical-align:middle;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))">`:'';
+    if(list.length){
+      out+='<table style="margin-top:10px"><tr><th>Когда</th><th class="item" style="text-align:left">Жертва (гир · маунт)</th><th>IP</th><th>Ганкеров</th><th>Фейм</th><th class="item" style="text-align:left">Убийца (оружие)</th></tr>';
+      list.slice(0,25).forEach(k=>{
         const ago=(now-k.t)/6e4;
-        out+=`<tr><td>${ago<60?Math.round(ago)+' мин':(ago/60).toFixed(1)+' ч'} назад</td>
-          <td class="item">${k.victim}${k.vGuild?' <span class="fresh">['+k.vGuild+']</span>':''}</td>
-          <td>${MOUNT_RU(k.mount)}</td><td>${k.party}</td><td>${fmt(k.fame)}</td>
-          <td class="item">${k.killer}${k.kGuild?' <span class="fresh">['+k.kGuild+']</span>':''}</td></tr>`;
+        out+=`<tr><td style="white-space:nowrap">${ago<60?Math.round(ago)+' мин':(ago/60).toFixed(1)+' ч'}</td>
+          <td class="item">${gearIcon(k.vWeap,'оружие жертвы')}${gearIcon(k.mount,'маунт: '+MOUNT_RU(k.mount))}
+            <div class="iname"><b>${k.victim}</b><span>${k.vGuild||'без гильдии'}${TRANSPORT_MOUNTS.some(m=>k.mount.includes(m))?' · '+MOUNT_RU(k.mount):''}</span></div></td>
+          <td>${k.ip||'—'}</td>
+          <td>${k.party>=5?'<b class="neg">'+k.party+'</b>':k.party>=3?'<b style="color:#e8a54b">'+k.party+'</b>':k.party}</td>
+          <td>${fmt(k.fame)}</td>
+          <td class="item">${gearIcon(k.kWeap,'оружие убийцы')}<div class="iname"><b>${k.killer}</b><span>${k.kGuild||'без гильдии'}</span></div></td></tr>`;
       });
       out+='</table>';
-    } else out+='<br><br><span class="pos">В выборке нет убитых транспортников — на дорогах спокойно.</span>';
+      if(list.length>25) out+=`<span class="fresh">Показаны 25 из ${list.length} — жми ⟳ для свежих.</span>`;
+    } else out+='<br><span class="pos">По текущему фильтру килов нет — на дорогах спокойно.</span>';
     out+='<br><span style="color:var(--muted);font-size:11.5px">⚠ Киллборд не отдаёт зону убийства, поэтому это общий пульс сервера, а не конкретно дороги в Карлеон. Светофор — ориентир, глаза на миникарте он не заменяет.</span>';
   }
   out+='</div></div>';
