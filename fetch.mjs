@@ -7,11 +7,11 @@ const API = 'https://europe.albion-online-data.com/api/v2/stats';
 const CITIES = ['Martlock','Bridgewatch','Lymhurst','Fort Sterling','Thetford','Caerleon','Brecilien'];
 const CITY_IDX = Object.fromEntries(CITIES.map((c,i)=>[c,i]));
 const HIST_DAYS = 7;
-const PRICE_BATCH = 120;
-const HIST_BATCH = 40;
-const DELAY_MS = 120;
-const RETRIES = 3;
-const CONCURRENCY = 4;
+const PRICE_BATCH = 80;
+const HIST_BATCH = 25;
+const DELAY_MS = 350;
+const RETRIES = 5;
+const CONCURRENCY = 2;
 
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 const chunks = (a,n) => { const o=[]; for(let i=0;i<a.length;i+=n) o.push(a.slice(i,i+n)); return o; };
@@ -43,13 +43,15 @@ async function getJSON(url){
       const timer = setTimeout(()=>ctl.abort(), 60000);
       const r = await fetch(url, {signal: ctl.signal, headers:{'User-Agent':'albion-craft-profit-builder'}});
       clearTimeout(timer);
-      if(r.status===429 || r.status>=500) throw new Error('HTTP '+r.status);
+      if(r.status===429 || r.status===403 || r.status>=500){
+        const e=new Error('HTTP '+r.status); e.rate=true; throw e;
+      }
       if(!r.ok) throw new Error('HTTP '+r.status);
       okCount++;
       return await r.json();
     }catch(e){
       if(attempt===RETRIES){ failCount++; console.warn('FAIL', e.message, url.slice(0,110)); return null; }
-      await sleep(1500*attempt);
+      await sleep((e.rate ? 4000 : 1500) * attempt); // лимит запросов — ждём дольше
     }
   }
   return null;
