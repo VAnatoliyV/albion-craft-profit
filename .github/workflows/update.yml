@@ -1,0 +1,67 @@
+name: Update market data
+
+on:
+  schedule:
+    # каждые 20 минут (GitHub может задерживать запуск на 5-30 мин при нагрузке)
+    - cron: '*/20 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Собрать цены с Albion Online Data Project
+        id: fetch
+        continue-on-error: true
+        run: node fetch.mjs
+
+      - name: Если сбор не удался — взять уже опубликованный снимок
+        if: steps.fetch.outcome != 'success'
+        run: |
+          echo "Сбор не удался, пробую сохранить прежние данные с сайта"
+          curl -sfL --retry 2 -o data.json \
+            "https://vanatoliyv.github.io/albion-craft-profit/data.json" || true
+          if [ -s data.json ]; then echo "Взят прежний снимок ($(wc -c < data.json) байт)"; else echo "Прежнего снимка нет"; fi
+
+      - name: Собрать сайт
+        run: |
+          mkdir -p public
+          cp index.html items.json public/
+          [ -f data.json ] && cp data.json public/ || echo "data.json отсутствует — сайт уйдёт в режим прямого опроса API"
+          [ -f data-stats.json ] && cp data-stats.json public/ || true
+          touch public/.nojekyll
+          ls -lh public/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
