@@ -390,6 +390,16 @@ async function pool(tasks, onOne){
 async function loadAll(force){
   if(force){ try{ Object.keys(localStorage).filter(k=>k.startsWith('acp_')).forEach(k=>localStorage.removeItem(k)); }catch(e){} }
   document.body.classList.add('loading');
+  // проба прямого доступа: не сидим на прокси вечно, если блокировка ушла
+  if(apiRoute>0){
+    try{
+      const r = await fetchTO(`${API}/prices/T4_BAG.json?locations=Caerleon&qualities=1`, 4000);
+      if(r.ok){ apiRoute=0; try{localStorage.setItem('acp_route','0')}catch(e){} }
+    }catch(e){}
+  }
+  // через прокси — батчи мельче: бесплатные зеркала режут длинные URL и большие ответы
+  const HB = apiRoute>0 ? 20 : CFG.histBatch;
+  const PB = apiRoute>0 ? 60 : CFG.priceBatch;
   S.loaded=false; S.matPrices={}; S.cityPrices={}; S.bm={};
   const st=$('status'), pg=$('prog');
   const itemIds = [...DATA.items.map(i=>i.id), ...(DATA.ench3Ids||[])];
@@ -397,7 +407,7 @@ async function loadAll(force){
   const tasks=[];
   // объёмы продаж готовых ресурсов на рынках городов (для вкладки «Переработка»)
   const refIds = (DATA.refining||[]).map(r=>r.id);
-  for(const ch of chunks(refIds, CFG.histBatch)){
+  for(const ch of chunks(refIds, HB)){
     tasks.push(async ()=>{
       const d = await fetchJSON(`${API}/history/${enc(ch.join(','))}.json?locations=${enc(CITIES.join(','))}&time-scale=24`);
       const cutoff = Date.now() - CFG.histDays*864e5;
@@ -417,7 +427,7 @@ async function loadAll(force){
   const jFullIds = [];
   for(const arch of ['WARRIOR','HUNTER','MAGE','TOOLMAKER'])
     for(const t of [4,5,6]) jFullIds.push(`T${t}_JOURNAL_${arch}_FULL`);
-  for(const ch of chunks([...matIds, ...DATA.arts, ...jFullIds], CFG.priceBatch)){
+  for(const ch of chunks([...matIds, ...DATA.arts, ...jFullIds], PB)){
     tasks.push(async ()=>{
       const d = await fetchJSON(`${API}/prices/${enc(ch.join(','))}.json?locations=${enc(CITIES.join(','))}&qualities=1`);
       for(const e of d){ if(!e.sell_price_min) continue;
@@ -425,7 +435,7 @@ async function loadAll(force){
     });
   }
   // 2) цены предметов на рынках городов, все качества (канал продажи + покупка для флипа)
-  for(const ch of chunks(itemIds, CFG.priceBatch)){
+  for(const ch of chunks(itemIds, PB)){
     tasks.push(async ()=>{
       const d = await fetchJSON(`${API}/prices/${enc(ch.join(','))}.json?locations=${enc(CITIES.join(','))}`);
       for(const e of d){ if(!e.sell_price_min) continue;
@@ -434,7 +444,7 @@ async function loadAll(force){
     });
   }
   // 3) история ЧР: средняя сделок и объём по каждому качеству (1–5)
-  for(const ch of chunks(itemIds, CFG.histBatch)){
+  for(const ch of chunks(itemIds, HB)){
     tasks.push(async ()=>{
       const d = await fetchJSON(`${API}/history/${enc(ch.join(','))}.json?locations=${enc('Black Market')}&time-scale=24`);
       const cutoff = Date.now() - CFG.histDays*864e5;
@@ -469,6 +479,8 @@ async function loadAll(force){
     pg.style.width='0';
   } else if(res.fail>0){
     st.textContent = `⚠ Данные загружены частично: ${res.ok} из ${res.total} запросов прошли — часть предметов может отсутствовать. Нажми «⟳ Обновить» для повтора${viaProxy}`;
+  } else if(Object.keys(S.bm).length===0){
+    st.textContent = `⚠ Цены рынков загружены, но история чёрного рынка (объёмы, средние сделок) не пришла — поэтому нет колонок «Объём» и «Пул», а канал везде городской. Нажми «⟳ Обновить»${viaProxy}`;
   } else {
     st.textContent = `Данные загружены · предметов в базе: ${DATA.items.length} · обновлено ${new Date().toLocaleTimeString('ru-RU')}${viaProxy}`;
   }
