@@ -1276,46 +1276,54 @@ const RE_GEAR = /_(2H|MAIN|OFF)_|_HEAD_|_ARMOR_|_SHOES_|_BAG(@|$)|CAPEITEM|_CAPE
 const RE_TOOL = /_TOOL_/;
 const RE_RAW = /_(ORE|HIDE|FIBER|WOOD|ROCK)(_LEVEL\d)?(@\d)?$/;
 const RE_REFINED = /_(METALBAR|LEATHER|CLOTH|PLANKS|STONEBLOCK)(_LEVEL\d)?(@\d)?$/;
+const RE_STONE = /_(RUNE|SOUL|RELIC|SHARD_AVALONIAN)(@\d)?$/; // руны/души/реликты: ЧР их не принимает — это лут или рыночный груз
 function classifyKill(k){
   if(k._cls) return k._cls;
-  let gear=0, tools=0, raw=0, refined=0, ench=0, maxDup=0;
+  let gear=0, tools=0, raw=0, refined=0, stones=0, ench=0, maxDup=0;
+  let distinct=0, singles=0, dupUnits=0, enchDup=0;
   for(const i of k.inv){
     if(RE_TOOL.test(i.t)) tools+=i.c;
     else if(RE_RAW.test(i.t)) raw+=i.c;
     else if(RE_REFINED.test(i.t)) refined+=i.c;
+    else if(RE_STONE.test(i.t)) stones+=i.c;
     else if(RE_GEAR.test(i.t)){
-      gear+=i.c; maxDup=Math.max(maxDup,i.c);
+      gear+=i.c; distinct++; maxDup=Math.max(maxDup,i.c);
+      if(i.c===1) singles++;
+      if(i.c>=3){ dupUnits+=i.c; if(/@[123]/.test(i.t)) enchDup+=i.c; }
       if(/@[123]/.test(i.t)) ench+=i.c;
     }
   }
-  const res = raw+refined;
+  const res = raw+refined+stones;
   // анализ сета жертвы: раннер или боевой билд?
   const RUNNER_W = /DAGGER|DOUBLEBLADEDSTAFF|MAIN_SWORD|QUARTERSTAFF/; // кровопускатель, кинжалы, мечик, шест
   const COMBAT_W = /HOLYSTAFF|NATURESTAFF|ARCANESTAFF|FIRESTAFF|FROSTSTAFF|CURSEDSTAFF|BOW|CROSSBOW|SPEAR|HAMMER|KNUCKLES|SHAPESHIFTER/;
   const runnerKit = (!k.vWeap || RUNNER_W.test(k.vWeap) ? 1:0) + (/INVIS|GIGANT/.test(k.potion)?1:0) + (k.bag?1:0);
   const combatSet = COMBAT_W.test(k.vWeap);
   let cat, why;
+  const dupShare = gear>0 ? dupUnits/gear : 0;
   if(tools>0 && gear<5){ cat='gatherer'; why=`инструменты ×${tools}, сырьё ×${raw} — собиратель/фермер, не ЧР`; }
-  else if(res>=10 && res>gear){ cat='resources'; why=`ресурсы ×${res} — возил сырьё/материалы (ЧР их не принимает), скорее на рынок/переработку`; }
-  else if(gear>=4 || (gear>=2 && (maxDup>=2 || ench>0))){
-    // боевой сет без единого раннерского признака и с небольшим грузом — вряд ли ЧР-раннер
-    if(combatSet && runnerKit===0 && gear<10 && maxDup<3){
-      cat='other';
-      why=`шмотки ×${gear}, но сет боевой (${k.vWeap.replace(/^T\d_/,'')}) без сумки/инвиза — похоже на обычного игрока с запаской, а не ЧР-раннера`;
-      k._cls={cat, why, conf:0, gear, res, tools};
-      return k._cls;
-    }
+  else if(res>=10 && res>dupUnits){ cat='resources'; why=`ресурсы/камни ×${res}${stones?' (руны/души/реликты ×'+stones+')':''} — ЧР это не принимает: лут или груз на обычный рынок`; }
+  // ЧР-партия = стопки одинакового: минимум одна стопка от 3 шт и стопки составляют большинство груза
+  else if(dupUnits>=6 && maxDup>=3 && dupShare>=0.6 && tools===0){
     cat='bm';
-    let conf = (maxDup>=3?1:0)+(ench>0?1:0)+(gear>=10?1:0)+runnerKit;
-    if(combatSet){ conf-=2; }
+    let conf = (maxDup>=10?1:0)+(dupShare>=0.85?1:0)+(enchDup>0?1:0)+Math.min(2,runnerKit);
+    if(combatSet) conf-=2;
+    if(singles>=5) conf-=1;   // много разносортицы рядом со стопками — сомнительно
+    if(stones>0) conf-=1;     // руны в грузе — примесь лута
     conf=Math.max(0,Math.min(4,conf));
-    why=`шмотки ×${gear}${maxDup>=2?', стопки одинаковых ×'+maxDup:''}${ench?', зачарованные ×'+ench:''}`+
+    why=`стопки одинаковых шмоток: макс ×${maxDup}, в стопках ${dupUnits} из ${gear}${enchDup?', зачарованные в стопках ×'+enchDup:''}`+
       `${k.bag?', сумка':''}${/INVIS|GIGANT/.test(k.potion)?', зелье побега':''}`+
       `${!k.vWeap?', без оружия (типично для раннера)':RUNNER_W.test(k.vWeap)?', раннерское оружие':''}`+
-      `${combatSet?' · НО сет боевой ('+k.vWeap.replace(/^T\d_/,'')+') — уверенность снижена':''}`+
-      ` — вероятный ЧР-ран`;
+      `${combatSet?' · НО сет боевой — уверенность снижена':''}`+
+      `${singles>=5?' · рядом разносортица ×'+singles+' — возможно, с лутом':''}`+
+      ` — похоже на крафт-партию для ЧР`;
     k._cls={cat, why, conf, gear, res, tools};
     return k._cls;
+  }
+  else if(gear>=4){
+    // шмота много, но всё по одной штуке — лут с опена или запасные сетапы, не ЧР-партия
+    cat='other';
+    why=`шмот разный, по 1–2 штуки (${distinct} позиций, макс стопка ×${maxDup})${stones?' + руны/камни ×'+stones:''} — похоже на лут или сетапы для опена, а не крафт-партию для ЧР`;
   }
   else { cat='other'; why=k.inv.length?`в грузе нечего везти на ЧР (шмоток ×${gear}, ресурсов ×${res})`:'инвентарь пуст — обычный игрок'; }
   k._cls={cat, why, conf:0, gear, res, tools};
@@ -1389,7 +1397,7 @@ function roadsHTML(){
     // фильтры: кого показываем
     const mode = S.roads.mode||'bm', minP = S.roads.minParty||1;
     out+=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0">
-      <label class="ctl">Кто это был<span class="help" title="Классификация по СОСТАВУ ГРУЗА. Ключ: чёрный рынок принимает только экипировку.&#10;&#10;🖤 Вёз на ЧР — в инвентаре стопки крафтовых шмоток (часто одинаковых, часто зачарованных), без инструментов и сырья. Звёзды = уверенность (стопки, зачарования, сумка, инвиз).&#10;&#10;⛏ Собиратель — инструменты и сырьё в грузе: возвращался со сбора (чёрные земли и т.п.), к ЧР отношения не имеет.&#10;&#10;📦 Ресурсовоз — стопки руды/брусков/кожи: вёз на рынок или переработку, ЧР это не принимает.&#10;&#10;⚔ Просто игрок — нечего было везти.&#10;&#10;Наведи на чип в строке — увидишь объяснение.">?</span>
+      <label class="ctl">Кто это был<span class="help" title="Классификация по СОСТАВУ ГРУЗА. Ключ: ЧР принимает только экипировку, а перевозчик везёт СТОПКИ ОДИНАКОВОГО (крафт-партии).&#10;&#10;🖤 Вёз на ЧР — стопки одинаковых шмоток (от 3 шт одной позиции, и стопки составляют большинство груза). Разносортица по 1 шт, руны/души/реликты и опен-сетапы сюда НЕ попадают.&#10;&#10;⛏ Собиратель — инструменты и сырьё: возвращался со сбора.&#10;&#10;📦 Ресурсовоз — руда/бруски/кожа/руны-души-реликты: ЧР это не принимает, груз на обычный рынок.&#10;&#10;⚔ Просто игрок — пустой инвентарь, лут вразнобой или запасные сетапы.&#10;&#10;Наведи на чип в строке — увидишь объяснение.">?</span>
         <select id="roadsMode">
           <option value="bm"${mode==='bm'?' selected':''}>🖤 Везли на чёрный рынок</option>
           <option value="resources"${mode==='resources'?' selected':''}>📦 Ресурсовозы</option>
@@ -1404,7 +1412,7 @@ function roadsHTML(){
           <option value="3"${minP==3?' selected':''}>3</option>
           <option value="5"${minP==5?' selected':''}>5</option>
         </select></label>
-      <span class="ctl" style="cursor:help" title="Звёзды у чипа «вёз на ЧР» — уверенность классификатора (0–4):&#10;&#10;+1 — стопки одинаковых шмоток (3 и больше одной позиции: так возят крафтеры, а не «запаску»)&#10;+1 — зачарованные предметы в грузе (.1/.2/.3 — типичный товар ЧР)&#10;+1 — груза много (10+ шмоток)&#10;+1..3 — раннерский кит: эскейп-оружие (кровопускатель/кинжалы/мечик/шест) или пустые руки, зелье инвиза/гиганта, сумка&#10;−2 — боевой сет (хил-посох, луки, огонь и т.п.): такой билд для перевозки нетипичен&#10;&#10;Без звёзд — груз похож на ЧР, но уверенности мало. ★★★★ — почти наверняка раздели ЧР-раннера.">★ что значат звёзды?</span>
+      <span class="ctl" style="cursor:help" title="Звёзды у чипа «вёз на ЧР» — уверенность (0–4). В категорию вообще попадают только грузы со стопками одинаковых шмоток (от 3 шт, стопки — большинство груза). Дальше:&#10;&#10;+1 — жирные стопки (10+ одной позиции)&#10;+1 — почти весь груз в стопках (85%+, без примеси лута)&#10;+1 — зачарованные стопки (.1/.2/.3 — типичный товар ЧР)&#10;+1..2 — раннерский кит: эскейп-оружие или пустые руки, инвиз/гигантифай, сумка&#10;−2 — боевой сет (хил и т.п.)&#10;−1 — рядом со стопками разносортица по 1 шт (примесь лута)&#10;−1 — руны/души/реликты в грузе (лут, ЧР их не берёт)&#10;&#10;★★★★ — эталонный ЧР-раннер. Без звёзд — стопки есть, но много сомнений.">★ что значат звёзды?</span>
       <label class="ctl">Сортировка
         <select id="roadsSort">
           <option value="cargo"${(S.roads.sort||'cargo')==='cargo'?' selected':''}>по стоимости груза 💰</option>
