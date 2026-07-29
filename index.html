@@ -1220,6 +1220,7 @@ async function loadRoads(){
       vShoes: e.Victim?.Equipment?.Shoes?.Type||'',
       ip: Math.round(e.Victim?.AverageItemPower||0),
       inv: (e.Victim?.Inventory||[]).filter(Boolean).map(i=>({t:i.Type, c:i.Count||1})),
+      parts: (e.Participants||[]).map(p=>p?.Name).filter(Boolean).slice(0,8),
     }));
     S.roads.kills = S.roads.all.filter(k=>TRANSPORT_MOUNTS.some(m=>k.mount.includes(m)));
     S.roads.loaded=true; S.roads.at=Date.now();
@@ -1266,13 +1267,31 @@ function classifyKill(k){
     }
   }
   const res = raw+refined;
+  // анализ сета жертвы: раннер или боевой билд?
+  const RUNNER_W = /DAGGER|DOUBLEBLADEDSTAFF|MAIN_SWORD|QUARTERSTAFF/; // кровопускатель, кинжалы, мечик, шест
+  const COMBAT_W = /HOLYSTAFF|NATURESTAFF|ARCANESTAFF|FIRESTAFF|FROSTSTAFF|CURSEDSTAFF|BOW|CROSSBOW|SPEAR|HAMMER|KNUCKLES|SHAPESHIFTER/;
+  const runnerKit = (!k.vWeap || RUNNER_W.test(k.vWeap) ? 1:0) + (/INVIS|GIGANT/.test(k.potion)?1:0) + (k.bag?1:0);
+  const combatSet = COMBAT_W.test(k.vWeap);
   let cat, why;
   if(tools>0 && gear<5){ cat='gatherer'; why=`инструменты ×${tools}, сырьё ×${raw} — собиратель/фермер, не ЧР`; }
   else if(res>=10 && res>gear){ cat='resources'; why=`ресурсы ×${res} — возил сырьё/материалы (ЧР их не принимает), скорее на рынок/переработку`; }
   else if(gear>=4 || (gear>=2 && (maxDup>=2 || ench>0))){
+    // боевой сет без единого раннерского признака и с небольшим грузом — вряд ли ЧР-раннер
+    if(combatSet && runnerKit===0 && gear<10 && maxDup<3){
+      cat='other';
+      why=`шмотки ×${gear}, но сет боевой (${k.vWeap.replace(/^T\d_/,'')}) без сумки/инвиза — похоже на обычного игрока с запаской, а не ЧР-раннера`;
+      k._cls={cat, why, conf:0, gear, res, tools};
+      return k._cls;
+    }
     cat='bm';
-    const conf = (maxDup>=3?1:0)+(ench>0?1:0)+(gear>=10?1:0)+(/INVIS/.test(k.potion)?1:0)+(k.bag?1:0);
-    why=`шмотки ×${gear}${maxDup>=2?', стопки одинаковых ×'+maxDup:''}${ench?', зачарованные ×'+ench:''}${k.bag?', сумка':''}${/INVIS/.test(k.potion)?', инвиз-зелье':''} — профиль ЧР-раннера`;
+    let conf = (maxDup>=3?1:0)+(ench>0?1:0)+(gear>=10?1:0)+runnerKit;
+    if(combatSet){ conf-=2; }
+    conf=Math.max(0,Math.min(4,conf));
+    why=`шмотки ×${gear}${maxDup>=2?', стопки одинаковых ×'+maxDup:''}${ench?', зачарованные ×'+ench:''}`+
+      `${k.bag?', сумка':''}${/INVIS|GIGANT/.test(k.potion)?', зелье побега':''}`+
+      `${!k.vWeap?', без оружия (типично для раннера)':RUNNER_W.test(k.vWeap)?', раннерское оружие':''}`+
+      `${combatSet?' · НО сет боевой ('+k.vWeap.replace(/^T\d_/,'')+') — уверенность снижена':''}`+
+      ` — вероятный ЧР-ран`;
     k._cls={cat, why, conf, gear, res, tools};
     return k._cls;
   }
@@ -1401,13 +1420,16 @@ function roadsHTML(){
           cargo+=`<div class="fresh" style="margin-top:2px">${cv.items} предм. · <b style="color:${cv.sum>1e6?'var(--red)':cv.sum>2e5?'#e8a54b':'var(--muted)'}">${valTxt}</b></div>`;
         }
         const cls=classifyKill(k);
+        const setIcons = [ [k.vWeap,'оружие'],[k.vHead,'шлем'],[k.vArmor,'броня'],[k.vShoes,'обувь'],[k.cape,'плащ'],[k.bag,'сумка'],[k.mount,'маунт: '+MOUNT_RU(k.mount)] ]
+          .filter(x=>x[0]).map(x=>gearIcon(x[0],x[1])).join('');
         out+=`<tr><td style="white-space:nowrap">${ago<60?Math.round(ago)+' мин':(ago/60).toFixed(1)+' ч'}</td>
-          <td class="item">${gearIcon(k.vWeap,'оружие жертвы')}${gearIcon(k.mount,'маунт: '+MOUNT_RU(k.mount))}${k.bag?gearIcon(k.bag,'сумка'):''}
-            <div class="iname"><b>${k.victim}</b><span>${k.vGuild||'без гильдии'}<br><span title="${cls.why}">${CLS_CHIP[cls.cat](cls.conf)}</span></span></div></td>
+          <td class="item" style="display:table-cell">
+            <div style="display:flex;align-items:center;gap:8px"><div class="iname"><b>${k.victim}</b><span>${k.vGuild||'без гильдии'} · <span title="${cls.why}" style="cursor:help">${CLS_CHIP[cls.cat](cls.conf)}</span></span></div></div>
+            <div style="margin-top:3px">${setIcons}</div></td>
           <td class="item" style="display:table-cell;max-width:260px;white-space:normal">${cargo}</td>
           <td>${k.party>=5?'<b class="neg">'+k.party+'</b>':k.party>=3?'<b style="color:#e8a54b">'+k.party+'</b>':k.party}</td>
           <td>${k.fame>=5e5?'<b class="neg">'+fmt(k.fame)+'</b>':k.fame>=1e5?'<b style="color:#e8a54b">'+fmt(k.fame)+'</b>':fmt(k.fame)}</td>
-          <td class="item">${gearIcon(k.kWeap,'оружие убийцы')}<div class="iname"><b>${k.killer}</b><span>${k.kGuild||'без гильдии'}</span></div></td></tr>`;
+          <td class="item">${gearIcon(k.kWeap,'оружие убийцы')}<div class="iname"><b>${k.killer}</b><span>${k.kGuild||'без гильдии'}${k.parts&&k.parts.length>1?`<br><span title="${k.parts.join(', ')}" style="cursor:help">банда: ${k.parts.slice(0,3).join(', ')}${k.parts.length>3?' +'+(k.parts.length-3):''}</span>`:''}</span></div></td></tr>`;
       });
       out+='</table>';
       out+=`<span class="fresh">Стоимость груза — оценка по нашим ценам (ресурсы, шмотки Т4–Т6, камни); предметы вне базы (Т7+, еда и пр.) в сумму не входят — знак «+» значит, что реальный груз дороже.</span>`;
