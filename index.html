@@ -669,11 +669,13 @@ function bmExpected(bm, mode){
   return v ? s/v : null;
 }
 function compute(){
+  const TAB = S.tab||'craft';           // считаем только нужный раздел
+  const need = t => TAB===t;
   const focus=$('focusChk').checked, tax=$('premChk').checked?0.04:0.08;
   const citySel=$('citySel').value, qualMode=$('qualSel').value;
-  buildSelfCosts(focus);
+  if(need('craft')||need('ref')) buildSelfCosts(focus);
   const rows=[];
-  for(const it of DATA.items){
+  if(need('craft')) for(const it of DATA.items){
     const tryCities = citySel==='ALL' ? [BONUS_CITY_OF[it.cat]].filter(Boolean) : [citySel];
     for(const city of tryCities){
       const cc = craftCostIn(it, city, focus);
@@ -711,6 +713,7 @@ function compute(){
   S.rows=rows;
   // флиппинг → ЧР: купить в любом городе (или выбранном), продать на чёрный рынок
   const flip=[];
+  if(need('flip')){
   const fCities = citySel==='ALL'
     ? [...new Set([...routeCities(),'Caerleon'])] // Карлеон всегда в списке: там сам ЧР, перевозки ноль
     : [citySel];
@@ -735,9 +738,11 @@ function compute(){
         pool:bq.vol*Math.max(net,0), real:Math.max(net,0)*bq.vol*CFG.marketShare, stale, warn});
     }
   }
+  }
   S.flipRows=flip;
   // флиппинг между городами: купить в самом дешёвом городе → продать в самом дорогом
   const cflip=[];
+  if(need('cityflip'))
   for(const it of DATA.items){
     const cp = S.cityPrices[it.id]; if(!cp) continue;
     for(let q=1;q<=5;q++){
@@ -766,6 +771,7 @@ function compute(){
   S.cityFlipRows=cflip;
   // переработка
   const refRows=[];
+  if(need('ref')){
   const refMode = $('refModeSel') ? $('refModeSel').value : 'local';
   const fee100 = +$('feeInp').value||0;
   if(refMode==='local'){
@@ -851,12 +857,13 @@ function compute(){
         real: vol!=null?Math.max(best.net,0)*vol*CFG.marketShare:0, warn});
     }
   }
+  }
   S.refRows=refRows;
   // рунофикация: купить шмотку + камни (руны/души/реликты) → поднять зачарование → продать на ЧР
   // выбран конкретный город — покупаем шмотку и камни только в нём; «Все города» — ищем где дешевле
   const enchRows=[];
   const rcs = citySel==='ALL' ? routeCities() : [citySel];
-  for(const it of DATA.items){
+  if(need('ench')) for(const it of DATA.items){
     const base = it.id.split('@')[0];
     const up = (DATA.upgrades||{})[base]?.[it.ench+1];
     if(!up) continue;
@@ -1034,7 +1041,11 @@ function render(){
   let html='<table><thead><tr>'+cols.map(([k,t])=>
     `<th class="${k==='item'?'item':''}" data-k="${k}"${COL_TIPS[k]?` title="${COL_TIPS[k]}"`:''}>${t}${COL_TIPS[k]?'<span class="help">?</span>':''}${key===k?(dir<0?' ↓':' ↑'):''}</th>`).join('')+'</tr></thead><tbody>';
   const qualMode = $('qualSel').value;
-  rows.slice(0,400).forEach((r,i)=>{
+  const isMobile = (window.matchMedia && window.matchMedia('(max-width: 768px)').matches);
+  const STEP = isMobile ? 50 : 150;
+  if(!S.limit) S.limit = STEP;
+  const shown = Math.min(S.limit, rows.length);
+  rows.slice(0, shown).forEach((r,i)=>{
     const it=r.it;
     const topBadge = S.gold&&i<10?'<span class="badge b-top" title="Топ-10 «Золотой середины»: лучший баланс маржи и объёма продаж среди позиций со свежими данными. Сортировка — по реалистичному профиту в день (профит со штуки × 25% дневного объёма рынка).">ТОП</span>':'';
     const staleBadge = r.stale>CFG.staleHours?'<span class="badge b-stale">старые данные</span>':'';
@@ -1102,8 +1113,12 @@ function render(){
     }
   });
   html+='</tbody></table>';
+  if(rows.length>shown) html+=`<div style="text-align:center;margin:12px 0">
+      <button id="moreBtn">Показать ещё ${Math.min(STEP, rows.length-shown)} из ${rows.length-shown}</button>
+      <div class="fresh" style="margin-top:4px">Показано ${shown} из ${rows.length} — так страница не грузит телефон</div></div>`;
   if(!rows.length) html='<div style="color:var(--muted);padding:30px">Ничего не найдено — ослабь фильтры или дождись загрузки данных.</div>';
   wrap.innerHTML=html;
+  { const mb=$('moreBtn'); if(mb) mb.onclick=()=>{ S.limit=(S.limit||0)+STEP; render(); }; }
   wrap.querySelectorAll('th').forEach(th=>th.onclick=()=>{
     const k=th.dataset.k; if(!k) return;
     if(S.sortKey===k) S.sortDir*=-1; else {S.sortKey=k; S.sortDir=-1;}
@@ -1588,8 +1603,8 @@ function roadsHTML(){
 }
 // ─── События ───
 ['citySel','focusChk','premChk','feeInp','qualSel'].forEach(id=>$(id).onchange=()=>{ compute(); render(); });
-['searchInp','minMargin','minVol'].forEach(id=>$(id).oninput=()=>render());
-['catSel','tierSel','enchSel','ageSel'].forEach(id=>$(id).onchange=()=>render());
+['searchInp','minMargin','minVol'].forEach(id=>$(id).oninput=()=>{ S.limit=0; render(); });
+['catSel','tierSel','enchSel','ageSel'].forEach(id=>$(id).onchange=()=>{ S.limit=0; render(); });
 // автообновление: интервал управляется селектором в шапке
 let refTimer = null;
 function setupRefresh(){
@@ -1619,6 +1634,8 @@ function setTab(t){
   for(const id of ALL_WRAPS){ const w=$(id); if(w) w.style.display = vis.includes(id)?'':'none'; }
   const flt=$('filters'); if(flt) flt.style.display = t==='roads'?'none':'';
   if(t==='roads' && !S.roads.loaded && !S.roads.loading) loadRoads(); // ленивая загрузка при входе
+  S.limit = 0; // сбросить порцию строк
+  if(S.loaded && t!=='roads') compute();
   render();
 }
 $('refModeSel').onchange=()=>{ compute(); render(); };
