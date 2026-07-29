@@ -1247,6 +1247,45 @@ function cargoValue(k){
   k._val={sum, unknown, items:k.inv.reduce((a,i)=>a+i.c,0)};
   return k._val;
 }
+// классификация груза: кто это был? ЧР принимает ТОЛЬКО экипировку —
+// поэтому стопки шмоток без инструментов/ресурсов = почти наверняка вёз на чёрный рынок
+const RE_GEAR = /_(2H|MAIN|OFF)_|_HEAD_|_ARMOR_|_SHOES_|_BAG(@|$)|CAPEITEM|_CAPE(@|$)/;
+const RE_TOOL = /_TOOL_/;
+const RE_RAW = /_(ORE|HIDE|FIBER|WOOD|ROCK)(_LEVEL\d)?(@\d)?$/;
+const RE_REFINED = /_(METALBAR|LEATHER|CLOTH|PLANKS|STONEBLOCK)(_LEVEL\d)?(@\d)?$/;
+function classifyKill(k){
+  if(k._cls) return k._cls;
+  let gear=0, tools=0, raw=0, refined=0, ench=0, maxDup=0;
+  for(const i of k.inv){
+    if(RE_TOOL.test(i.t)) tools+=i.c;
+    else if(RE_RAW.test(i.t)) raw+=i.c;
+    else if(RE_REFINED.test(i.t)) refined+=i.c;
+    else if(RE_GEAR.test(i.t)){
+      gear+=i.c; maxDup=Math.max(maxDup,i.c);
+      if(/@[123]/.test(i.t)) ench+=i.c;
+    }
+  }
+  const res = raw+refined;
+  let cat, why;
+  if(tools>0 && gear<5){ cat='gatherer'; why=`инструменты ×${tools}, сырьё ×${raw} — собиратель/фермер, не ЧР`; }
+  else if(res>=10 && res>gear){ cat='resources'; why=`ресурсы ×${res} — возил сырьё/материалы (ЧР их не принимает), скорее на рынок/переработку`; }
+  else if(gear>=4 || (gear>=2 && (maxDup>=2 || ench>0))){
+    cat='bm';
+    const conf = (maxDup>=3?1:0)+(ench>0?1:0)+(gear>=10?1:0)+(/INVIS/.test(k.potion)?1:0)+(k.bag?1:0);
+    why=`шмотки ×${gear}${maxDup>=2?', стопки одинаковых ×'+maxDup:''}${ench?', зачарованные ×'+ench:''}${k.bag?', сумка':''}${/INVIS/.test(k.potion)?', инвиз-зелье':''} — профиль ЧР-раннера`;
+    k._cls={cat, why, conf, gear, res, tools};
+    return k._cls;
+  }
+  else { cat='other'; why=k.inv.length?`в грузе нечего везти на ЧР (шмоток ×${gear}, ресурсов ×${res})`:'инвентарь пуст — обычный игрок'; }
+  k._cls={cat, why, conf:0, gear, res, tools};
+  return k._cls;
+}
+const CLS_CHIP = {
+  bm:      c=>`<span class="badge b-top" style="cursor:help">🖤 вёз на ЧР${c>=3?' ★★★':c>=2?' ★★':c>=1?' ★':''}</span>`,
+  gatherer:()=>`<span class="badge b-bonus" style="cursor:help">⛏ собиратель</span>`,
+  resources:()=>`<span class="badge b-ch" style="cursor:help">📦 ресурсовоз</span>`,
+  other:   ()=>`<span class="badge" style="cursor:help;background:var(--panel3);color:var(--muted)">⚔ просто игрок</span>`,
+};
 // «индекс перевозчика»: насколько жертва похожа на транспортёра с грузом (по мета-сетапам)
 function haulerScore(k){
   if(k._hs!==undefined) return k._hs;
@@ -1306,13 +1345,14 @@ function roadsHTML(){
     out+=`<div class="light-big"><b class="${lightCls}">${light}</b> <span style="font-size:14px;color:var(--muted)">— транспортников убито за последний час: <b style="color:var(--text)">${k60}</b></span></div>`;
     out+=`<span style="color:var(--muted);font-size:12px">Анализ последних ${r.fetched} килов сервера (охват ~${span<1?'меньше часа':span.toFixed(1)+' ч'}), из них на транспортных маунтах: ${r.kills.length}. Обновлено ${new Date(r.at).toLocaleTimeString('ru-RU')}.</span>`;
     // фильтры: кого показываем
-    const mode = S.roads.mode||'hauler', minP = S.roads.minParty||1;
+    const mode = S.roads.mode||'bm', minP = S.roads.minParty||1;
     out+=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0">
-      <label class="ctl">Показывать<span class="help" title="Перевозчики (индекс) — умный фильтр по мета-сетапам транспортёров: транспортный маунт, сумки, эскейп-оружие (Bloodletter/Double Bladed), собирательский гер, плащ Тетфорда/Бресильена, зелья побега, шмотки или дорогой груз в инвентаре. Наведи на «индекс N» в строке — увидишь, за что начислены баллы.">?</span>
+      <label class="ctl">Кто это был<span class="help" title="Классификация по СОСТАВУ ГРУЗА. Ключ: чёрный рынок принимает только экипировку.&#10;&#10;🖤 Вёз на ЧР — в инвентаре стопки крафтовых шмоток (часто одинаковых, часто зачарованных), без инструментов и сырья. Звёзды = уверенность (стопки, зачарования, сумка, инвиз).&#10;&#10;⛏ Собиратель — инструменты и сырьё в грузе: возвращался со сбора (чёрные земли и т.п.), к ЧР отношения не имеет.&#10;&#10;📦 Ресурсовоз — стопки руды/брусков/кожи: вёз на рынок или переработку, ЧР это не принимает.&#10;&#10;⚔ Просто игрок — нечего было везти.&#10;&#10;Наведи на чип в строке — увидишь объяснение.">?</span>
         <select id="roadsMode">
-          <option value="hauler"${mode==='hauler'?' selected':''}>Перевозчики (индекс)</option>
-          <option value="transport"${mode==='transport'?' selected':''}>Только транспортные маунты</option>
-          <option value="gank"${mode==='gank'?' selected':''}>Ганки (3+ на одного)</option>
+          <option value="bm"${mode==='bm'?' selected':''}>🖤 Везли на чёрный рынок</option>
+          <option value="resources"${mode==='resources'?' selected':''}>📦 Ресурсовозы</option>
+          <option value="gatherer"${mode==='gatherer'?' selected':''}>⛏ Собиратели</option>
+          <option value="cargo"${mode==='cargo'?' selected':''}>Все с грузом</option>
           <option value="all"${mode==='all'?' selected':''}>Все килы</option>
         </select></label>
       <label class="ctl">Ганкеров ≥
@@ -1329,9 +1369,9 @@ function roadsHTML(){
           <option value="time"${S.roads.sort==='time'?' selected':''}>по времени</option>
         </select></label>
     </div>`;
-    let list = mode==='hauler' ? r.all.filter(k=>haulerScore(k).s>=4)
-      : mode==='transport' ? r.kills
-      : mode==='gank' ? r.all.filter(k=>k.party>=3) : r.all;
+    let list = mode==='all' ? r.all
+      : mode==='cargo' ? r.all.filter(k=>['bm','resources','gatherer'].includes(classifyKill(k).cat))
+      : r.all.filter(k=>classifyKill(k).cat===mode);
     list = list.filter(k=>k.party>=minP);
     const srt = S.roads.sort||'cargo';
     if(srt==='cargo') list=[...list].sort((a,b)=>(cargoValue(b).sum+haulerScore(b).s*1e4)-(cargoValue(a).sum+haulerScore(a).s*1e4));
@@ -1360,10 +1400,10 @@ function roadsHTML(){
           const valTxt = cv.sum>0 ? `~${fmt(cv.sum)}${cv.unknown?'+':''} серебра` : (cv.unknown?'цены неизвестны':'');
           cargo+=`<div class="fresh" style="margin-top:2px">${cv.items} предм. · <b style="color:${cv.sum>1e6?'var(--red)':cv.sum>2e5?'#e8a54b':'var(--muted)'}">${valTxt}</b></div>`;
         }
-        const hs=haulerScore(k);
+        const cls=classifyKill(k);
         out+=`<tr><td style="white-space:nowrap">${ago<60?Math.round(ago)+' мин':(ago/60).toFixed(1)+' ч'}</td>
           <td class="item">${gearIcon(k.vWeap,'оружие жертвы')}${gearIcon(k.mount,'маунт: '+MOUNT_RU(k.mount))}${k.bag?gearIcon(k.bag,'сумка'):''}
-            <div class="iname"><b>${k.victim}</b><span>${k.vGuild||'без гильдии'} · <span title="${hs.why}" style="cursor:help;color:${hs.s>=7?'var(--red)':hs.s>=4?'#e8a54b':'var(--muted)'}">индекс ${hs.s}</span></span></div></td>
+            <div class="iname"><b>${k.victim}</b><span>${k.vGuild||'без гильдии'}<br><span title="${cls.why}">${CLS_CHIP[cls.cat](cls.conf)}</span></span></div></td>
           <td class="item" style="display:table-cell;max-width:260px;white-space:normal">${cargo}</td>
           <td>${k.party>=5?'<b class="neg">'+k.party+'</b>':k.party>=3?'<b style="color:#e8a54b">'+k.party+'</b>':k.party}</td>
           <td>${k.fame>=5e5?'<b class="neg">'+fmt(k.fame)+'</b>':k.fame>=1e5?'<b style="color:#e8a54b">'+fmt(k.fame)+'</b>':fmt(k.fame)}</td>
