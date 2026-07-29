@@ -1393,6 +1393,12 @@ function roadsHTML(){
     const light = k60>=8?'🔴 ОЧЕНЬ ОПАСНО':k60>=3?'🟡 НЕСПОКОЙНО':'🟢 ОТНОСИТЕЛЬНО ТИХО';
     const lightCls = k60>=8?'neg':k60>=3?'':'pos';
     out+=`<div class="light-big"><b class="${lightCls}">${light}</b> <span style="font-size:14px;color:var(--muted)">— транспортников убито за последний час: <b style="color:var(--text)">${k60}</b></span></div>`;
+    // разбивка транспортников по классификации, чтобы светофор не путал с фильтром таблицы
+    {
+      const bk={bm:0,resources:0,gatherer:0,other:0};
+      r.kills.forEach(k=>{ bk[classifyKill(k).cat]++; });
+      out+=`<div style="color:var(--muted);font-size:12.5px;margin:-4px 0 6px">Из всех транспортников в выборке (${r.kills.length}): 🖤 везли на ЧР — <b style="color:var(--text)">${bk.bm}</b> · 📦 ресурсы/камни — ${bk.resources} · ⛏ собиратели — ${bk.gatherer} · ⚔ прочее — ${bk.other}. Светофор считается по всем транспортникам, а таблица ниже — только по выбранному фильтру.</div>`;
+    }
     out+=`<span style="color:var(--muted);font-size:12px">Анализ последних ${r.fetched} килов сервера (охват ~${span<1?'меньше часа':span.toFixed(1)+' ч'}), из них на транспортных маунтах: ${r.kills.length}. Обновлено ${new Date(r.at).toLocaleTimeString('ru-RU')}.</span>`;
     // фильтры: кого показываем
     const mode = S.roads.mode||'bm', minP = S.roads.minParty||1;
