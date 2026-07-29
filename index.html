@@ -876,6 +876,7 @@ function render(){
     const rb=$('roadsReload'); if(rb) rb.onclick=()=>{ S.roads.loaded=false; loadRoads(); };
     const rm=$('roadsMode'); if(rm) rm.onchange=()=>{ S.roads.mode=rm.value; render(); };
     const rp=$('roadsParty'); if(rp) rp.onchange=()=>{ S.roads.minParty=+rp.value; render(); };
+    const rs=$('roadsSort'); if(rs) rs.onchange=()=>{ S.roads.sort=rs.value; render(); };
     return;
   }
   if(!S.loaded){
@@ -1212,12 +1213,33 @@ async function loadRoads(){
       vWeap: e.Victim?.Equipment?.MainHand?.Type||'',
       kWeap: e.Killer?.Equipment?.MainHand?.Type||'',
       ip: Math.round(e.Victim?.AverageItemPower||0),
+      inv: (e.Victim?.Inventory||[]).filter(Boolean).map(i=>({t:i.Type, c:i.Count||1})),
     }));
     S.roads.kills = S.roads.all.filter(k=>TRANSPORT_MOUNTS.some(m=>k.mount.includes(m)));
     S.roads.loaded=true; S.roads.at=Date.now();
   }catch(e){ S.roads.err = 'Не удалось загрузить киллборд ('+e.message+'). Возможно, API недоступен из твоей сети — попробуй «Обновить» или VPN.'; }
   S.roads.loading=false;
   if(S.tab==='roads') render();
+}
+// оценка стоимости груза по известным нам ценам (ресурсы, шмотки, камни)
+function anyPrice(t){
+  const byCity = S.matPrices[t];
+  if(byCity){ let m=Infinity; for(const v of Object.values(byCity)) m=Math.min(m,v.price); if(isFinite(m)) return m; }
+  const cp = S.cityPrices[t];
+  if(cp){ let m=Infinity; for(const byQ of Object.values(cp)){ const v=byQ[1]; if(v) m=Math.min(m,v.sell); } if(isFinite(m)) return m; }
+  const bm = S.bm[t];
+  if(bm && bm.qs[1]) return bm.qs[1].price;
+  return null;
+}
+function cargoValue(k){
+  if(k._val!==undefined) return k._val;
+  let sum=0, unknown=0;
+  for(const it of k.inv){
+    const p=anyPrice(it.t);
+    if(p!=null) sum+=p*it.c; else unknown+=it.c;
+  }
+  k._val={sum, unknown, items:k.inv.reduce((a,i)=>a+i.c,0)};
+  return k._val;
 }
 function banditInfo(){
   const now=new Date();
@@ -1275,9 +1297,19 @@ function roadsHTML(){
           <option value="3"${minP==3?' selected':''}>3</option>
           <option value="5"${minP==5?' selected':''}>5</option>
         </select></label>
+      <label class="ctl">Сортировка
+        <select id="roadsSort">
+          <option value="cargo"${(S.roads.sort||'cargo')==='cargo'?' selected':''}>по стоимости груза 💰</option>
+          <option value="fame"${S.roads.sort==='fame'?' selected':''}>по фейму (жирные килы)</option>
+          <option value="time"${S.roads.sort==='time'?' selected':''}>по времени</option>
+        </select></label>
     </div>`;
     let list = mode==='transport' ? r.kills : mode==='gank' ? r.all.filter(k=>k.party>=3) : r.all;
     list = list.filter(k=>k.party>=minP);
+    const srt = S.roads.sort||'cargo';
+    if(srt==='cargo') list=[...list].sort((a,b)=>cargoValue(b).sum-cargoValue(a).sum);
+    else if(srt==='fame') list=[...list].sort((a,b)=>b.fame-a.fame);
+    else list=[...list].sort((a,b)=>b.t-a.t);
     // топ гильдий по отфильтрованному
     const g={};
     list.forEach(k=>{ if(k.kGuild) g[k.kGuild]=(g[k.kGuild]||0)+1; });
@@ -1286,19 +1318,32 @@ function roadsHTML(){
     // последние килы: с иконками маунта и оружия (как на киллбордах)
     const gearIcon = (t,title) => t?`<img loading="lazy" src="https://render.albiononline.com/v1/item/${enc(t)}.png?size=32" title="${title||t}" style="width:30px;height:30px;vertical-align:middle;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))">`:'';
     if(list.length){
-      out+='<table style="margin-top:10px"><tr><th>Когда</th><th class="item" style="text-align:left">Жертва (гир · маунт)</th><th>IP</th><th>Ганкеров</th><th>Фейм</th><th class="item" style="text-align:left">Убийца (оружие)</th></tr>';
+      out+='<table style="margin-top:10px"><tr><th>Когда</th><th class="item" style="text-align:left">Жертва (гир · маунт)</th><th class="item" style="text-align:left">Груз (что везли)</th><th>Ганкеров</th><th>Фейм</th><th class="item" style="text-align:left">Убийца (оружие)</th></tr>';
       list.slice(0,25).forEach(k=>{
         const ago=(now-k.t)/6e4;
+        const cv=cargoValue(k);
+        let cargo='—';
+        if(k.inv.length){
+          const topInv=[...k.inv].sort((a,b)=>{
+            const pa=anyPrice(a.t)||0, pb=anyPrice(b.t)||0;
+            return pb*b.c - pa*a.c;
+          }).slice(0,6);
+          cargo = topInv.map(i=>`<span style="position:relative;display:inline-block" title="${i.t} ×${i.c}">${gearIcon(i.t)}<span style="position:absolute;bottom:-2px;right:-2px;font-size:9px;background:rgba(0,0,0,.75);border-radius:6px;padding:0 3px;color:var(--text)">${i.c}</span></span>`).join('');
+          if(k.inv.length>6) cargo+=` <span class="fresh">+${k.inv.length-6}</span>`;
+          const valTxt = cv.sum>0 ? `~${fmt(cv.sum)}${cv.unknown?'+':''} серебра` : (cv.unknown?'цены неизвестны':'');
+          cargo+=`<div class="fresh" style="margin-top:2px">${cv.items} предм. · <b style="color:${cv.sum>1e6?'var(--red)':cv.sum>2e5?'#e8a54b':'var(--muted)'}">${valTxt}</b></div>`;
+        }
         out+=`<tr><td style="white-space:nowrap">${ago<60?Math.round(ago)+' мин':(ago/60).toFixed(1)+' ч'}</td>
           <td class="item">${gearIcon(k.vWeap,'оружие жертвы')}${gearIcon(k.mount,'маунт: '+MOUNT_RU(k.mount))}
             <div class="iname"><b>${k.victim}</b><span>${k.vGuild||'без гильдии'}${TRANSPORT_MOUNTS.some(m=>k.mount.includes(m))?' · '+MOUNT_RU(k.mount):''}</span></div></td>
-          <td>${k.ip||'—'}</td>
+          <td class="item" style="display:table-cell;max-width:260px;white-space:normal">${cargo}</td>
           <td>${k.party>=5?'<b class="neg">'+k.party+'</b>':k.party>=3?'<b style="color:#e8a54b">'+k.party+'</b>':k.party}</td>
-          <td>${fmt(k.fame)}</td>
+          <td>${k.fame>=5e5?'<b class="neg">'+fmt(k.fame)+'</b>':k.fame>=1e5?'<b style="color:#e8a54b">'+fmt(k.fame)+'</b>':fmt(k.fame)}</td>
           <td class="item">${gearIcon(k.kWeap,'оружие убийцы')}<div class="iname"><b>${k.killer}</b><span>${k.kGuild||'без гильдии'}</span></div></td></tr>`;
       });
       out+='</table>';
-      if(list.length>25) out+=`<span class="fresh">Показаны 25 из ${list.length} — жми ⟳ для свежих.</span>`;
+      out+=`<span class="fresh">Стоимость груза — оценка по нашим ценам (ресурсы, шмотки Т4–Т6, камни); предметы вне базы (Т7+, еда и пр.) в сумму не входят — знак «+» значит, что реальный груз дороже.</span>`;
+      if(list.length>25) out+=`<br><span class="fresh">Показаны 25 из ${list.length}.</span>`;
     } else out+='<br><span class="pos">По текущему фильтру килов нет — на дорогах спокойно.</span>';
     out+='<br><span style="color:var(--muted);font-size:11.5px">⚠ Киллборд не отдаёт зону убийства, поэтому это общий пульс сервера, а не конкретно дороги в Карлеон. Светофор — ориентир, глаза на миникарте он не заменяет.</span>';
   }
