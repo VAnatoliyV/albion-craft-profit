@@ -605,7 +605,8 @@ function compute(){
       else continue;
       const net = rev-cc.cost, margin = net/cc.cost*100;
       const vol = channel==='ЧР' ? (bm?bm.vol:0) : 0;
-      const stale = Math.max(cc.stale, channel==='ЧР'&&bm ? hoursAgo(bm.last) : 0);
+      // возраст истории ЧР не учитываем: это средняя за 7 дней, суточная агрегация API отстаёт на 1–3 дня — это нормально
+      const stale = cc.stale;
       // «сомнительное»: аномальная маржа или жирная маржа при мизерном объёме
       const warn = margin>300 || (margin>100 && (vol||0)<10);
       rows.push({it, city, cost:cc.cost, bonus:cc.bonus, rev, channel, net, margin,
@@ -626,7 +627,7 @@ function compute(){
       if(!buy || !bq) continue;
       const net = bq.price*(1-tax) - buy.sell;
       const margin = net/buy.sell*100;
-      const stale = Math.max(hoursAgo(buy.ts), hoursAgo(bm.last));
+      const stale = hoursAgo(buy.ts);
       const warn = margin>300 || (margin>100 && bq.vol<10);
       flip.push({it, q, buy:buy.sell, bmPrice:bq.price, net, margin, vol:bq.vol,
         pool:bq.vol*Math.max(net,0), real:Math.max(net,0)*bq.vol*CFG.marketShare, stale, warn});
@@ -783,7 +784,7 @@ function compute(){
       const cost = buy.sell + stoneCost;
       const net = tq.price*(1-tax) - cost;
       const margin = net/cost*100;
-      const stale = Math.max(hoursAgo(buy.ts), stone.age||0, hoursAgo(tgtBm.last));
+      const stale = Math.max(hoursAgo(buy.ts), stone.age||0);
       const warn = margin>300 || (margin>100 && tq.vol<10);
       enchRows.push({it, q, targetId, buy:buy.sell, buyCity:buy.city,
         stoneRes:up.res, stoneN:up.n, stonePrice:stone.price, stoneCity:stone.city, stoneCost,
