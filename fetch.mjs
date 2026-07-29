@@ -133,12 +133,31 @@ async function main(){
     }
   }), 'ref-volumes')
 
+  // 5) объёмы продаж предметов на городских рынках (межгородской флип, канал «город»)
+  console.log(`city market volumes: ${itemIds.length} ids`);
+  out.ch = {};
+  await runPool(chunks(itemIds, HIST_BATCH).map(ch => async ()=>{
+    const d = await getJSON(`${API}/history/${encodeURIComponent(ch.join(','))}.json?locations=${encodeURIComponent(CITIES.join(','))}&time-scale=24`);
+    for(const e of d||[]){
+      const ci = CITY_IDX[e.location]; if(ci===undefined) continue;
+      let vol=0;
+      for(const p of e.data||[]){
+        if(new Date(p.timestamp+'Z').getTime() < cutoff) continue;
+        vol += p.item_count;
+      }
+      if(!vol) continue;
+      const rec = (out.ch[e.item_id] ||= {});
+      rec[ci] = Math.round(((rec[ci]||0) + vol/HIST_DAYS)*10)/10;
+    }
+  }), 'city-volumes')
+
   const json = JSON.stringify(out);
   const stats = {
     materials: Object.keys(out.m).length,
     itemsWithCityPrices: Object.keys(out.c).length,
     itemsWithBM: Object.keys(out.b).length,
     resourceVolumes: Object.keys(out.h).length,
+    itemsWithCityVolumes: Object.keys(out.ch||{}).length,
     requestsOk: okCount, requestsFailed: failCount,
     sizeKB: Math.round(json.length/1024),
   };

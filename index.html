@@ -409,7 +409,7 @@ async function pool(tasks, onOne){
 // ─── Данные с «мини-сервера» (GitHub Actions обновляет data.json по расписанию) ───
 function applyServerData(d){
   const CI = d.cities || CITIES;
-  S.matPrices={}; S.cityPrices={}; S.bm={}; S.matHist={};
+  S.matPrices={}; S.cityPrices={}; S.bm={}; S.matHist={}; S.cityHist={};
   for(const [id,byCi] of Object.entries(d.m||{})){
     const o={}; for(const [ci,v] of Object.entries(byCi)) o[CI[ci]]={price:v[0], ts:v[1]};
     S.matPrices[id]=o;
@@ -430,6 +430,10 @@ function applyServerData(d){
   for(const [id,byCi] of Object.entries(d.h||{})){
     const o={}; for(const [ci,v] of Object.entries(byCi)) o[CI[ci]]=v;
     S.matHist[id]=o;
+  }
+  for(const [id,byCi] of Object.entries(d.ch||{})){
+    const o={}; for(const [ci,v] of Object.entries(byCi)) o[CI[ci]]=v;
+    S.cityHist[id]=o;
   }
 }
 async function loadServerData(){
@@ -1089,7 +1093,7 @@ function render(){
         <td>${fmt(r.sell)}<br><span class="fresh">${r.sellCity}</span></td>
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
-        <td>${r.vol!=null?fmt(r.vol):'<span class="fresh" title="Объём подгружается для топ-250 кандидатов после основной загрузки">…</span>'}</td>
+        <td>${r.vol!=null?fmt(r.vol):'<span class="fresh" title="Нет данных об объёме продаж этого предмета в городе продажи — сделок за неделю не зафиксировано либо сборщик их не получил">—</span>'}</td>
         <td>${r.pool!=null?fmt(r.pool):'—'}</td>
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
     } else {
