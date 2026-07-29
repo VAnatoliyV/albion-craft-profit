@@ -170,8 +170,8 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
       <span>Что выгодно крафтить в каждом городе: себестоимость с бонусами и станком, продажа на чёрный рынок или городские рынки. Золотая середина, калькулятор партии, журналы.</span></div>
     <div class="card" onclick="enterApp('ref')"><b>♻️ Переработка</b>
       <span>Локальный цикл без перевозок: купил сырьё → переработал → продал ресурс в том же городе. Бонусные города дают +40% возврата.</span></div>
-    <div class="card" onclick="enterApp('flip')"><b>🖤 Флиппинг Карлеон → ЧР</b>
-      <span>Купить на обычном рынке Карлеона и сразу продать на чёрный рынок. Ноль логистики, каждое качество считается отдельно.</span></div>
+    <div class="card" onclick="enterApp('flip')"><b>🖤 Флиппинг → Чёрный рынок</b>
+      <span>Купить на рынке любого города (или прямо в Карлеоне — тогда ноль логистики) и продать на ЧР. Город покупки виден в каждой строке, каждое качество считается отдельно.</span></div>
     <div class="card" onclick="enterApp('cityflip')"><b>🐂 Флиппинг между городами</b>
       <span>Купить дёшево в одном городе, продать дорого в другом. С объёмами продаж города-получателя. Перевозку и риск бери на себя.</span></div>
     <div class="card" onclick="enterApp('ench')"><b>💎 Рунофикация</b>
@@ -616,20 +616,29 @@ function compute(){
     }
   }
   S.rows=rows;
-  // флиппинг: покупка Caerleon → продажа ЧР, каждое качество отдельной строкой
+  // флиппинг → ЧР: купить в любом городе (или выбранном), продать на чёрный рынок
   const flip=[];
+  const fCities = citySel==='ALL'
+    ? [...new Set([...routeCities(),'Caerleon'])] // Карлеон всегда в списке: там сам ЧР, перевозки ноль
+    : [citySel];
   for(const it of DATA.items){
-    const byQ = S.cityPrices[it.id]?.['Caerleon'];
+    const cp = S.cityPrices[it.id];
     const bm = S.bm[it.id];
-    if(!byQ || !bm) continue;
+    if(!cp || !bm) continue;
     for(let q=1;q<=5;q++){
-      const buy = byQ[q], bq = bm.qs[q];
+      let buy=null;
+      for(const c of fCities){
+        const v = cp[c]?.[q]; if(!v) continue;
+        if(hoursAgo(v.ts)>CFG.staleHours) continue;
+        if(!buy || v.sell<buy.sell) buy={...v, city:c};
+      }
+      const bq = bm.qs[q];
       if(!buy || !bq) continue;
       const net = bq.price*(1-tax) - buy.sell;
       const margin = net/buy.sell*100;
       const stale = hoursAgo(buy.ts);
       const warn = margin>300 || (margin>100 && bq.vol<10);
-      flip.push({it, q, buy:buy.sell, bmPrice:bq.price, net, margin, vol:bq.vol,
+      flip.push({it, q, buy:buy.sell, buyCity:buy.city, bmPrice:bq.price, net, margin, vol:bq.vol,
         pool:bq.vol*Math.max(net,0), real:Math.max(net,0)*bq.vol*CFG.marketShare, stale, warn});
     }
   }
@@ -829,7 +838,7 @@ const COLS_CRAFT = [
   ['channel','Канал'],['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['stale','Данные'],
 ];
 const COLS_FLIP = [
-  ['item','Предмет'],['q','Качество'],['buy','Купить (Caerleon)'],['bmPrice','Продать (ЧР ср.)'],
+  ['item','Предмет'],['q','Качество'],['buy','Купить'],['bmPrice','Продать (ЧР ср.)'],
   ['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['stale','Данные'],
 ];
 const COLS_CITYFLIP = [
@@ -952,7 +961,7 @@ function render(){
     } else if(S.tab==='flip'){
       html+=`<tr class="row">${nameCellQ(it, r.q, topBadge+warnBadge+staleBadge)}
         <td>${QUAL_RU[r.q]}</td>
-        <td>${fmt(r.buy)}</td><td>${fmt(r.bmPrice)}</td>
+        <td>${fmt(r.buy)}<br><span class="fresh">${r.buyCity||'Caerleon'}${r.buyCity && r.buyCity!=='Caerleon'?' → везти в Карлеон':''}</span></td><td>${fmt(r.bmPrice)}</td>
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
         <td>${fmt(r.vol)}</td><td>${fmt(r.pool)}</td>
@@ -1485,12 +1494,12 @@ $('refSel').onchange = setupRefresh;
 setupRefresh();
 $('goldBtn').onclick=()=>{ S.gold=!S.gold; $('goldBtn').classList.toggle('active',S.gold); render(); };
 $('reloadBtn').onclick=()=>loadAll(true);
-const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг Карлеон → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', roads:'🛡 Дороги в Карлеон · БЕТА'};
+const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', roads:'🛡 Дороги в Карлеон · БЕТА'};
 // какие контролы нужны на каждой вкладке (премиум, возраст данных, обновление и поиск — всегда)
 const TAB_CONTROLS={
   craft:   ['wrapCity','wrapFocus','wrapSelfRef','wrapQual','wrapFee','wrapCat'],
   ref:     ['wrapCity','wrapFocus','wrapSafe','wrapFee','refModeWrap'],
-  flip:    ['wrapCat'],
+  flip:    ['wrapCity','wrapSafe','wrapCat'],
   cityflip:['wrapSafe','wrapCat'],
   ench:    ['wrapCity','wrapSafe','wrapCat'],
   roads:   [],
