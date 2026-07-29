@@ -176,8 +176,8 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
       <span>Купить дёшево в одном городе, продать дорого в другом. С объёмами продаж города-получателя. Перевозку и риск бери на себя.</span></div>
     <div class="card" onclick="enterApp('ench')"><b>💎 Рунофикация</b>
       <span>Купить шмотку, докинуть руны/души/реликты, поднять зачарование (например 4.2 → 4.3) и продать дороже на чёрном рынке. С объёмами продаж по каждому качеству.</span></div>
-    <div class="card" onclick="enterApp('roads')"><b>🛡 Дороги в Карлеон</b>
-      <span>Стоит ли везти сейчас: живой светофор по убийствам транспортников (киллборд Europe) + расписание окон Bandit Assault с отсчётом. Данные грузятся при входе.</span></div>
+    <div class="card" onclick="enterApp('roads')"><b>🛡 Дороги в Карлеон <span class="badge b-warn" style="vertical-align:2px">бета</span></b>
+      <span>Стоит ли везти сейчас: живой светофор по убийствам транспортников (киллборд Europe), классификатор «кто вёз на ЧР» и окна Bandit Assault. Раздел дорабатывается.</span></div>
   </div>
   <div id="homeStatus">Загрузка цен начнётся при входе в раздел…</div>
   <div class="foot">Данные: Albion Online Data Project (краудсорсинг) · Иконки: официальный Render API</div>
@@ -1349,7 +1349,8 @@ function roadsHTML(){
   </div>`;
   // Киллборд
   out+='<div class="panel">';
-  out+='<b>💀 Убийства транспортников (киллборд Europe, живые данные)</b> <button id="roadsReload" style="margin-left:8px;padding:3px 10px;font-size:12px">⟳ Обновить</button><br>';
+  out+='<b>💀 Убийства на дорогах (киллборд Europe, живые данные)</b> <span class="badge b-warn">бета</span> <button id="roadsReload" style="margin-left:8px;padding:3px 10px;font-size:12px">⟳ Обновить</button>'+
+    '<br><span style="color:var(--muted);font-size:12px">Раздел в бете: классификатор «кто вёз на ЧР» — эвристика, будем дорабатывать. Видишь странную классификацию — присылай пример.</span><br>';
   if(r.loading) out+='<div class="skel" style="margin-top:10px;box-shadow:none">'+
     '<div class="skel-note">⏳ Опрашиваю киллборд Europe — последние ~200 убийств…</div>'+
     Array.from({length:4},()=>'<div class="skel-row" style="height:34px"></div>').join('')+'</div>';
@@ -1381,6 +1382,7 @@ function roadsHTML(){
           <option value="3"${minP==3?' selected':''}>3</option>
           <option value="5"${minP==5?' selected':''}>5</option>
         </select></label>
+      <span class="ctl" style="cursor:help" title="Звёзды у чипа «вёз на ЧР» — уверенность классификатора (0–4):&#10;&#10;+1 — стопки одинаковых шмоток (3 и больше одной позиции: так возят крафтеры, а не «запаску»)&#10;+1 — зачарованные предметы в грузе (.1/.2/.3 — типичный товар ЧР)&#10;+1 — груза много (10+ шмоток)&#10;+1..3 — раннерский кит: эскейп-оружие (кровопускатель/кинжалы/мечик/шест) или пустые руки, зелье инвиза/гиганта, сумка&#10;−2 — боевой сет (хил-посох, луки, огонь и т.п.): такой билд для перевозки нетипичен&#10;&#10;Без звёзд — груз похож на ЧР, но уверенности мало. ★★★★ — почти наверняка раздели ЧР-раннера.">★ что значат звёзды?</span>
       <label class="ctl">Сортировка
         <select id="roadsSort">
           <option value="cargo"${(S.roads.sort||'cargo')==='cargo'?' selected':''}>по стоимости груза 💰</option>
@@ -1470,7 +1472,7 @@ $('refSel').onchange = setupRefresh;
 setupRefresh();
 $('goldBtn').onclick=()=>{ S.gold=!S.gold; $('goldBtn').classList.toggle('active',S.gold); render(); };
 $('reloadBtn').onclick=()=>loadAll(true);
-const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг Карлеон → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', roads:'🛡 Дороги в Карлеон'};
+const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг Карлеон → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', roads:'🛡 Дороги в Карлеон · БЕТА'};
 // какие контролы нужны на каждой вкладке (премиум, возраст данных, обновление и поиск — всегда)
 const TAB_CONTROLS={
   craft:   ['wrapCity','wrapFocus','wrapSelfRef','wrapQual','wrapFee','wrapCat'],
