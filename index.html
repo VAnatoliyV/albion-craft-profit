@@ -651,7 +651,9 @@ function compute(){
       else if(revCity!=null){ rev=revCity; channel=bestCity; }
       else continue;
       const net = rev-cc.cost, margin = net/cc.cost*100;
-      const vol = channel==='ЧР' ? (bm?bm.vol:0) : 0;
+      // объём: с ЧР — из истории чёрного рынка, с городского рынка — из истории города (обычное качество)
+      const vol = channel==='ЧР' ? (bm?bm.vol:0)
+        : (S.cityHist?.[it.id]?.[channel]?.[1] ?? 0);
       // возраст истории ЧР не учитываем: это средняя за 7 дней, суточная агрегация API отстаёт на 1–3 дня — это нормально
       const stale = cc.stale;
       // «сомнительное»: аномальная маржа или жирная маржа при мизерном объёме
