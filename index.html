@@ -356,10 +356,30 @@ async function fetchJSON(url){
       const d = await r.json();
       if(idx!==apiRoute){ apiRoute=idx; try{localStorage.setItem('acp_route',String(idx))}catch(e){}
         const st=$('status'); if(st && idx>0) st.textContent+=' · соединение через прокси-зеркало'; }
-      cache_set(url,d); return d;
+      // историю в per-URL кэш не пишем: ответы огромные и выбивают квоту localStorage;
+      // вместо этого готовый разобранный снимок сохраняет saveSnap()
+      if(!url.includes('/stats/history/')) cache_set(url,d);
+      return d;
     }catch(e){ lastErr=e; }
   }
   throw lastErr;
+}
+// снимок готовых данных: мгновенное восстановление после перезагрузки страницы
+// (телефоны выгружают тяжёлую вкладку при повороте экрана — с снимком это безболезненно)
+function saveSnap(){
+  const full = {t:Date.now(), m:S.matPrices, c:S.cityPrices, b:S.bm, h:S.matHist||{}, ch:S.cityHist||{}};
+  try{ localStorage.setItem('acp_snap', JSON.stringify(full)); return; }catch(e){}
+  // не влезло в квоту — сохраняем самое дорогое: цены материалов и историю ЧР
+  try{
+    localStorage.setItem('acp_snap', JSON.stringify({t:Date.now(), m:S.matPrices, c:{}, b:S.bm, h:S.matHist||{}, ch:{}}));
+  }catch(e){ try{ localStorage.removeItem('acp_snap'); }catch(_){} }
+}
+function loadSnap(){
+  try{
+    const s=JSON.parse(localStorage.getItem('acp_snap')||'null');
+    if(s && Date.now()-s.t < CFG.cacheTTLmin*6e4) return s;
+  }catch(e){}
+  return null;
 }
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 // одна волна запросов; возвращает список неудавшихся задач
@@ -389,6 +409,22 @@ async function pool(tasks, onOne){
 // ─── Загрузка данных ───
 async function loadAll(force){
   if(force){ try{ Object.keys(localStorage).filter(k=>k.startsWith('acp_')).forEach(k=>localStorage.removeItem(k)); }catch(e){} }
+  // мгновенное восстановление из снимка (после перезагрузки вкладки на телефоне)
+  if(!force){
+    const snap = loadSnap();
+    if(snap){
+      S.matPrices=snap.m||{}; S.cityPrices=snap.c||{}; S.bm=snap.b||{};
+      S.matHist=snap.h||{}; S.cityHist=snap.ch||{};
+      S.loaded=true;
+      document.body.classList.remove('loading');
+      const mins=Math.max(1,Math.round((Date.now()-snap.t)/6e4));
+      const st0=$('status'); if(st0) st0.textContent=`Данные восстановлены из кэша (${mins} мин назад) · предметов в базе: ${DATA.items.length} · «⟳ Обновить» — свежие цены`;
+      const pg0=$('prog'); if(pg0) pg0.style.width='100%';
+      const hs=$('homeStatus'); if(hs) hs.textContent='Цены готовы (из кэша) ✓';
+      compute(); render();
+      return;
+    }
+  }
   document.body.classList.add('loading');
   // проба прямого доступа: не сидим на прокси вечно, если блокировка ушла
   if(apiRoute>0){
@@ -485,7 +521,7 @@ async function loadAll(force){
     st.textContent = `Данные загружены · предметов в базе: ${DATA.items.length} · обновлено ${new Date().toLocaleTimeString('ru-RU')}${viaProxy}`;
   }
   compute(); render();
-  if(gotData) loadCityVolumes(); // объёмы городов для межгородского флипа — фоном
+  if(gotData){ saveSnap(); loadCityVolumes(); } // снимок + объёмы городов фоном
 }
 
 // ─── Расчёт ───
@@ -827,7 +863,7 @@ async function loadCityVolumes(){
         await new Promise(r=>setTimeout(r,200));
       }
     }
-    compute(); if(S.tab==='cityflip') render();
+    compute(); saveSnap(); if(S.tab==='cityflip') render();
   }catch(e){ console.warn('city volumes', e); }
   cityVolLoading=false;
 }
