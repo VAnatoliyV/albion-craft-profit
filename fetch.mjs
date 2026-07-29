@@ -140,14 +140,15 @@ async function main(){
     const d = await getJSON(`${API}/history/${encodeURIComponent(ch.join(','))}.json?locations=${encodeURIComponent(CITIES.join(','))}&time-scale=24`);
     for(const e of d||[]){
       const ci = CITY_IDX[e.location]; if(ci===undefined) continue;
+      const q = e.quality||1;
       let vol=0;
       for(const p of e.data||[]){
         if(new Date(p.timestamp+'Z').getTime() < cutoff) continue;
         vol += p.item_count;
       }
       if(!vol) continue;
-      const rec = (out.ch[e.item_id] ||= {});
-      rec[ci] = Math.round(((rec[ci]||0) + vol/HIST_DAYS)*10)/10;
+      const rec = ((out.ch[e.item_id] ||= {})[ci] ||= {});
+      rec[q] = Math.round(((rec[q]||0) + vol/HIST_DAYS)*10)/10;
     }
   }), 'city-volumes')
 

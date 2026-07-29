@@ -356,8 +356,7 @@ async function fetchJSON(url){
       const d = await r.json();
       if(idx!==apiRoute){ apiRoute=idx; try{localStorage.setItem('acp_route',String(idx))}catch(e){}
         const st=$('status'); if(st && idx>0) st.textContent+=' · соединение через прокси-зеркало'; }
-      // историю в per-URL кэш не пишем: ответы огромные и выбивают квоту localStorage;
-      // вместо этого готовый разобранный снимок сохраняет saveSnap()
+      // историю в per-URL кэш не пишем: ответы огромные и выбивают квоту localStorage
       if(!url.includes('/stats/history/')) cache_set(url,d);
       return d;
     }catch(e){ lastErr=e; }
@@ -366,46 +365,6 @@ async function fetchJSON(url){
 }
 // снимок готовых данных: мгновенное восстановление после перезагрузки страницы
 // (телефоны выгружают тяжёлую вкладку при повороте экрана — с снимком это безболезненно)
-function saveSnap(){
-  const full = {t:Date.now(), m:S.matPrices, c:S.cityPrices, b:S.bm, h:S.matHist||{}, ch:S.cityHist||{}};
-  try{ localStorage.setItem('acp_snap', JSON.stringify(full)); return; }catch(e){}
-  // не влезло в квоту — сохраняем самое дорогое: цены материалов и историю ЧР
-  try{
-    localStorage.setItem('acp_snap', JSON.stringify({t:Date.now(), m:S.matPrices, c:{}, b:S.bm, h:S.matHist||{}, ch:{}}));
-  }catch(e){ try{ localStorage.removeItem('acp_snap'); }catch(_){} }
-}
-function loadSnap(){
-  try{
-    const s=JSON.parse(localStorage.getItem('acp_snap')||'null');
-    if(s && Date.now()-s.t < CFG.cacheTTLmin*6e4) return s;
-  }catch(e){}
-  return null;
-}
-const sleep = ms => new Promise(r=>setTimeout(r,ms));
-// одна волна запросов; возвращает список неудавшихся задач
-async function runRound(list, conc, delay, onOne){
-  const failed=[]; let done=0; const total=list.length; const queue=[...list];
-  const workers = Array.from({length:Math.max(1,conc)}, async ()=>{
-    while(queue.length){ const t=queue.shift();
-      try{ await t(); }catch(e){ failed.push(t); console.warn(e); }
-      done++; onOne(done,total); await sleep(delay); }
-  });
-  await Promise.all(workers);
-  return failed;
-}
-// загрузка с автоповтором: через прокси — медленнее и бережнее (лимиты бесплатных зеркал)
-async function pool(tasks, onOne){
-  const total=tasks.length;
-  let failed = await runRound(tasks, apiRoute>0?2:CFG.concurrency, apiRoute>0?450:150, onOne);
-  for(let round=1; round<=3 && failed.length; round++){
-    const st=$('status');
-    if(st) st.textContent=`Повторяю неудачные запросы: волна ${round}, осталось ${failed.length}…`;
-    await sleep(2000*round); // пауза, чтобы лимиты прокси остыли
-    failed = await runRound(failed, apiRoute>0?1:2, apiRoute>0?800:300, onOne);
-  }
-  return {ok: total-failed.length, fail: failed.length, total};
-}
-
 // ─── Данные с «мини-сервера» (GitHub Actions обновляет data.json по расписанию) ───
 function applyServerData(d){
   const CI = d.cities || CITIES;
@@ -432,7 +391,12 @@ function applyServerData(d){
     S.matHist[id]=o;
   }
   for(const [id,byCi] of Object.entries(d.ch||{})){
-    const o={}; for(const [ci,v] of Object.entries(byCi)) o[CI[ci]]=v;
+    const o={};
+    for(const [ci,byQ] of Object.entries(byCi)){
+      if(typeof byQ==='number'){ o[CI[ci]]={1:byQ}; continue; } // старый формат снимка
+      const q={}; for(const [ql,v] of Object.entries(byQ)) q[ql]=v;
+      o[CI[ci]]=q;
+    }
     S.cityHist[id]=o;
   }
 }
@@ -451,22 +415,6 @@ async function loadServerData(){
 // ─── Загрузка данных ───
 async function loadAll(force){
   if(force){ try{ Object.keys(localStorage).filter(k=>k.startsWith('acp_')).forEach(k=>localStorage.removeItem(k)); }catch(e){} }
-  // мгновенное восстановление из снимка (после перезагрузки вкладки на телефоне)
-  if(!force){
-    const snap = loadSnap();
-    if(snap){
-      S.matPrices=snap.m||{}; S.cityPrices=snap.c||{}; S.bm=snap.b||{};
-      S.matHist=snap.h||{}; S.cityHist=snap.ch||{};
-      S.loaded=true;
-      document.body.classList.remove('loading');
-      const mins=Math.max(1,Math.round((Date.now()-snap.t)/6e4));
-      const st0=$('status'); if(st0) st0.textContent=`Данные восстановлены из кэша (${mins} мин назад) · предметов в базе: ${DATA.items.length} · «⟳ Обновить» — свежие цены`;
-      const pg0=$('prog'); if(pg0) pg0.style.width='100%';
-      const hs=$('homeStatus'); if(hs) hs.textContent='Цены готовы (из кэша) ✓';
-      compute(); render();
-      return;
-    }
-  }
   document.body.classList.add('loading');
   // готовый снимок с нашего мини-сервера: один маленький файл вместо сотни запросов
   {
@@ -482,7 +430,7 @@ async function loadAll(force){
       if(st) st.textContent = `${stale?'⚠ ':''}Данные с сервера · обновлены ${ageTxt} · предметов в базе: ${DATA.items.length}${stale?' — сборщик, похоже, отстаёт':''}`;
       const pg=$('prog'); if(pg) pg.style.width='100%';
       const hs=$('homeStatus'); if(hs) hs.textContent='Цены готовы ✓';
-      compute(); render(); saveSnap();
+      compute(); render();
       return;
     }
     if(st1) st1.textContent='Снимок недоступен — опрашиваю API напрямую…';
@@ -582,7 +530,7 @@ async function loadAll(force){
     st.textContent = `Данные загружены · предметов в базе: ${DATA.items.length} · обновлено ${new Date().toLocaleTimeString('ru-RU')}${viaProxy}`;
   }
   compute(); render();
-  if(gotData){ saveSnap(); loadCityVolumes(); } // снимок + объёмы городов фоном
+  if(gotData) loadCityVolumes(); // объёмы городов фоном (только в режиме прямого опроса API)
 }
 
 // ─── Расчёт ───
@@ -931,7 +879,7 @@ async function loadCityVolumes(){
         await new Promise(r=>setTimeout(r,200));
       }
     }
-    compute(); saveSnap(); if(S.tab==='cityflip') render();
+    compute(); if(S.tab==='cityflip') render();
   }catch(e){ console.warn('city volumes', e); }
   cityVolLoading=false;
 }
@@ -1676,6 +1624,7 @@ window.goHome=()=>{
 };
 // ─── старт: сначала база рецептов, потом цены ───
 (async function boot(){
+  try{ localStorage.removeItem('acp_snap'); }catch(e){} // старый кэш снимка больше не используется
   const hs=$('homeStatus');
   try{
     if(hs) hs.textContent='Загружаю базу предметов…';
