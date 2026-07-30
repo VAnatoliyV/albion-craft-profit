@@ -9,16 +9,40 @@ const CITY_IDX = Object.fromEntries(CITIES.map((c,i)=>[c,i]));
 const HIST_DAYS = 7;
 const PRICE_BATCH = 80;
 const HIST_BATCH = 25;
-const DELAY_MS = 350;
+const DELAY_MS = 120;
 const RETRIES = 5;
 const CONCURRENCY = 2;
+// Лимиты Albion Online Data Project из их документации: 180 запросов в минуту
+// и 300 за 5 минут. Берём с запасом — сбор идёт чуть дольше, зато без отказов.
+const RL_PER_MIN = 165;
+const RL_PER_5MIN = 285;
 
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 const chunks = (a,n) => { const o=[]; for(let i=0;i<a.length;i+=n) o.push(a.slice(i,i+n)); return o; };
 const minutes = iso => Math.round(new Date(iso+'Z').getTime()/6e4); // epoch-минуты
 const nowMin = () => Math.round(Date.now()/6e4);
 
-let okCount=0, failCount=0;
+let okCount=0, failCount=0, waitedMs=0;
+
+// Собственный ограничитель: не даём себе выйти за лимиты API ни в минутном,
+// ни в пятиминутном окне. Считаем каждую попытку, включая ретраи.
+const rlHits = [];
+async function rateGate(){
+  for(;;){
+    const now = Date.now();
+    while(rlHits.length && now - rlHits[0] >= 300000) rlHits.shift();
+    const in5 = rlHits.length;
+    let inMin = 0;
+    for(let i=rlHits.length-1; i>=0 && now-rlHits[i] < 60000; i--) inMin++;
+    if(inMin < RL_PER_MIN && in5 < RL_PER_5MIN){ rlHits.push(now); return; }
+    // ждём, пока освободится ближайший слот в переполненном окне
+    let wait = 250;
+    if(inMin >= RL_PER_MIN) wait = Math.max(wait, 60000 - (now - rlHits[rlHits.length-inMin]) + 50);
+    if(in5   >= RL_PER_5MIN) wait = Math.max(wait, 300000 - (now - rlHits[0]) + 50);
+    waitedMs += wait;
+    await sleep(wait);
+  }
+}
 
 // очередь с ограниченной параллельностью + прогресс в лог
 async function runPool(jobs, label){
@@ -39,6 +63,7 @@ async function runPool(jobs, label){
 async function getJSON(url){
   for(let attempt=1; attempt<=RETRIES; attempt++){
     try{
+      await rateGate();
       const ctl = new AbortController();
       const timer = setTimeout(()=>ctl.abort(), 60000);
       const r = await fetch(url, {signal: ctl.signal, headers:{'User-Agent':'albion-craft-profit-builder'}});
@@ -171,6 +196,7 @@ async function main(){
     resourceVolumes: Object.keys(out.h).length,
     itemsWithCityVolumes: Object.keys(out.ch||{}).length,
     requestsOk: okCount, requestsFailed: failCount,
+    rateWaitSec: Math.round(waitedMs/1000),
     sizeKB: Math.round(json.length/1024),
   };
   console.log('RESULT', JSON.stringify(stats));
