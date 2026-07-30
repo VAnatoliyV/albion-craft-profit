@@ -142,6 +142,47 @@ footer{padding:16px 22px;color:var(--muted);font-size:11.5px;border-top:1px soli
   .cards{grid-template-columns:1fr;width:100%;max-width:420px}
 }
 
+
+/* ── живая статус-полоса ── */
+#status{margin:2px 0 10px;min-height:0;display:block}
+.sbar{position:relative;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:9px 14px;border:1px solid var(--border);border-radius:14px;overflow:hidden;
+  background:linear-gradient(100deg, rgba(238,188,78,.07), rgba(21,25,36,.9) 38%), var(--panel);
+  box-shadow:0 4px 18px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.03);
+  font-size:12.5px;color:var(--muted);isolation:isolate}
+.sbar::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:-1;
+  background:linear-gradient(105deg,transparent 30%,rgba(238,188,78,.10) 48%,transparent 66%);
+  background-size:280% 100%;animation:sbarSheen 7s ease-in-out infinite}
+@keyframes sbarSheen{0%{background-position:130% 0}55%{background-position:-40% 0}100%{background-position:-40% 0}}
+.sbar b{color:var(--text);font-variant-numeric:tabular-nums}
+.sbar .sep{width:1px;height:16px;background:var(--border2);opacity:.7}
+/* пульсирующая точка «в эфире» */
+.live{display:inline-flex;align-items:center;gap:7px;font-weight:700;letter-spacing:.6px;font-size:11px;
+  text-transform:uppercase;color:var(--green)}
+.live i{position:relative;width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;
+  box-shadow:0 0 10px currentColor}
+.live i::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid currentColor;
+  opacity:.55;animation:livePulse 2s ease-out infinite}
+@keyframes livePulse{0%{transform:scale(.6);opacity:.7}80%,100%{transform:scale(1.5);opacity:0}}
+.live.warn{color:var(--accent)} .live.bad{color:var(--red)}
+.live.bad i::after{animation-duration:1.1s}
+/* кольцо: сколько прошло от 15-минутного цикла сервера */
+.ring{--p:0;position:relative;width:26px;height:26px;border-radius:50%;flex:none;
+  background:conic-gradient(var(--accent) calc(var(--p)*1%), rgba(255,255,255,.07) 0);
+  display:grid;place-items:center;transition:--p .4s}
+.ring::before{content:'';position:absolute;inset:3px;border-radius:50%;background:var(--panel)}
+.ring span{position:relative;font-size:9px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+/* чипы-метрики */
+.mchip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:20px;
+  background:rgba(255,255,255,.04);border:1px solid var(--border);white-space:nowrap}
+.mchip b{font-size:12.5px}
+.mchip.proxy{border-color:rgba(106,165,224,.4);color:var(--blue)}
+.mchip.err{border-color:rgba(228,111,97,.45);color:var(--red)}
+/* индикатор загрузки в полосе */
+.sbar .spin{width:14px;height:14px;border:2px solid var(--panel3);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .8s linear infinite;flex:none}
+@media (max-width:768px){ .sbar{gap:9px;padding:7px 10px;font-size:11.5px} .sbar .sep{display:none} }
+
 /* ── стартовый экран ── */
 #home{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:20px}
 #home h1{font-size:44px;margin:0 0 4px;font-weight:800;
@@ -355,7 +396,7 @@ async function fetchJSON(url){
       if(!r.ok) throw new Error('API '+r.status);
       const d = await r.json();
       if(idx!==apiRoute){ apiRoute=idx; try{localStorage.setItem('acp_route',String(idx))}catch(e){}
-        const st=$('status'); if(st && idx>0) st.textContent+=' · соединение через прокси-зеркало'; }
+        if(idx>0){ S.viaProxy=true; if(typeof renderStatus==='function') renderStatus(); } }
       // историю в per-URL кэш не пишем: ответы огромные и выбивают квоту localStorage
       if(!url.includes('/stats/history/')) cache_set(url,d);
       return d;
@@ -365,6 +406,44 @@ async function fetchJSON(url){
 }
 // снимок готовых данных: мгновенное восстановление после перезагрузки страницы
 // (телефоны выгружают тяжёлую вкладку при повороте экрана — с снимком это безболезненно)
+
+// ─── живая статус-полоса ───
+const REFRESH_CYCLE_MIN = 15; // сервер обновляет снимок каждые 15 минут
+function ageText(min){
+  if(min<1) return 'только что';
+  if(min<60) return Math.round(min)+' мин назад';
+  const h=min/60;
+  return (h<10?h.toFixed(1):Math.round(h))+' ч назад';
+}
+function renderStatus(){
+  const el=$('status'); if(!el) return;
+  const st=S.st||{};
+  let inner='';
+  if(st.kind==='loading'){
+    inner = `<span class="spin"></span><span>${st.text||'Загружаю…'}</span>`;
+  } else if(st.kind==='error'){
+    inner = `<span class="live bad"><i></i>нет данных</span><span class="sep"></span><span>${st.text||''}</span>`;
+  } else {
+    const min = st.at ? (Date.now()-st.at)/6e4 : 0;
+    const cls = min>180 ? 'bad' : min>60 ? 'warn' : '';
+    const label = min>180 ? 'устарело' : min>60 ? 'с задержкой' : 'в эфире';
+    const pct = Math.min(100, Math.round(min/REFRESH_CYCLE_MIN*100));
+    const left = Math.max(0, Math.ceil(REFRESH_CYCLE_MIN - min));
+    inner = `<span class="live ${cls}" title="Свежесть снимка данных"><i></i>${label}</span>
+      <span class="sep"></span>
+      <span>${st.src==='api'?'Прямой опрос API':'Снимок сервера'} · <b>${ageText(min)}</b></span>
+      <span class="ring" style="--p:${pct}" title="Сервер собирает данные каждые ${REFRESH_CYCLE_MIN} мин. До следующего снимка ≈${left} мин"><span>${left}′</span></span>
+      <span class="sep"></span>
+      <span class="mchip">⚒ <b>${(DATA&&DATA.items.length||0).toLocaleString('ru-RU')}</b> предметов</span>
+      <span class="mchip">📊 <b>${Object.keys(S.bm||{}).length.toLocaleString('ru-RU')}</b> с историей ЧР</span>
+      ${S.viaProxy?'<span class="mchip proxy">через прокси-зеркало</span>':''}
+      ${st.partial?`<span class="mchip err">частично: ${st.partial}</span>`:''}`;
+  }
+  el.innerHTML = `<div class="sbar">${inner}</div>`;
+}
+function setStatus(st){ S.st = {...(S.st||{}), ...st}; renderStatus(); }
+setInterval(()=>{ if(S.st && S.st.kind==='ok') renderStatus(); }, 30000); // возраст тикает сам
+
 // ─── Данные с «мини-сервера» (GitHub Actions обновляет data.json по расписанию) ───
 function applyServerData(d){
   const CI = d.cities || CITIES;
@@ -418,22 +497,18 @@ async function loadAll(force){
   document.body.classList.add('loading');
   // готовый снимок с нашего мини-сервера: один маленький файл вместо сотни запросов
   {
-    const st1=$('status'); if(st1) st1.textContent='Загружаю готовый снимок цен…';
+    setStatus({kind:'loading', text:'Загружаю готовый снимок цен…'});
     const srv = await loadServerData();
     if(srv){
       S.loaded=true;
       document.body.classList.remove('loading');
-      const ageMin = Math.max(0, Math.round(Date.now()/1000 - srv.t)/60);
-      const ageTxt = ageMin<60 ? Math.round(ageMin)+' мин назад' : (ageMin/60).toFixed(1)+' ч назад';
-      const stale = ageMin>180;
-      const st=$('status');
-      if(st) st.textContent = `${stale?'⚠ ':''}Данные с сервера · обновлены ${ageTxt} · предметов в базе: ${DATA.items.length}${stale?' — сборщик, похоже, отстаёт':''}`;
+      setStatus({kind:'ok', src:'server', at: srv.t*1000, partial:null});
       const pg=$('prog'); if(pg) pg.style.width='100%';
       const hs=$('homeStatus'); if(hs) hs.textContent='Цены готовы ✓';
       compute(); render();
       return;
     }
-    if(st1) st1.textContent='Снимок недоступен — опрашиваю API напрямую…';
+    setStatus({kind:'loading', text:'Снимок сервера недоступен — опрашиваю API напрямую…'});
   }
   // проба прямого доступа: не сидим на прокси вечно, если блокировка ушла
   if(apiRoute>0){
@@ -510,24 +585,22 @@ async function loadAll(force){
       }
     });
   }
-  st.textContent = `Загрузка цен: 0/${tasks.length} запросов…`;
+  setStatus({kind:'loading', text:`Загрузка цен: 0/${tasks.length} запросов…`});
   render(); // показать скелетон, пока грузится
-  const res = await pool(tasks, (d,t)=>{ pg.style.width=(d/t*100)+'%'; st.textContent=`Загрузка цен: ${d}/${t} запросов…`; });
+  const res = await pool(tasks, (d,t)=>{ pg.style.width=(d/t*100)+'%'; setStatus({kind:'loading', text:`Загрузка цен: ${d}/${t} запросов…`}); });
   S.loaded=true;
   document.body.classList.remove('loading');
   const gotData = Object.keys(S.matPrices).length>0 || Object.keys(S.bm).length>0;
   const viaProxy = apiRoute>0 ? ' · соединение через прокси-зеркало' : '';
   if(!gotData || res.ok===0){
-    st.innerHTML = `<span style="color:var(--red)">❌ Не удалось загрузить цены: ${res.fail} из ${res.total} запросов не прошли.</span> `+
-      `Ни прямой доступ к albion-online-data.com, ни прокси-зеркала не отвечают из твоей сети. `+
-      `Включи VPN и нажми «⟳ Обновить». Проверка доступа: открой <a href="https://europe.albion-online-data.com/api/v2/stats/prices/T4_BAG.json" target="_blank" style="color:var(--accent)">эту ссылку</a> — должен показаться текст с ценами.`;
+    setStatus({kind:'error', text:`${res.fail} из ${res.total} запросов не прошли — ни снимок сервера, ни API не отвечают. Включи VPN и нажми «⟳ Обновить» · <a href="https://europe.albion-online-data.com/api/v2/stats/prices/T4_BAG.json" target="_blank" style="color:var(--accent)">проверить доступ</a>`});
     pg.style.width='0';
   } else if(res.fail>0){
-    st.textContent = `⚠ Данные загружены частично: ${res.ok} из ${res.total} запросов прошли — часть предметов может отсутствовать. Нажми «⟳ Обновить» для повтора${viaProxy}`;
+    setStatus({kind:'ok', src:'api', at:Date.now(), partial:`${res.ok} из ${res.total} запросов`});
   } else if(Object.keys(S.bm).length===0){
-    st.textContent = `⚠ Цены рынков загружены, но история чёрного рынка (объёмы, средние сделок) не пришла — поэтому нет колонок «Объём» и «Пул», а канал везде городской. Нажми «⟳ Обновить»${viaProxy}`;
+    setStatus({kind:'ok', src:'api', at:Date.now(), partial:'история ЧР не пришла'});
   } else {
-    st.textContent = `Данные загружены · предметов в базе: ${DATA.items.length} · обновлено ${new Date().toLocaleTimeString('ru-RU')}${viaProxy}`;
+    setStatus({kind:'ok', src:'api', at:Date.now(), partial:null});
   }
   compute(); render();
   if(gotData) loadCityVolumes(); // объёмы городов фоном (только в режиме прямого опроса API)
