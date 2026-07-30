@@ -76,6 +76,8 @@ td.item{display:flex;align-items:center;gap:9px;min-width:260px}
 td.item img{width:42px;height:42px;flex:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))}
 .iname{overflow:hidden}
 .iname b{display:block;font-weight:600;font-size:13px;color:var(--text)}
+.iname b.lnk{display:inline;cursor:pointer;border-bottom:1px dotted var(--border2)}
+.iname b.lnk:hover{color:var(--accent);border-bottom-color:var(--accent)}
 .iname span{font-size:11.5px;color:var(--muted)}
 tbody tr.row:nth-child(4n+1){background:rgba(255,255,255,.015)}
 tr.row{transition:background .12s}
@@ -214,6 +216,8 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
       <span>Купить дёшево в одном городе, продать дорого в другом. С объёмами продаж города-получателя. Перевозку и риск бери на себя.</span></div>
     <div class="card" onclick="enterApp('ench')"><b>💎 Рунофикация</b>
       <span>Купить шмотку, докинуть руны/души/реликты, поднять зачарование (например 4.2 → 4.3) и продать дороже на чёрном рынке. С объёмами продаж по каждому качеству.</span></div>
+    <div class="card" onclick="enterApp('item')"><b>🔍 Цены предмета</b>
+      <span>Сколько стоит любая вещь или ресурс: цены по всем семи городам и качествам, бай-ордера (за сколько сдать сразу) и средние сделок на чёрном рынке.</span></div>
     <div class="card" onclick="enterApp('roads')"><b>🛡 Дороги в Карлеон <span class="badge b-warn" style="vertical-align:2px">бета</span></b>
       <span>Стоит ли везти сейчас: живой светофор по убийствам транспортников (киллборд Europe), классификатор «кто вёз на ЧР» и окна Bandit Assault. Раздел дорабатывается.</span></div>
   </div>
@@ -403,6 +407,30 @@ async function fetchJSON(url){
 // снимок готовых данных: мгновенное восстановление после перезагрузки страницы
 // (телефоны выгружают тяжёлую вкладку при повороте экрана — с снимком это безболезненно)
 
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+// одна волна запросов; возвращает список неудавшихся задач
+async function runRound(list, conc, delay, onOne){
+  const failed=[]; let done=0; const total=list.length; const queue=[...list];
+  const workers = Array.from({length:Math.max(1,conc)}, async ()=>{
+    while(queue.length){ const t=queue.shift();
+      try{ await t(); }catch(e){ failed.push(t); console.warn(e); }
+      done++; onOne(done,total); await sleep(delay); }
+  });
+  await Promise.all(workers);
+  return failed;
+}
+// загрузка с автоповтором: через прокси — медленнее и бережнее (лимиты бесплатных зеркал)
+async function pool(tasks, onOne){
+  const total=tasks.length;
+  let failed = await runRound(tasks, apiRoute>0?2:CFG.concurrency, apiRoute>0?450:150, onOne);
+  for(let round=1; round<=3 && failed.length; round++){
+    if(typeof setStatus==='function') setStatus({kind:'loading', text:`Повторяю неудачные запросы: волна ${round}, осталось ${failed.length}…`});
+    await sleep(2000*round); // пауза, чтобы лимиты остыли
+    failed = await runRound(failed, apiRoute>0?1:2, apiRoute>0?800:300, onOne);
+  }
+  return {ok: total-failed.length, fail: failed.length, total};
+}
+
 // ─── живая статус-полоса ───
 const REFRESH_CYCLE_MIN = 15; // сервер обновляет снимок каждые 15 минут
 function ageText(min){
@@ -445,13 +473,13 @@ function applyServerData(d){
   const CI = d.cities || CITIES;
   S.matPrices={}; S.cityPrices={}; S.bm={}; S.matHist={}; S.cityHist={};
   for(const [id,byCi] of Object.entries(d.m||{})){
-    const o={}; for(const [ci,v] of Object.entries(byCi)) o[CI[ci]]={price:v[0], ts:v[1]};
+    const o={}; for(const [ci,v] of Object.entries(byCi)) o[CI[ci]]={price:v[0], ts:v[1], buy:v[2]||0, buyTs:v[3]||0};
     S.matPrices[id]=o;
   }
   for(const [id,byCi] of Object.entries(d.c||{})){
     const o={};
     for(const [ci,byQ] of Object.entries(byCi)){
-      const q={}; for(const [ql,v] of Object.entries(byQ)) q[ql]={sell:v[0], ts:v[1]};
+      const q={}; for(const [ql,v] of Object.entries(byQ)) q[ql]={sell:v[0], ts:v[1], buy:v[2]||0, buyTs:v[3]||0};
       o[CI[ci]]=q;
     }
     S.cityPrices[id]=o;
@@ -1006,15 +1034,23 @@ const WARN_TIP = 'Подозрительные цифры: аномальная 
 const QUAL_RU = {1:'Обычное',2:'Хорошее',3:'Выдающееся',4:'Отличное',5:'Шедевр'};
 function icon(id,q){ return `<img loading="lazy" src="https://render.albiononline.com/v1/item/${enc(id)}.png?size=64${q?`&quality=${q}`:''}" alt="">`; }
 function nameCell(it, extra, qualText){
-  return `<td class="item">${icon(it.id)}<div class="iname"><b>${it.en}${extra||''}</b>
+  return `<td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${it.en}</b>${extra||''}`+`
     <span>${it.ru||''} · T${it.tier}${it.ench?'.'+it.ench:''} · ${CAT_RU[it.cat]||it.cat}${qualText?' · '+qualText:''}</span></div></td>`;
 }
 function nameCellQ(it, q, extra){
-  return `<td class="item">${icon(it.id,q)}<div class="iname"><b>${it.en}${extra||''}</b>
+  return `<td class="item">${icon(it.id,q)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${it.en}</b>${extra||''}`+`
     <span>${it.ru||''} · T${it.tier}${it.ench?'.'+it.ench:''} · ${CAT_RU[it.cat]||it.cat} · ${QUAL_RU[q]}</span></div></td>`;
 }
 function render(){
   const wrap=$('tableWrap');
+  if(S.tab==='item'){
+    wrap.innerHTML = itemTabHTML();
+    const q=$('itemQ');
+    if(q){ q.oninput=()=>{ S.itemQ=q.value; const p=q.selectionStart; render(); const q2=$('itemQ'); if(q2){ q2.focus(); q2.setSelectionRange(p,p); } }; }
+    const back=$('itemBack'); if(back) back.onclick=()=>{ S.itemSel=null; render(); };
+    wrap.querySelectorAll('tr.row[data-open]').forEach(tr=>tr.onclick=()=>{ S.itemSel=tr.dataset.open; render(); });
+    return;
+  }
   if(S.tab==='roads'){
     wrap.innerHTML = roadsHTML();
     const rb=$('roadsReload'); if(rb) rb.onclick=()=>{ S.roads.loaded=false; loadRoads(); };
@@ -1623,6 +1659,104 @@ function roadsHTML(){
   out+='</div>';
   return out;
 }
+
+// ─── раздел «Цены предмета»: цены по городам и на ЧР ───
+function itemIndex(){
+  if(S._idx) return S._idx;
+  const list = DATA.items.map(it=>({id:it.id, en:it.en, ru:it.ru, tier:it.tier, ench:it.ench, cat:it.cat, kind:'item'}));
+  for(const [mid,nm] of Object.entries(DATA.matNames||{})){
+    const m = /^T(\d)/.exec(mid);
+    list.push({id:mid, en:nm.en||mid, ru:nm.ru||'', tier:m?+m[1]:0, ench:(/@(\d)/.exec(mid)?.[1]|0), cat:'resource', kind:'mat'});
+  }
+  S._idx = list;
+  return list;
+}
+function priceCell(v){
+  if(!v) return '<span class="fresh">—</span>';
+  const sell = v.sell ?? v.price ?? 0, buy = v.buy||0;
+  const ts = v.ts, bts = v.buyTs;
+  return `${sell?`<b>${fmt(sell)}</b> <span class="fresh">${fmtAge(hoursAgo(ts))}</span>`:'<span class="fresh">нет ордеров</span>'}`
+    + (buy?`<br><span style="color:var(--blue)">${fmt(buy)}</span> <span class="fresh">${fmtAge(hoursAgo(bts))}</span>`:'');
+}
+function itemCardHTML(id){
+  const it = DATA.items.find(x=>x.id===id);
+  const nm = it || {id, en:(DATA.matNames?.[id]?.en||id), ru:(DATA.matNames?.[id]?.ru||''), tier:0, ench:0, cat:'resource'};
+  const isMat = !it;
+  const bm = S.bm[id];
+  let out = `<div class="panel"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <img src="https://render.albiononline.com/v1/item/${enc(id)}.png?size=76" style="width:64px;height:64px" onerror="this.style.display='none'">
+      <div><div style="font-size:17px;font-weight:700">${nm.en}</div>
+        <div class="fresh">${nm.ru||''} ${nm.tier?'· T'+nm.tier+(nm.ench?'.'+nm.ench:''):''} · ${isMat?'ресурс/материал':(CAT_RU[nm.cat]||nm.cat)} · <code>${id}</code></div></div>
+      <button id="itemBack" style="margin-left:auto">← к поиску</button></div>`;
+
+  // сводка «лучшее сейчас» (обычное качество)
+  const byCity = isMat ? (S.matPrices[id]||{}) : (S.cityPrices[id]||{});
+  let cheap=null, rich=null;
+  for(const c of CITIES){
+    const v = isMat ? byCity[c] : byCity[c]?.[1];
+    if(!v) continue;
+    const sell = v.sell ?? v.price ?? 0, buy = v.buy||0;
+    if(sell && (!cheap || sell<cheap.p)) cheap={c, p:sell, ts:v.ts};
+    if(buy && (!rich || buy>rich.p)) rich={c, p:buy, ts:v.buyTs};
+  }
+  const bmQ1 = bm && (bm.qs[1]||bm.qs[2]);
+  out += `<div style="margin:12px 0;display:flex;gap:10px;flex-wrap:wrap">
+    <span class="mchip">🛒 дешевле купить: <b>${cheap?fmt(cheap.p)+' · '+cheap.c:'—'}</b></span>
+    <span class="mchip">💰 дороже сдать: <b>${rich?fmt(rich.p)+' · '+rich.c:'—'}</b></span>
+    ${bmQ1?`<span class="mchip">🖤 ЧР, средняя сделок: <b>${fmt(bmQ1.price)}</b> · объём ${fmt(bmQ1.vol)}/д</span>`:''}
+  </div>`;
+
+  // таблица по городам
+  const quals = isMat ? [1] : [1,2,3,4,5];
+  out += '<table><thead><tr><th class="item" style="text-align:left">Город</th>'
+      + quals.map(q=>`<th>${isMat?'Цена':QUAL_RU[q]}</th>`).join('')
+      + (isMat?'<th>Объём/д</th>':'') + '</tr></thead><tbody>';
+  for(const c of CITIES){
+    const has = isMat ? byCity[c] : quals.some(q=>byCity[c]?.[q]);
+    out += `<tr><td class="item" style="display:table-cell"><b>${c}</b></td>`
+      + quals.map(q=>`<td>${priceCell(isMat?byCity[c]:byCity[c]?.[q])}</td>`).join('')
+      + (isMat?`<td>${S.matHist?.[id]?.[c]?fmt(S.matHist[id][c]):'<span class="fresh">—</span>'}</td>`:'')
+      + '</tr>';
+  }
+  out += '</tbody></table>';
+
+  // чёрный рынок
+  if(bm){
+    out += '<div style="margin-top:14px"><b>🖤 Чёрный рынок — реальные сделки за 7 дней</b></div>';
+    out += '<table style="margin-top:6px"><thead><tr><th class="item" style="text-align:left">Качество</th><th>Средняя цена</th><th>Объём/день</th></tr></thead><tbody>';
+    for(let q=1;q<=5;q++){ const d=bm.qs[q]; if(!d) continue;
+      out += `<tr><td class="item" style="display:table-cell">${QUAL_RU[q]}</td><td><b>${fmt(d.price)}</b></td><td>${fmt(d.vol)}</td></tr>`; }
+    out += '</tbody></table>';
+  } else if(!isMat){
+    out += '<div class="fresh" style="margin-top:12px">На чёрном рынке сделок по этому предмету за неделю не зафиксировано.</div>';
+  }
+  out += `<div class="fresh" style="margin-top:12px">Верхнее число — минимальный селл-ордер (за сколько купить), <span style="color:var(--blue)">синее</span> — максимальный бай-ордер (за сколько сдать мгновенно). Рядом возраст цены.</div></div>`;
+  return out;
+}
+function itemTabHTML(){
+  if(S.itemSel) return itemCardHTML(S.itemSel);
+  const q = (S.itemQ||'').trim().toLowerCase();
+  let out = `<div class="panel"><b>🔍 Поиск цены предмета или ресурса</b>
+    <div style="margin-top:10px"><input type="text" id="itemQ" value="${(S.itemQ||'').replace(/"/g,'&quot;')}"
+      placeholder="Название на английском или русском: bow, посох, metal bar…" style="width:100%;max-width:460px;font-size:14px;padding:9px 12px"></div>`;
+  if(q.length<2){
+    out += '<div class="fresh" style="margin-top:10px">Введи хотя бы две буквы. Ищет по 4 456 предметам и всем материалам: цены по семи городам, бай-ордера и средние сделок на чёрном рынке.</div></div>';
+    return out;
+  }
+  const hits = itemIndex().filter(x=>x.en.toLowerCase().includes(q) || (x.ru||'').toLowerCase().includes(q) || x.id.toLowerCase().includes(q))
+    .sort((a,b)=>(a.tier-b.tier)||(a.ench-b.ench)||a.en.localeCompare(b.en));
+  out += `<div class="fresh" style="margin:10px 0">Найдено: ${hits.length}${hits.length>60?' — показаны первые 60':''}</div>`;
+  out += '<table><tbody>';
+  for(const h of hits.slice(0,60)){
+    out += `<tr class="row" data-open="${h.id}"><td class="item">
+      <img loading="lazy" src="https://render.albiononline.com/v1/item/${enc(h.id)}.png?size=48" style="width:38px;height:38px" onerror="this.style.display='none'">
+      <div class="iname"><b>${h.en}</b><span>${h.ru||''} ${h.tier?'· T'+h.tier+(h.ench?'.'+h.ench:''):''} · ${h.kind==='mat'?'ресурс':(CAT_RU[h.cat]||h.cat)}</span></div></td></tr>`;
+  }
+  out += '</tbody></table></div>';
+  return out;
+}
+window.openItem = (id)=>{ S.itemSel=id; setTab('item'); };
+
 // ─── События ───
 ['citySel','focusChk','premChk','feeInp','qualSel'].forEach(id=>$(id).onchange=()=>{ compute(); render(); });
 ['searchInp','minMargin','minVol'].forEach(id=>$(id).oninput=()=>{ S.limit=0; render(); });
@@ -1638,7 +1772,7 @@ $('refSel').onchange = setupRefresh;
 setupRefresh();
 $('goldBtn').onclick=()=>{ S.gold=!S.gold; $('goldBtn').classList.toggle('active',S.gold); render(); };
 $('reloadBtn').onclick=()=>loadAll(true);
-const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', roads:'🛡 Дороги в Карлеон · БЕТА'};
+const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', item:'🔍 Цены предмета', roads:'🛡 Дороги в Карлеон · БЕТА'};
 // какие контролы нужны на каждой вкладке (премиум, возраст данных, обновление и поиск — всегда)
 const TAB_CONTROLS={
   craft:   ['wrapCity','wrapFocus','wrapSelfRef','wrapQual','wrapFee','wrapCat'],
@@ -1646,6 +1780,7 @@ const TAB_CONTROLS={
   flip:    ['wrapCity','wrapSafe','wrapCat'],
   cityflip:['wrapSafe','wrapCat'],
   ench:    ['wrapCity','wrapSafe','wrapCat'],
+  item:    [],
   roads:   [],
 };
 const ALL_WRAPS=['wrapCity','wrapFocus','wrapSafe','wrapSelfRef','wrapQual','wrapFee','wrapCat','refModeWrap'];
@@ -1654,7 +1789,7 @@ function setTab(t){
   const el=$('secName'); if(el) el.textContent=TAB_NAMES[t]||'';
   const vis=TAB_CONTROLS[t]||[];
   for(const id of ALL_WRAPS){ const w=$(id); if(w) w.style.display = vis.includes(id)?'':'none'; }
-  const flt=$('filters'); if(flt) flt.style.display = t==='roads'?'none':'';
+  const flt=$('filters'); if(flt) flt.style.display = (t==='roads'||t==='item')?'none':'';
   if(t==='roads' && !S.roads.loaded && !S.roads.loading) loadRoads(); // ленивая загрузка при входе
   S.limit = 0; // сбросить порцию строк
   if(S.loaded && t!=='roads') compute();

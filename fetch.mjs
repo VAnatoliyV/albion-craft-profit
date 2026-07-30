@@ -77,9 +77,12 @@ async function main(){
   await runPool(chunks(matAll, PRICE_BATCH).map(ch => async ()=>{
     const d = await getJSON(`${API}/prices/${encodeURIComponent(ch.join(','))}.json?locations=${encodeURIComponent(CITIES.join(','))}&qualities=1`);
     for(const e of d||[]){
-      if(!e.sell_price_min) continue;
       const ci = CITY_IDX[e.city]; if(ci===undefined) continue;
-      (out.m[e.item_id] ||= {})[ci] = [Math.round(e.sell_price_min), minutes(e.sell_price_min_date)];
+      const sell = Math.round(e.sell_price_min||0), buy = Math.round(e.buy_price_max||0);
+      if(!sell && !buy) continue;
+      const rec = [sell, sell?minutes(e.sell_price_min_date):0];
+      if(buy){ rec.push(buy, minutes(e.buy_price_max_date)); }
+      (out.m[e.item_id] ||= {})[ci] = rec;
     }
   }), 'mats')
 
@@ -88,10 +91,13 @@ async function main(){
   await runPool(chunks(itemIds, PRICE_BATCH).map(ch => async ()=>{
     const d = await getJSON(`${API}/prices/${encodeURIComponent(ch.join(','))}.json?locations=${encodeURIComponent(CITIES.join(','))}`);
     for(const e of d||[]){
-      if(!e.sell_price_min) continue;
       const ci = CITY_IDX[e.city]; if(ci===undefined) continue;
       const q = e.quality||1;
-      (((out.c[e.item_id] ||= {})[ci] ||= {}))[q] = [Math.round(e.sell_price_min), minutes(e.sell_price_min_date)];
+      const sell = Math.round(e.sell_price_min||0), buy = Math.round(e.buy_price_max||0);
+      if(!sell && !buy) continue;
+      const rec = [sell, sell?minutes(e.sell_price_min_date):0];
+      if(buy){ rec.push(buy, minutes(e.buy_price_max_date)); }
+      (((out.c[e.item_id] ||= {})[ci] ||= {}))[q] = rec;
     }
   }), 'city-prices')
 
