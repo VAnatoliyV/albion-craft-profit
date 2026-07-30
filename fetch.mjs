@@ -69,7 +69,10 @@ async function main(){
     for(const t of [4,5,6,7,8]) journalIds.push(`T${t}_JOURNAL_${arch}_FULL`);
   const refIds = (items.refining||[]).map(r=>r.id);
 
-  const out = { t: Math.round(Date.now()/1000), cities: CITIES, m:{}, c:{}, b:{}, h:{} };
+  const startedAt = Date.now();
+  // t выставим в самом конце: сбор идёт несколько минут, и время старта делает снимок
+  // на вид старше, чем он есть. Штамп ставим по факту готовности данных.
+  const out = { t: 0, cities: CITIES, m:{}, c:{}, b:{}, h:{} };
 
   // 1) материалы, артефакты, полные журналы — обычное качество, все города
   const matAll = [...new Set([...matIds, ...journalIds])];
@@ -158,8 +161,10 @@ async function main(){
     }
   }), 'city-volumes')
 
+  out.t = Math.round(Date.now()/1000);
   const json = JSON.stringify(out);
   const stats = {
+    collectSec: Math.round((Date.now()-startedAt)/1000),
     materials: Object.keys(out.m).length,
     itemsWithCityPrices: Object.keys(out.c).length,
     itemsWithBM: Object.keys(out.b).length,

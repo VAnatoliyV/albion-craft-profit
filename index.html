@@ -171,6 +171,10 @@ footer{padding:16px 22px;color:var(--muted);font-size:11.5px;border-top:1px soli
   display:grid;place-items:center;transition:--p .4s}
 .ring::before{content:'';position:absolute;inset:3px;border-radius:50%;background:var(--panel)}
 .ring span{position:relative;font-size:9px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+/* снимок уже пора обновить, но сбор на GitHub запускается с опозданием */
+.ring.due{background:conic-gradient(#8a93a6 100%,#8a93a6 0)}
+.ring.due span{font-size:11px;color:var(--muted);animation:ringspin 3.2s linear infinite}
+@keyframes ringspin{to{transform:rotate(360deg)}}
 /* чипы-метрики */
 .mchip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:20px;
   background:rgba(255,255,255,.04);border:1px solid var(--border);white-space:nowrap}
@@ -381,10 +385,12 @@ const API_ROUTES = [
 ];
 let apiRoute = +( (()=>{ try{return localStorage.getItem('acp_route')}catch(e){return 0} })() || 0 );
 if(!(apiRoute>=0 && apiRoute<API_ROUTES.length)) apiRoute=0;
-function fetchTO(url, ms){
+function fetchTO(url, ms, noCache){
   const ctl = new AbortController();
   const t = setTimeout(()=>ctl.abort(), ms);
-  return fetch(url, {signal: ctl.signal}).finally(()=>clearTimeout(t));
+  const opt = {signal: ctl.signal};
+  if(noCache) opt.cache = 'reload'; // «Обновить» обязан сходить в сеть, а не в кэш
+  return fetch(url, opt).finally(()=>clearTimeout(t));
 }
 async function fetchJSON(url){
   const c = cache_get(url); if(c) return c;
@@ -452,11 +458,15 @@ function renderStatus(){
     const cls = min>180 ? 'bad' : min>60 ? 'warn' : '';
     const label = min>180 ? 'устарело' : min>60 ? 'с задержкой' : 'в эфире';
     const pct = Math.min(100, Math.round(min/REFRESH_CYCLE_MIN*100));
-    const left = Math.max(0, Math.ceil(REFRESH_CYCLE_MIN - min));
+    const left = Math.ceil(REFRESH_CYCLE_MIN - min);
+    const due = left <= 0; // снимок уже должен был обновиться, но GitHub запускает сбор с опозданием
+    const ringTitle = due
+      ? `Новый снимок уже пора собрать. GitHub Actions запускает сбор по расписанию бесплатно, но может опоздать на 10–30 минут при нагрузке — это нормально. Кнопка «Обновить» скачает снимок заново, минуя кэш.`
+      : `Сервер собирает данные каждые ${REFRESH_CYCLE_MIN} мин. До следующего снимка ≈${left} мин`;
     inner = `<span class="live ${cls}" title="Свежесть снимка данных"><i></i>${label}</span>
       <span class="sep"></span>
       <span>${st.src==='api'?'Прямой опрос API':'Снимок сервера'} · <b>${ageText(min)}</b></span>
-      <span class="ring" style="--p:${pct}" title="Сервер собирает данные каждые ${REFRESH_CYCLE_MIN} мин. До следующего снимка ≈${left} мин"><span>${left}′</span></span>
+      <span class="ring${due?' due':''}" style="--p:${due?100:pct}" title="${ringTitle}"><span>${due?'⟳':left+'′'}</span></span>
       <span class="sep"></span>
       <span class="mchip">⚒ <b>${(DATA&&DATA.items.length||0).toLocaleString('ru-RU')}</b> предметов</span>
       <span class="mchip">📊 <b>${Object.keys(S.bm||{}).length.toLocaleString('ru-RU')}</b> с историей ЧР</span>
@@ -503,10 +513,12 @@ function applyServerData(d){
     S.cityHist[id]=o;
   }
 }
-async function loadServerData(){
+async function loadServerData(force){
   try{
-    const bust = Math.floor(Date.now()/3e5); // кэш-бастер раз в 5 минут
-    const r = await fetchTO(`data.json?v=${bust}`, 25000);
+    // кэш-бастер раз в минуту, а по кнопке «Обновить» — уникальный,
+    // иначе браузер и CDN отдают прежний снимок и кажется, что сервер не обновился
+    const bust = force ? Date.now() : Math.floor(Date.now()/6e4);
+    const r = await fetchTO(`data.json?v=${bust}`, 25000, force);
     if(!r.ok) return null;
     const d = await r.json();
     if(!d || !d.b || Object.keys(d.b).length<50) return null;
@@ -522,7 +534,7 @@ async function loadAll(force){
   // готовый снимок с нашего мини-сервера: один маленький файл вместо сотни запросов
   {
     setStatus({kind:'loading', text:'Загружаю готовый снимок цен…'});
-    const srv = await loadServerData();
+    const srv = await loadServerData(force);
     if(srv){
       S.loaded=true;
       document.body.classList.remove('loading');
@@ -1761,17 +1773,35 @@ window.openItem = (id)=>{ S.itemSel=id; setTab('item'); };
 ['citySel','focusChk','premChk','feeInp','qualSel'].forEach(id=>$(id).onchange=()=>{ compute(); render(); });
 ['searchInp','minMargin','minVol'].forEach(id=>$(id).oninput=()=>{ S.limit=0; render(); });
 ['catSel','tierSel','enchSel','ageSel'].forEach(id=>$(id).onchange=()=>{ S.limit=0; render(); });
-// автообновление: интервал управляется селектором в шапке
-let refTimer = null;
-function setupRefresh(){
-  if(refTimer){ clearInterval(refTimer); refTimer=null; }
-  const min = +$('refSel').value;
-  if(min>0) refTimer = setInterval(()=>{ if(S.loaded) loadAll(true); }, min*60*1000);
+// Автообновление. Сам снимок весит ~2 МБ, поэтому не тянем его по таймеру:
+// сначала спрашиваем крошечный data-stats.json (200 байт) — не поменялся ли builtAt,
+// и только если сервер реально собрал новый снимок, качаем его целиком.
+let lastCheck = 0;
+async function checkSnapshot(){
+  try{
+    const r = await fetchTO('data-stats.json?v='+Date.now(), 8000, true);
+    if(!r.ok) return;
+    const s = await r.json();
+    if(!s || !s.builtAt) return;
+    if(!S.builtAt){ S.builtAt = s.builtAt; return; } // первый замер — просто запомнили
+    if(s.builtAt !== S.builtAt){ S.builtAt = s.builtAt; if(S.loaded) loadAll(true); }
+  }catch(e){}
 }
+function setupRefresh(){ lastCheck = Date.now(); }
 $('refSel').onchange = setupRefresh;
-setupRefresh();
+setInterval(async ()=>{
+  if(!S.loaded) return;
+  const sel = +$('refSel').value; if(sel<=0) return; // «выкл»
+  const ageMin = (S.st && S.st.at) ? (Date.now()-S.st.at)/6e4 : 999;
+  // снимок уже просрочен — GitHub опаздывает, ждём его чаще, чем по расписанию
+  const everyMs = (ageMin >= REFRESH_CYCLE_MIN ? 90e3 : sel*60e3);
+  if(Date.now()-lastCheck < everyMs) return;
+  lastCheck = Date.now();
+  await checkSnapshot();
+}, 30000);
+checkSnapshot();
 $('goldBtn').onclick=()=>{ S.gold=!S.gold; $('goldBtn').classList.toggle('active',S.gold); render(); };
-$('reloadBtn').onclick=()=>loadAll(true);
+$('reloadBtn').onclick=async ()=>{ lastCheck=Date.now(); await loadAll(true); S.builtAt=null; checkSnapshot(); };
 const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', item:'🔍 Цены предмета', roads:'🛡 Дороги в Карлеон · БЕТА'};
 // какие контролы нужны на каждой вкладке (премиум, возраст данных, обновление и поиск — всегда)
 const TAB_CONTROLS={
