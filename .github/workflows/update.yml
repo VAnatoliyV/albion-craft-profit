@@ -2,8 +2,8 @@ name: Update market data
 
 on:
   schedule:
-    # каждые 20 минут (GitHub может задерживать запуск на 5-30 мин при нагрузке)
-    - cron: '*/20 * * * *'
+    # каждые 15 минут (GitHub может задерживать запуск на 5-30 мин при нагрузке)
+    - cron: '*/15 * * * *'
   workflow_dispatch:
   push:
     branches: [main]
