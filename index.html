@@ -55,9 +55,6 @@ main{padding:18px 22px}
 body.loading #status::before{content:'';width:14px;height:14px;border:2px solid var(--panel3);border-top-color:var(--accent);
   border-radius:50%;animation:spin .8s linear infinite;flex:none}
 @keyframes spin{to{transform:rotate(360deg)}}
-.bar{height:5px;background:var(--panel2);border-radius:3px;overflow:hidden;margin:4px 0 14px;max-width:520px}
-.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));
-  transition:width .25s;border-radius:3px;box-shadow:0 0 8px rgba(238,188,78,.5)}
 
 /* ── скелетон загрузки ── */
 .skel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:8px;overflow:hidden}
@@ -268,7 +265,6 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
 </header>
 <main id="appMain" style="display:none">
   <div id="status">Загрузка цен с Albion Online Data Project…</div>
-  <div class="bar"><i id="prog"></i></div>
   <div class="filters" id="filters">
     <input type="text" id="searchInp" placeholder="Поиск предмета…" style="min-width:200px">
     <span id="ovrChip" style="display:none;font-size:12px;color:var(--accent)">✎ своих цен: <b id="ovrCnt">0</b>
@@ -503,7 +499,7 @@ async function loadAll(force){
       S.loaded=true;
       document.body.classList.remove('loading');
       setStatus({kind:'ok', src:'server', at: srv.t*1000, partial:null});
-      const pg=$('prog'); if(pg) pg.style.width='100%';
+      
       const hs=$('homeStatus'); if(hs) hs.textContent='Цены готовы ✓';
       compute(); render();
       return;
@@ -521,7 +517,7 @@ async function loadAll(force){
   const HB = apiRoute>0 ? 20 : CFG.histBatch;
   const PB = apiRoute>0 ? 60 : CFG.priceBatch;
   S.loaded=false; S.matPrices={}; S.cityPrices={}; S.bm={};
-  const st=$('status'), pg=$('prog');
+  const pg=$('prog'); // элемент удалён — обращения защищены проверками
   const itemIds = [...DATA.items.map(i=>i.id), ...(DATA.ench3Ids||[])];
   const matIds = [...Object.keys(DATA.resval), ...(DATA.rawIds||[]), ...(DATA.extraMatIds||[]), ...(DATA.stoneIds||[])];
   const tasks=[];
@@ -587,14 +583,13 @@ async function loadAll(force){
   }
   setStatus({kind:'loading', text:`Загрузка цен: 0/${tasks.length} запросов…`});
   render(); // показать скелетон, пока грузится
-  const res = await pool(tasks, (d,t)=>{ pg.style.width=(d/t*100)+'%'; setStatus({kind:'loading', text:`Загрузка цен: ${d}/${t} запросов…`}); });
+  const res = await pool(tasks, (d,t)=>{ if(pg) pg.style.width=(d/t*100)+'%'; setStatus({kind:'loading', text:`Загрузка цен: ${d}/${t} запросов…`}); });
   S.loaded=true;
   document.body.classList.remove('loading');
   const gotData = Object.keys(S.matPrices).length>0 || Object.keys(S.bm).length>0;
   const viaProxy = apiRoute>0 ? ' · соединение через прокси-зеркало' : '';
   if(!gotData || res.ok===0){
     setStatus({kind:'error', text:`${res.fail} из ${res.total} запросов не прошли — ни снимок сервера, ни API не отвечают. Включи VPN и нажми «⟳ Обновить» · <a href="https://europe.albion-online-data.com/api/v2/stats/prices/T4_BAG.json" target="_blank" style="color:var(--accent)">проверить доступ</a>`});
-    pg.style.width='0';
   } else if(res.fail>0){
     setStatus({kind:'ok', src:'api', at:Date.now(), partial:`${res.ok} из ${res.total} запросов`});
   } else if(Object.keys(S.bm).length===0){
