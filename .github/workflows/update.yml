@@ -2,9 +2,12 @@ name: Update market data
 
 on:
   schedule:
-    # каждые 15 минут, но НЕ в круглые минуты: на :00/:15/:30/:45 у GitHub пик
-    # очереди и запуск уезжает на 10-30 мин. Смещение на 7 минут снижает задержку.
-    - cron: '7,22,37,52 * * * *'
+    # GitHub запускает cron «по возможности» и на бесплатных публичных репозиториях
+    # роняет большинство слотов: за 2 часа из девяти слотов */15 сработал один.
+    # Поэтому просим запуск часто (каждые 5 минут, на некруглых минутах — там
+    # очередь короче), а лишние срабатывания отсекает шаг «Нужен ли новый сбор»:
+    # если опубликованный снимок свежее 12 минут, работа сразу завершается.
+    - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
   workflow_dispatch:
   push:
     branches: [main]
@@ -24,20 +27,44 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      collected: ${{ steps.gate.outputs.go }}
     steps:
       - uses: actions/checkout@v4
 
+      # Частое расписание не значит частый сбор: смотрим, насколько стар уже
+      # опубликованный снимок. Ручной запуск и push собирают всегда.
+      - name: Нужен ли новый сбор
+        id: gate
+        run: |
+          MIN_AGE=12
+          AGE=999
+          if curl -sfL --retry 2 -o prev-stats.json \
+               "https://vanatoliyv.github.io/albion-craft-profit/data-stats.json"; then
+            AGE=$(python3 -c "import json,datetime;b=json.load(open('prev-stats.json'))['builtAt'];t=datetime.datetime.fromisoformat(b.replace('Z','+00:00'));print(int((datetime.datetime.now(datetime.timezone.utc)-t).total_seconds()//60))" 2>/dev/null || echo 999)
+          fi
+          echo "Опубликованному снимку $AGE мин (порог $MIN_AGE), событие: ${{ github.event_name }}"
+          if [ "${{ github.event_name }}" != "schedule" ] || [ "$AGE" -ge "$MIN_AGE" ]; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+            echo "Собираем заново"
+          else
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            echo "Снимок ещё свежий — сбор пропускаем, API не трогаем"
+          fi
+
       - uses: actions/setup-node@v4
+        if: steps.gate.outputs.go == 'true'
         with:
           node-version: '20'
 
       - name: Собрать цены с Albion Online Data Project
         id: fetch
+        if: steps.gate.outputs.go == 'true'
         continue-on-error: true
         run: node fetch.mjs
 
       - name: Если сбор не удался — взять уже опубликованный снимок
-        if: steps.fetch.outcome != 'success'
+        if: steps.gate.outputs.go == 'true' && steps.fetch.outcome != 'success'
         run: |
           echo "Сбор не удался, пробую сохранить прежние данные с сайта"
           curl -sfL --retry 2 -o data.json \
@@ -45,6 +72,7 @@ jobs:
           if [ -s data.json ]; then echo "Взят прежний снимок ($(wc -c < data.json) байт)"; else echo "Прежнего снимка нет"; fi
 
       - name: Собрать сайт
+        if: steps.gate.outputs.go == 'true'
         run: |
           mkdir -p public
           cp index.html items.json public/
@@ -54,11 +82,13 @@ jobs:
           ls -lh public/
 
       - uses: actions/upload-pages-artifact@v3
+        if: steps.gate.outputs.go == 'true'
         with:
           path: public
 
   deploy:
     needs: build
+    if: needs.build.outputs.collected == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
