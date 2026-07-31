@@ -738,11 +738,17 @@ function craftCostIn(item, city, focus){
   const fee = item.iv*CFG.nutritionFactor*(+$('feeInp').value||0)/100;
   return {cost: raw*(1-ret)+artCost+fee, bonus, ret, fee, raw, artCost, artInfo, stale:worst, selfMats};
 }
-// слава за один крафт: зависит от тира, количества материалов и зачарования
+// Слава за один крафт — формула из вики Albion:
+//   F = A×множитель(тир) + (артефакт ? 500 : 0) + зачар × (F_база − 7.5×A),
+// где A — количество неартефактных материалов. Зачарование прибавляет линейно,
+// а НЕ удваивает: проверено на вики-таблице переработки (Т5.0 = 135, Т8.3 = 8300).
 function craftFame(it){
   const per = CFG.famePerMat[it.tier]; if(!per) return 0;
-  let n = 0; for(const c of Object.values(it.mats||{})) n += c;
-  return per * n * Math.pow(2, it.ench||0);
+  let A = 0; for(const c of Object.values(it.mats||{})) A += c;
+  const base = A * per;
+  const artBonus = it.art ? 500 : 0;
+  const ench = (it.ench||0) * (base - 7.5*A);
+  return base + artBonus + ench;
 }
 // сколько журналов нужно на партию из N штук (журнал закрывается по славе)
 function journalsFor(it, N){
