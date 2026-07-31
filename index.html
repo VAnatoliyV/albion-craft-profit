@@ -792,6 +792,7 @@ function compute(){
       const bm = S.bm[it.id];
       const sellOvr = S.overrides['SELL|'+it.id];
       const bmPrice = sellOvr!=null ? sellOvr : bmExpected(bm, qualMode);
+      const bmSrc = (bmQ(bm,1)||bmQ(bm,2)||{}).src || null; // чем посчитали цену ЧР
       // канал 1: ЧР
       const revBM = bmPrice!=null ? bmPrice*(1-tax) : null;
       // канал 2: лучший рынок города, обычное качество (ордер на продажу: налог + 2.5% сбор)
@@ -817,7 +818,7 @@ function compute(){
       const warn = margin>300 || (margin>100 && (vol||0)<10);
       rows.push({it, city, cost:cc.cost, bonus:cc.bonus, rev, channel, net, margin,
         vol, pool: vol*Math.max(net,0), real: Math.max(net,0)*vol*CFG.marketShare, stale, warn,
-        bmPrice, cityPrice:bestCityPrice||null, fee:cc.fee, ret:cc.ret, raw:cc.raw,
+        bmPrice, bmSrc, cityPrice:bestCityPrice||null, fee:cc.fee, ret:cc.ret, raw:cc.raw,
         artCost:cc.artCost||0, artInfo:cc.artInfo||null});
     }
   }
@@ -1284,7 +1285,7 @@ function detailHTML(r,idx){
   const sOvr = S.overrides['SELL|'+it.id]!=null;
   m+=`Сырьё: <b>${fmt(r.raw)}</b> · Возврат: <b>${(r.ret*100).toFixed(1)}%</b> → эффективно ${fmt(r.raw*(1-r.ret))} · `+
      `Станок: <b>${fmt(r.fee)}</b> · Итого себестоимость: <b>${fmt(r.cost)}</b><br>`+
-     `Продажа: ${r.channel==='ЧР'?`ЧР, ${sOvr?'моя цена':(bmQ(S.bm[it.id],qualMode==='q1'?1:1)?.src==='ордер'?'бай-ордер сейчас':'последние сделки')}`:`рынок ${r.channel}, ордер`}${sOvr?' <span style="color:var(--accent)">✎</span>':''}
+     `Продажа: ${r.channel==='ЧР'?`ЧР, ${sOvr?'моя цена':(r.bmSrc==='ордер'?'бай-ордер сейчас':r.bmSrc==='сделки'?'последние сделки':'средняя за 7 дней')}`:`рынок ${r.channel}, ордер`}${sOvr?' <span style="color:var(--accent)">✎</span>':''}
       <input type="number" style="width:100px" value="${Math.round(r.bmPrice??r.cityPrice??0)}"
         onchange="setSellOverride('${it.id}',this.value)"
         title="По какой цене реально продашь (правит цену ЧР). Пустое поле или 0 — вернуть среднюю сделок из API.">
