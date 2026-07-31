@@ -299,10 +299,10 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
 </main>
 <footer id="appFooter" style="display:none">
   Данные: <b>Albion Online Data Project</b> (краудсорсинг — свежесть зависит от игроков со сборщиком данных) ·
-  Иконки: официальный Render API · Цена продажи ЧР = средняя цена реальных сделок за 7 дней (не верхний ордер) ·
+  Иконки: официальный Render API · Цена продажи ЧР = живой бай-ордер чёрного рынка (сколько дадут прямо сейчас); если ордера нет — последняя суточная средняя сделок, и лишь затем средняя за 7 дней ·
   Возврат ресурсов: город 15,3%, бонусный город 24,8%, с фокусом 43,5%/47,9% (формула бонус/(1+бонус)) ·
   Плата за станок = item value × 0.1125 × тариф/100 · Охват: Т4–Т8, зачар. 0–3, включая артефактные
-  (артефакт — по мин. цене среди городов, возврат на него не действует) · Журналы: 1 журнал = 3 крафта своего тира ·
+  (артефакт — по мин. цене среди городов, возврат на него не действует) · Журналы: считаются по славе (слава за крафт = слава за материал × материалов × 2^зачар), а не по числу крафтов ·
   Материалы покупаются в городе крафта · «Пул/день» = профит × объём рынка; реально забрать ~25% ·
   Качество: «Обычное» — консервативный расчёт по сделкам обычного качества; «Взвешенно» — средняя по всем
   качествам с весом объёма (ближе к реальности при прокачанном спеке) · Флиппинг: каждое качество — отдельная строка ·
@@ -340,7 +340,11 @@ const CFG = {
   nutritionFactor: 0.1125, setupFee: 0.025, marketShare: 0.25,
   histDays: 7, staleHours: 24, cacheTTLmin: 15,
   histBatch: 50, priceBatch: 150, concurrency: 4,
-  journalCrafts: 3, // крафтов на журнал (3600/1200 = 7200/2400 = 14400/4800)
+  // Журналы наполняются СЛАВОЙ, а не числом крафтов. Ёмкость пустого журнала по тирам
+  // (вики) и слава за единицу материала — вместе они точно воспроизводят опубликованную
+  // таблицу славы за крафт для всех классов вещей: слава = славаЗаМатериал × материалов × 2^зачар.
+  journalCap:  {4:1200, 5:2400, 6:4800, 7:9600, 8:19200},
+  famePerMat:  {4:22.5, 5:90,   6:270,  7:645,  8:1395},
 };
 const rr = b => b/(1+b); // возврат из суммы бонусов
 
@@ -371,6 +375,9 @@ const $ = id => document.getElementById(id);
 const fmt = n => n==null?'—':Math.round(n).toLocaleString('ru-RU');
 const enc = s => encodeURIComponent(s);
 const hoursAgo = ts => ts==null||ts===0 ? 1e9 : (typeof ts==='number' ? (Date.now()-ts*6e4)/3.6e6 : (Date.now()-new Date(ts+'Z').getTime())/3.6e6);
+// возраст по метке времени в миллисекундах — коротко, для подписей рядом с ценой
+const ageTxt = ts => { if(!ts) return ''; const h=(Date.now()-ts)/3.6e6;
+  return h<1 ? Math.max(1,Math.round(h*60))+' мин' : h<48 ? Math.round(h)+' ч' : Math.round(h/24)+' дн'; };
 function cache_get(k){ try{ const v=JSON.parse(localStorage.getItem('acp_'+k)||'null');
   if(v && Date.now()-v.t < CFG.cacheTTLmin*6e4) return v.d; }catch(e){} return null; }
 function cache_set(k,d){ try{ localStorage.setItem('acp_'+k, JSON.stringify({t:Date.now(),d})); }catch(e){} }
@@ -496,8 +503,19 @@ function applyServerData(d){
   }
   for(const [id,rec] of Object.entries(d.b||{})){
     const qs={}; let vol=0;
-    for(const [ql,v] of Object.entries(rec.q||{})){ qs[ql]={price:v[0], vol:v[1]}; vol+=v[1]; }
+    for(const [ql,v] of Object.entries(rec.q||{})){
+      qs[ql]={price:v[0], vol:v[1], last:v[2]||0, lastTs:(v[3]||0)*6e4};
+      vol+=v[1];
+    }
     S.bm[id]={qs, vol, last:rec.l||0};
+  }
+  // живые бай-ордера чёрного рынка кладём в те же качества
+  for(const [id,byQ] of Object.entries(d.bo||{})){
+    const rec = (S.bm[id] ||= {qs:{}, vol:0, last:0});
+    for(const [ql,v] of Object.entries(byQ)){
+      const cell = (rec.qs[ql] ||= {price:0, vol:0, last:0, lastTs:0});
+      cell.order = v[0]; cell.orderTs = (v[1]||0)*6e4;
+    }
   }
   for(const [id,byCi] of Object.entries(d.h||{})){
     const o={}; for(const [ci,v] of Object.entries(byCi)) o[CI[ci]]=v;
@@ -720,12 +738,33 @@ function craftCostIn(item, city, focus){
   const fee = item.iv*CFG.nutritionFactor*(+$('feeInp').value||0)/100;
   return {cost: raw*(1-ret)+artCost+fee, bonus, ret, fee, raw, artCost, artInfo, stale:worst, selfMats};
 }
+// слава за один крафт: зависит от тира, количества материалов и зачарования
+function craftFame(it){
+  const per = CFG.famePerMat[it.tier]; if(!per) return 0;
+  let n = 0; for(const c of Object.values(it.mats||{})) n += c;
+  return per * n * Math.pow(2, it.ench||0);
+}
+// сколько журналов нужно на партию из N штук (журнал закрывается по славе)
+function journalsFor(it, N){
+  const cap = CFG.journalCap[it.tier]; const f = craftFame(it);
+  if(!cap || !f) return 0;
+  return Math.ceil(N * f / cap);
+}
+// Что реально дадут за качество q на чёрном рынке. Приоритет: живой бай-ордер →
+// последняя суточная средняя сделок → средняя за 7 дней (самая грубая).
+function bmQ(bm, q){
+  const d = bm && bm.qs && bm.qs[q]; if(!d) return null;
+  if(d.order) return {price:d.order, ts:d.orderTs, src:'ордер', vol:d.vol};
+  if(d.last)  return {price:d.last,  ts:d.lastTs,  src:'сделки', vol:d.vol};
+  if(d.price) return {price:d.price, ts:0,         src:'средняя 7д', vol:d.vol};
+  return null;
+}
 function bmExpected(bm, mode){
   // консервативно: цена сделок обычного качества; взвешенно: средняя по всем качествам с весом объёма
   if(!bm) return null;
-  if(mode==='q1') return bm.qs[1] ? bm.qs[1].price : (bm.qs[2] ? bm.qs[2].price : null);
+  if(mode==='q1'){ const a=bmQ(bm,1)||bmQ(bm,2); return a?a.price:null; }
   let s=0, v=0;
-  for(const q of Object.values(bm.qs)){ s += q.price*q.vol; v += q.vol; }
+  for(const ql of Object.keys(bm.qs)){ const a=bmQ(bm,ql); if(!a||!a.vol) continue; s += a.price*a.vol; v += a.vol; }
   return v ? s/v : null;
 }
 function compute(){
@@ -790,13 +829,13 @@ function compute(){
         if(hoursAgo(v.ts)>CFG.staleHours) continue;
         if(!buy || v.sell<buy.sell) buy={...v, city:c};
       }
-      const bq = bm.qs[q];
+      const bq = bmQ(bm, q);
       if(!buy || !bq) continue;
       const net = bq.price*(1-tax) - buy.sell;
       const margin = net/buy.sell*100;
       const stale = hoursAgo(buy.ts);
       const warn = margin>300 || (margin>100 && bq.vol<10);
-      flip.push({it, q, buy:buy.sell, buyCity:buy.city, bmPrice:bq.price, net, margin, vol:bq.vol,
+      flip.push({it, q, buy:buy.sell, buyCity:buy.city, bmPrice:bq.price, bmSrc:bq.src, net, margin, vol:bq.vol,
         pool:bq.vol*Math.max(net,0), real:Math.max(net,0)*bq.vol*CFG.marketShare, stale, warn});
     }
   }
@@ -950,7 +989,7 @@ function compute(){
         if(!buy || v.sell<buy.sell) buy={...v, city:c};
       }
       if(!buy) continue;
-      const tq = tgtBm.qs[q]; if(!tq) continue;
+      const tq = bmQ(tgtBm, q); if(!tq) continue;
       const stoneCost = stone.price*up.n;
       const cost = buy.sell + stoneCost;
       const net = tq.price*(1-tax) - cost;
@@ -1000,7 +1039,7 @@ const COLS_CRAFT = [
   ['channel','Канал'],['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['stale','Данные'],
 ];
 const COLS_FLIP = [
-  ['item','Предмет'],['q','Качество'],['buy','Купить'],['bmPrice','Продать (ЧР ср.)'],
+  ['item','Предмет'],['q','Качество'],['buy','Купить'],['bmPrice','Продать (ЧР)'],
   ['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['stale','Данные'],
 ];
 const COLS_CITYFLIP = [
@@ -1013,7 +1052,7 @@ const COLS_REF = [
 ];
 const COLS_ENCH = [
   ['item','Предмет'],['q','Качество'],['buy','Купить шмотку'],['stoneCost','Камни'],
-  ['sell','Продать (ЧР ср.)'],['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['stale','Данные'],
+  ['sell','Продать (ЧР)'],['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['stale','Данные'],
 ];
 const STONE_RU = {RUNE:'руны', SOUL:'души', RELIC:'реликты'};
 const stoneKind = id => STONE_RU[id.split('_')[1]]||id;
@@ -1024,7 +1063,7 @@ const COL_TIPS = {
   city: 'Где происходит действие. В Крафте — город крафта: бейдж «бонус» значит, что у города +15% к возврату ресурсов на эту категорию. В Переработке — маршрут по шагам: где купить сырьё, где переработать (там же указан возврат), где продать.',
   cost: 'Себестоимость одной штуки: материалы с учётом возврата ресурсов + плата за станок. Артефакт (если нужен) считается без возврата. Правится вручную через карточку предмета.',
   rev: 'Выручка с одной штуки уже после налога с продаж (4% с премиумом / 8% без) и сбора 2,5%, если продажа ордером на городском рынке.',
-  channel: 'Куда выгоднее продать: ЧР — чёрный рынок в Карлеоне (по средней цене реальных сделок за 7 дней, не по верхнему ордеру) или конкретный городской рынок. Тут же указано, по какому качеству посчитана цена.',
+  channel: 'Куда выгоднее продать: ЧР — чёрный рынок в Карлеоне (по живому бай-ордеру: столько дадут за вещь прямо сейчас) или конкретный городской рынок. Тут же указано, по какому качеству посчитана цена.',
   net: 'Чистый профит с одной штуки = выручка (после налогов) минус себестоимость. Зелёное — зарабатываешь, красное — теряешь.',
   margin: 'Маржа = профит ÷ себестоимость × 100%. Сколько процентов ты зарабатываешь на каждое вложенное серебро. 20–40% — отлично; выше 300% — подозрительно (см. флаг «проверить»).',
   vol: 'Сколько штук в день реально продаётся — среднее за 7 дней по истории сделок. Чем больше объём, тем быстрее уйдёт твоя партия и тем надёжнее цена.',
@@ -1032,7 +1071,7 @@ const COL_TIPS = {
   stale: 'Возраст самой старой цены, участвующей в расчёте строки (материалы, продажа, ЧР). Чем свежее, тем надёжнее. Данные обновляются, когда игроки со сборщиком Albion Data Project открывают рынки в игре.',
   q: 'Качество предмета (Обычное → Шедевр). На чёрном рынке у каждого качества свои ордера, цены и объёмы — поэтому каждое качество считается отдельной строкой.',
   buy: 'Цена покупки — лучший селл-ордер: во флиппинге ЧР это рынок Карлеона, во флиппинге городов — самый дешёвый город (указан под ценой).',
-  bmPrice: 'Средняя цена реальных сделок на чёрном рынке за последние 7 дней для этого качества — то, по чём реально продаётся, а не верхний ордер.',
+  bmPrice: 'Сколько чёрный рынок даёт за это качество прямо сейчас — живой бай-ордер. Если ордера в данных нет, берётся последняя суточная средняя сделок, и только в крайнем случае средняя за 7 дней (она заметно завышает: цена ползёт, а история отстаёт на 2–4 дня).',
   sell: 'Цена продажи: лучший селл-ордер в городе продажи (в переработке — готового ресурса; во флиппинге городов — самый дорогой город, указан под ценой). Продажа своим ордером: минус налог и 2,5% сбор.',
   stoneCost: 'Стоимость камней для поднятия зачарования: руны (0→1), души (1→2) или реликты (2→3). Количество зависит от слота и тира предмета (двуручка — больше, обувь — меньше). Под суммой — сколько штук и в каком городе дешевле купить.',
 };
@@ -1235,7 +1274,7 @@ function detailHTML(r,idx){
   const sOvr = S.overrides['SELL|'+it.id]!=null;
   m+=`Сырьё: <b>${fmt(r.raw)}</b> · Возврат: <b>${(r.ret*100).toFixed(1)}%</b> → эффективно ${fmt(r.raw*(1-r.ret))} · `+
      `Станок: <b>${fmt(r.fee)}</b> · Итого себестоимость: <b>${fmt(r.cost)}</b><br>`+
-     `Продажа: ${r.channel==='ЧР'?`ЧР, ${sOvr?'моя цена':'средняя сделок за 7 дней'}`:`рынок ${r.channel}, ордер`}${sOvr?' <span style="color:var(--accent)">✎</span>':''}
+     `Продажа: ${r.channel==='ЧР'?`ЧР, ${sOvr?'моя цена':(bmQ(S.bm[it.id],qualMode==='q1'?1:1)?.src==='ордер'?'бай-ордер сейчас':'последние сделки')}`:`рынок ${r.channel}, ордер`}${sOvr?' <span style="color:var(--accent)">✎</span>':''}
       <input type="number" style="width:100px" value="${Math.round(r.bmPrice??r.cityPrice??0)}"
         onchange="setSellOverride('${it.id}',this.value)"
         title="По какой цене реально продашь (правит цену ЧР). Пустое поле или 0 — вернуть среднюю сделок из API.">
@@ -1243,9 +1282,11 @@ function detailHTML(r,idx){
      `Реалистичный профит/день (25% рынка): <b>${fmt(r.real)}</b>`;
   const bm = S.bm[it.id];
   if(bm){
-    m+='<br><b>ЧР по качествам (сделки за 7 дней):</b><table><tr><th>Качество</th><th>Ср. цена</th><th>Объём/д</th></tr>';
+    m+='<br><b>ЧР по качествам:</b><table><tr><th>Качество</th><th>Бай-ордер</th><th>Средняя 7д</th><th>Объём/д</th></tr>';
     for(let q=1;q<=5;q++){ const d=bm.qs[q]; if(!d) continue;
-      m+=`<tr><td style="text-align:left">${QUAL_RU[q]}</td><td>${fmt(d.price)}</td><td>${fmt(d.vol)}</td></tr>`; }
+      m+=`<tr><td style="text-align:left">${QUAL_RU[q]}</td>`
+       + `<td>${d.order?'<b>'+fmt(d.order)+'</b> <span class="fresh">'+ageTxt(d.orderTs)+'</span>':'<span class="fresh">—</span>'}</td>`
+       + `<td><span class="fresh">${d.price?fmt(d.price):'—'}</span></td><td>${fmt(d.vol)}</td></tr>`; }
     m+='</table>';
   }
   m+=`<br><b>🧮 Калькулятор партии:</b> крафтим
@@ -1276,8 +1317,10 @@ function calcUpd(idx){
   let jHtml='', jNet=0;
   if(it.j && DATA.jinfo[it.tier]){
     const ji=DATA.jinfo[it.tier];
-    const nJ=Math.ceil(N/ji.crafts);
+    const fame=craftFame(it);
+    const nJ=journalsFor(it, N);
     const emptyCost=nJ*ji.empty;
+    const perCraft=CFG.journalCap[it.tier] ? fame/CFG.journalCap[it.tier] : 0;
     const fullId=`T${it.tier}_JOURNAL_${it.j}_FULL`;
     let best=null;
     for(const [c,v] of Object.entries(S.matPrices[fullId]||{}))
@@ -1286,9 +1329,11 @@ function calcUpd(idx){
       const fullNet=best.price*(1-tax-CFG.setupFee);
       jNet=nJ*(fullNet-ji.empty);
       jHtml=`Журналы (${it.j.toLowerCase()}, Т${it.tier}): нужно <b>${fmt(nJ)}</b> шт · пустые ${fmt(emptyCost)} · `+
-            `полные продаются ~${fmt(best.price)} (${best.city}) → <b class="${jNet>=0?'pos':'neg'}">${jNet>=0?'+':''}${fmt(jNet)}</b> к профиту партии<br>`;
+            `полные продаются ~${fmt(best.price)} (${best.city}) → <b class="${jNet>=0?'pos':'neg'}">${jNet>=0?'+':''}${fmt(jNet)}</b> к профиту партии<br>`+
+            `<span class="fresh">один крафт даёт ${fmt(fame)} славы, журнал вмещает ${fmt(CFG.journalCap[it.tier])} → ${perCraft.toFixed(2)} журнала на штуку</span><br>`;
     } else {
-      jHtml=`Журналы: нужно <b>${fmt(nJ)}</b> шт (Т${it.tier} ${it.j.toLowerCase()}), пустые обойдутся в ${fmt(emptyCost)}; цены полных на рынке не видно — в расчёт не включены<br>`;
+      jHtml=`Журналы: нужно <b>${fmt(nJ)}</b> шт (Т${it.tier} ${it.j.toLowerCase()}), пустые обойдутся в ${fmt(emptyCost)}; цены полных на рынке не видно — в расчёт не включены<br>`+
+            `<span class="fresh">один крафт даёт ${fmt(fame)} славы, журнал вмещает ${fmt(CFG.journalCap[it.tier])} → ${perCraft.toFixed(2)} журнала на штуку</span><br>`;
     }
   }
   const invest=matTotal+feeN+ (jNet<0?0:0);
@@ -1435,7 +1480,8 @@ function anyPrice(t){
   const cp = S.cityPrices[t];
   if(cp){ let m=Infinity; for(const byQ of Object.values(cp)){ const v=byQ[1]; if(v) m=Math.min(m,v.sell); } if(isFinite(m)) return m; }
   const bm = S.bm[t];
-  if(bm && bm.qs[1]) return bm.qs[1].price;
+  const a = bmQ(bm, 1);
+  if(a) return a.price;
   return null;
 }
 function cargoValue(k){
@@ -1711,11 +1757,11 @@ function itemCardHTML(id){
     if(sell && (!cheap || sell<cheap.p)) cheap={c, p:sell, ts:v.ts};
     if(buy && (!rich || buy>rich.p)) rich={c, p:buy, ts:v.buyTs};
   }
-  const bmQ1 = bm && (bm.qs[1]||bm.qs[2]);
+  const bmQ1 = bmQ(bm,1) || bmQ(bm,2);
   out += `<div style="margin:12px 0;display:flex;gap:10px;flex-wrap:wrap">
     <span class="mchip">🛒 дешевле купить: <b>${cheap?fmt(cheap.p)+' · '+cheap.c:'—'}</b></span>
     <span class="mchip">💰 дороже сдать: <b>${rich?fmt(rich.p)+' · '+rich.c:'—'}</b></span>
-    ${bmQ1?`<span class="mchip">🖤 ЧР, средняя сделок: <b>${fmt(bmQ1.price)}</b> · объём ${fmt(bmQ1.vol)}/д</span>`:''}
+    ${bmQ1?`<span class="mchip">🖤 ЧР ${bmQ1.src==='ордер'?'даёт сейчас':bmQ1.src}: <b>${fmt(bmQ1.price)}</b>${bmQ1.ts?' <span class="fresh">'+ageTxt(bmQ1.ts)+'</span>':''} · объём ${fmt(bmQ1.vol||0)}/д</span>`:''}
   </div>`;
 
   // таблица по городам
@@ -1734,15 +1780,18 @@ function itemCardHTML(id){
 
   // чёрный рынок
   if(bm){
-    out += '<div style="margin-top:14px"><b>🖤 Чёрный рынок — реальные сделки за 7 дней</b></div>';
-    out += '<table style="margin-top:6px"><thead><tr><th class="item" style="text-align:left">Качество</th><th>Средняя цена</th><th>Объём/день</th></tr></thead><tbody>';
+    out += '<div style="margin-top:14px"><b>🖤 Чёрный рынок</b></div>';
+    out += '<table style="margin-top:6px"><thead><tr><th class="item" style="text-align:left">Качество</th><th>Даёт сейчас</th><th>Посл. сделки</th><th>Средняя 7д</th><th>Объём/день</th></tr></thead><tbody>';
     for(let q=1;q<=5;q++){ const d=bm.qs[q]; if(!d) continue;
-      out += `<tr><td class="item" style="display:table-cell">${QUAL_RU[q]}</td><td><b>${fmt(d.price)}</b></td><td>${fmt(d.vol)}</td></tr>`; }
+      out += `<tr><td class="item" style="display:table-cell">${QUAL_RU[q]}</td>`
+        + `<td>${d.order?'<b>'+fmt(d.order)+'</b> <span class="fresh">'+ageTxt(d.orderTs)+'</span>':'<span class="fresh">—</span>'}</td>`
+        + `<td>${d.last?fmt(d.last)+' <span class="fresh">'+ageTxt(d.lastTs)+'</span>':'<span class="fresh">—</span>'}</td>`
+        + `<td><span class="fresh">${d.price?fmt(d.price):'—'}</span></td><td>${fmt(d.vol)}</td></tr>`; }
     out += '</tbody></table>';
   } else if(!isMat){
     out += '<div class="fresh" style="margin-top:12px">На чёрном рынке сделок по этому предмету за неделю не зафиксировано.</div>';
   }
-  out += `<div class="fresh" style="margin-top:12px">Верхнее число — минимальный селл-ордер (за сколько купить), <span style="color:var(--blue)">синее</span> — максимальный бай-ордер (за сколько сдать мгновенно). Рядом возраст цены.</div></div>`;
+  out += `<div class="fresh" style="margin-top:12px">Верхнее число — минимальный селл-ордер (за сколько купить), <span style="color:var(--blue)">синее</span> — максимальный бай-ордер (за сколько сдать мгновенно). Рядом возраст цены. По чёрному рынку в расчёт профита идёт колонка «даёт сейчас»: средняя за 7 дней завышает выручку, потому что история отстаёт на 2–4 дня.</div></div>`;
   return out;
 }
 function itemTabHTML(){

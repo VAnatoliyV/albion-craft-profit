@@ -144,11 +144,33 @@ async function main(){
         if(!last || p.timestamp>last) last=p.timestamp;
       }
       if(!cnt) continue;
+      // последняя суточная точка отдельно: средняя за неделю сильно врёт, когда цена ползёт
+      let lastAvg = 0, lastT = 0;
+      for(const p of e.data||[]){
+        const t = new Date(p.timestamp+'Z').getTime();
+        if(t < cutoff) continue;
+        if(!lastT || t > lastT){ lastT = t; lastAvg = Math.round(p.avg_price); }
+      }
       const rec = (out.b[e.item_id] ||= {q:{}, l:0});
-      rec.q[q] = [Math.round(sum/cnt), Math.round(vol/HIST_DAYS*10)/10];
+      rec.q[q] = [Math.round(sum/cnt), Math.round(vol/HIST_DAYS*10)/10, lastAvg, lastT?Math.round(lastT/6e4):0];
       if(last){ const lm=minutes(last); if(lm>rec.l) rec.l=lm; }
     }
   }), 'bm-history')
+
+  // 3b) ЖИВЫЕ БАЙ-ОРДЕРА ЧЁРНОГО РЫНКА — то, что реально заплатят прямо сейчас.
+  // Это главная цена для канала «ЧР»: средняя сделок за 7 дней систематически
+  // завышает выручку, а история к тому же отстаёт на 2-4 дня.
+  console.log(`black market orders: ${itemIds.length} ids`);
+  out.bo = {};
+  await runPool(chunks(itemIds, PRICE_BATCH).map(ch => async ()=>{
+    const d = await getJSON(`${API}/prices/${encodeURIComponent(ch.join(','))}.json?locations=${encodeURIComponent('Black Market')}`);
+    for(const e of d||[]){
+      const q = e.quality||1;
+      const buy = Math.round(e.buy_price_max||0);
+      if(!buy) continue;
+      (out.bo[e.item_id] ||= {})[q] = [buy, minutes(e.buy_price_max_date)];
+    }
+  }), 'bm-orders')
 
   // 4) объёмы продаж готовых ресурсов на городских рынках (вкладка «Переработка»)
   console.log(`refined resource volumes: ${refIds.length} ids`);
@@ -193,6 +215,7 @@ async function main(){
     materials: Object.keys(out.m).length,
     itemsWithCityPrices: Object.keys(out.c).length,
     itemsWithBM: Object.keys(out.b).length,
+    itemsWithBMOrders: Object.keys(out.bo||{}).length,
     resourceVolumes: Object.keys(out.h).length,
     itemsWithCityVolumes: Object.keys(out.ch||{}).length,
     requestsOk: okCount, requestsFailed: failCount,
