@@ -1094,17 +1094,21 @@ function compute(){
         : (SAFE_CITIES.includes(home) ? [home] : pool);
     }
     for(const city of tryCities){
-      let raw=0, worst=0, missing=false;
+      // редкие компоненты (рог чертёнка, слеза орла и т.п.) возврату не подлежат —
+      // в дампе у них maxreturnamount=0, как у артефактов в крафте шмота
+      const noRet = new Set(c.noRet||[]);
+      let raw=0, rawNoRet=0, worst=0, missing=false;
       for(const [m,n] of Object.entries(c.mats)){
         const pMat=matPrice(m, city);
         if(!pMat){ missing=true; break; }
-        raw+=pMat.price*n; worst=Math.max(worst,pMat.age);
+        if(noRet.has(m)) rawNoRet += pMat.price*n; else raw += pMat.price*n;
+        worst=Math.max(worst,pMat.age);
       }
       if(missing) continue;
       const bonus = city===home;
       const ret = returnRate(bonus, focus);
       const fee = c.iv*CFG.nutritionFactor*(+$('feeInp').value||0)/100; // за партию
-      const costBatch = raw*(1-ret)+fee;
+      const costBatch = raw*(1-ret) + rawNoRet + fee; // возврат только на обычное сырьё
       const cost = costBatch/c.batch; // за одну штуку
       // канал продажи: лучший городской селл-ордер (ЧР потребляемые не берёт)
       let sellCity=null, sellPrice=0, sellTs=null;
@@ -1124,7 +1128,7 @@ function compute(){
       const vol = S.cityHist?.[c.id]?.[sellCity]?.[1] ?? null;
       const stale = Math.max(worst, hoursAgo(sellTs));
       const warn = margin>300 || (margin>100 && (vol||0)<10);
-      consRows.push({it:c, city, bonus, cost, costBatch, raw, ret, fee, rev,
+      consRows.push({it:c, city, bonus, cost, costBatch, raw, rawNoRet, ret, fee, rev,
         channel:sellCity, sellPrice, net, margin, vol,
         pool: vol!=null?vol*Math.max(net,0):null,
         ...goldOf(net, cost, vol, stale), stale, warn});
@@ -1421,7 +1425,8 @@ function detailConsHTML(r,idx){
   for(const [mid,c] of Object.entries(it.mats)){
     const p=matPrice(mid, r.city);
     const nm=(DATA.matNames||{})[mid]||{};
-    m+=`<tr><td class="item">${icon(mid)} <div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${mid}')">${nm.en||mid}</b><span>${nm.ru||''}${p&&p.ovr?' <span style="color:var(--accent)">✎ моя цена</span>':''}</span></div></td><td>${c}</td>
+    const noRetMark = (it.noRet||[]).includes(mid) ? ' <i style="color:var(--muted)">без возврата</i>' : '';
+    m+=`<tr><td class="item">${icon(mid)} <div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${mid}')">${nm.en||mid}</b><span>${nm.ru||''}${noRetMark}${p&&p.ovr?' <span style="color:var(--accent)">✎ моя цена</span>':''}</span></div></td><td>${c}</td>
       <td><input type="number" style="width:90px" value="${p?Math.round(p.price):''}" placeholder="—"
         onclick="event.stopPropagation()"
         onchange="setOverride('${mid}','${r.city}',this.value)"
@@ -1429,7 +1434,9 @@ function detailConsHTML(r,idx){
       <td>${p?fmt(p.price*c):'—'}</td></tr>`;
   }
   m+='</table>';
-  m+=`Сырьё на партию: <b>${fmt(r.raw)}</b> · Возврат: <b>${(r.ret*100).toFixed(1)}%</b> → эффективно ${fmt(r.raw*(1-r.ret))} · Станок: <b>${fmt(r.fee)}</b><br>`+
+  m+=`Сырьё на партию: <b>${fmt(r.raw)}</b> · Возврат: <b>${(r.ret*100).toFixed(1)}%</b> → эффективно ${fmt(r.raw*(1-r.ret))}`+
+     (r.rawNoRet ? ` · Редкие компоненты <b>${fmt(r.rawNoRet)}</b> <i style="color:var(--muted)">без возврата</i>` : '')+
+     ` · Станок: <b>${fmt(r.fee)}</b><br>`+
      `Партия обходится в <b>${fmt(r.costBatch)}</b> → себестоимость штуки <b>${fmt(r.cost)}</b> · `+
      `Продажа: рынок ${r.channel}, ордер
       <input type="number" style="width:100px" value="${Math.round(r.sellPrice||0)}"
