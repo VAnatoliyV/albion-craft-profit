@@ -1434,7 +1434,7 @@ function detailConsHTML(r,idx){
       <td>${p?fmt(p.price*c):'—'}</td></tr>`;
   }
   m+='</table>';
-  m+=`Сырьё на партию: <b>${fmt(r.raw)}</b> · Возврат: <b>${(r.ret*100).toFixed(1)}%</b> → эффективно ${fmt(r.raw*(1-r.ret))}`+
+  m+=`Обычное сырьё: <b>${fmt(r.raw)}</b> · Возврат: <b>${(r.ret*100).toFixed(1)}%</b> → эффективно ${fmt(r.raw*(1-r.ret))}`+
      (r.rawNoRet ? ` · Редкие компоненты <b>${fmt(r.rawNoRet)}</b> <i style="color:var(--muted)">без возврата</i>` : '')+
      ` · Станок: <b>${fmt(r.fee)}</b><br>`+
      `Партия обходится в <b>${fmt(r.costBatch)}</b> → себестоимость штуки <b>${fmt(r.cost)}</b> · `+
@@ -1457,8 +1457,23 @@ function calcConsUpd(idx){
   const invest=r.costBatch*batches;
   const profit=r.net*made;
   const days=r.vol?(made/Math.max(1,r.vol*CFG.marketShare)).toFixed(1):null;
+  // список закупки под запрошенное количество: сколько чего реально нести в город
+  const noRet=new Set(it.noRet||[]);
+  let shop=`<b>Закупить на ${fmt(made)} шт (${fmt(batches)} ${batches===1?'партия':'партий'}):</b>`+
+    '<table style="margin-top:4px"><tr><th class="item">Ингредиент</th><th>Всего нужно</th><th>Стоимость</th></tr>';
+  let sum=0;
+  for(const [mid,cnt] of Object.entries(it.mats)){
+    const p=matPrice(mid, r.city);
+    const total=cnt*batches, cost=p?p.price*total:null;
+    if(cost!=null) sum+=cost;
+    const nm=(DATA.matNames||{})[mid]||{};
+    shop+=`<tr><td class="item">${icon(mid)} <div class="iname"><b>${nm.en||mid}</b><span>${nm.ru||''}${noRet.has(mid)?' <i style="color:var(--muted)">без возврата</i>':''}</span></div></td>`+
+      `<td><b>${fmt(total)}</b> <span class="fresh">(${cnt} × ${fmt(batches)})</span></td><td>${cost!=null?fmt(cost):'—'}</td></tr>`;
+  }
+  shop+=`<tr><td class="item"><b>Итого сырья</b></td><td></td><td><b>${fmt(sum)}</b></td></tr></table>`;
   const el=$('calcConsOut'+idx);
-  if(el) el.innerHTML=`Партий: <b>${fmt(batches)}</b> (выйдет ${fmt(made)} шт) · Вложение: <b>${fmt(invest)}</b> · Фокус: ${fmt(batches*it.focus)}<br>`+
+  if(el) el.innerHTML=shop+
+    `Партий: <b>${fmt(batches)}</b> (выйдет ${fmt(made)} шт) · Вложение с учётом возврата и станка: <b>${fmt(invest)}</b> · Фокус: ${fmt(batches*it.focus)}<br>`+
     `Профит: <b class="${profit>=0?'pos':'neg'}">${fmt(profit)}</b>`+
     (days?` · при объёме ${fmt(r.vol)}/д партия уйдёт за ~${days} дн. (25% рынка)`:'');
 }
