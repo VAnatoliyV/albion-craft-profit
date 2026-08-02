@@ -42,6 +42,7 @@ button{background:var(--panel2);color:var(--text);border:1px solid var(--border2
   font-size:13px;cursor:pointer;transition:all .15s;font-weight:500}
 button:hover{border-color:var(--accent);color:var(--accent2);transform:translateY(-1px)}
 button:active{transform:translateY(0)}
+button.mini{padding:4px 8px;font-size:13px;line-height:1}
 button.gold{background:linear-gradient(135deg,#a37b22,#d4a942);color:#181203;border:1px solid #e3bd58;font-weight:700;
   box-shadow:0 2px 12px rgba(238,188,78,.25);text-shadow:0 1px 0 rgba(255,255,255,.15)}
 button.gold:hover{background:linear-gradient(135deg,#b98c28,#e8bd4d);color:#181203;transform:translateY(-1px);
@@ -241,6 +242,20 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
         <option>Martlock</option><option>Bridgewatch</option><option>Lymhurst</option>
         <option>Fort Sterling</option><option>Thetford</option><option>Caerleon</option><option>Brecilien</option>
       </select>
+    </label>
+    <label class="ctl" id="wrapRoute">Маршрут
+      <select id="flipFrom">
+        <option value="ANY">откуда: любой</option>
+        <option>Martlock</option><option>Bridgewatch</option><option>Lymhurst</option>
+        <option>Fort Sterling</option><option>Thetford</option><option>Caerleon</option><option>Brecilien</option>
+      </select>
+      <button id="flipSwap" class="mini" title="Поменять города местами">⇄</button>
+      <select id="flipTo">
+        <option value="ANY">куда: любой</option>
+        <option>Martlock</option><option>Bridgewatch</option><option>Lymhurst</option>
+        <option>Fort Sterling</option><option>Thetford</option><option>Caerleon</option><option>Brecilien</option>
+      </select>
+      <span class="help" title="Своя пара городов вместо автоподбора.&#10;&#10;По умолчанию сайт для каждого предмета сам берёт самый дешёвый город и самый дорогой — маршрут получается разный от строки к строке, и повезти всё одной ходкой нельзя.&#10;&#10;Задай «откуда» и «куда» — и останутся только те предметы, которые выгодно тащить именно по этому маршруту. Это уже готовый список закупки на одну поездку.&#10;&#10;Можно указать только одно поле: например «откуда: Бресильен, куда: любой» — что выгодно вывозить из Бресильена куда угодно.&#10;&#10;Явно выбранный город работает даже при включённых «безопасных маршрутах»: раз ты его назвал, значит дорогу туда планируешь сам.">?</span>
     </label>
     <label class="ctl toggle" id="wrapFocus"><input type="checkbox" id="focusChk"> Фокус</label>
     <label class="ctl toggle" id="wrapLocal"><input type="checkbox" id="localChk"> 📍 Продать на месте<span class="help" title="Продажа только в том же городе, где скрафтил. Никакой перевозки вообще — ни между городами, ни на чёрный рынок.&#10;&#10;Сайт по умолчанию ищет лучшую цену среди всех городов и молча предполагает, что ты туда повезёшь. Этот режим отвечает на другой вопрос: сколько выйдет, если никуда не ехать.&#10;&#10;Исключение — крафт в Карлеоне: там чёрный рынок под боком, поэтому продажа на ЧР считается продажей на месте.&#10;&#10;В режиме «все города» перебираются все доступные города и остаётся лучший вариант по каждому предмету.">?</span></label>
@@ -923,18 +938,22 @@ function compute(){
   S.flipRows=flip;
   // флиппинг между городами: купить в самом дешёвом городе → продать в самом дорогом
   const cflip=[];
-  if(need('cityflip'))
+  // свой маршрут: если города заданы явно, автоподбор по ним и отключается.
+  // Явный выбор сильнее «безопасных маршрутов» — раз назвал город, дорогу планируешь сам.
+  const fFrom = $('flipFrom') ? $('flipFrom').value : 'ANY';
+  const fTo   = $('flipTo')   ? $('flipTo').value   : 'ANY';
+  if(need('cityflip') && !(fFrom!=='ANY' && fFrom===fTo))
   for(const it of DATA.items){
     const cp = S.cityPrices[it.id]; if(!cp) continue;
     for(let q=1;q<=5;q++){
       let lo=null, hi=null;
       const allowed = routeCities();
       for(const [c,byQ] of Object.entries(cp)){
-        if(!allowed.includes(c)) continue;
+        if(!allowed.includes(c) && c!==fFrom && c!==fTo) continue;
         const v=byQ[q]; if(!v) continue;
         if(hoursAgo(v.ts)>CFG.staleHours) continue;
-        if(!lo || v.sell<lo.sell) lo={...v, city:c};
-        if(!hi || v.sell>hi.sell) hi={...v, city:c};
+        if((fFrom==='ANY'||c===fFrom) && (!lo || v.sell<lo.sell)) lo={...v, city:c};
+        if((fTo  ==='ANY'||c===fTo)   && (!hi || v.sell>hi.sell)) hi={...v, city:c};
       }
       if(!lo || !hi || lo.city===hi.city) continue;
       // продажа селл-ордером в дорогом городе: налог + 2.5% сбор за выставление
@@ -2105,13 +2124,13 @@ const TAB_CONTROLS={
   craft:   ['wrapCity','wrapFocus','wrapSelfRef','wrapQual','wrapFee','wrapCat','wrapSafeCraft','wrapLocal'],
   ref:     ['wrapCity','wrapFocus','wrapSafe','wrapFee','refModeWrap'],
   flip:    ['wrapCity','wrapSafe','wrapCat'],
-  cityflip:['wrapSafe','wrapCat'],
+  cityflip:['wrapRoute','wrapSafe','wrapCat'],
   ench:    ['wrapCity','wrapSafe','wrapCat'],
   cons:    ['wrapCity','wrapFocus','wrapFee','wrapSafeCraft','wrapLocal'],
   item:    [],
   roads:   [],
 };
-const ALL_WRAPS=['wrapCity','wrapFocus','wrapSafe','wrapSafeCraft','wrapLocal','wrapSelfRef','wrapQual','wrapFee','wrapCat','refModeWrap'];
+const ALL_WRAPS=['wrapCity','wrapRoute','wrapFocus','wrapSafe','wrapSafeCraft','wrapLocal','wrapSelfRef','wrapQual','wrapFee','wrapCat','refModeWrap'];
 function setTab(t){
   S.tab=t;
   const el=$('secName'); if(el) el.textContent=TAB_NAMES[t]||'';
@@ -2127,6 +2146,8 @@ $('refModeSel').onchange=()=>{ compute(); render(); };
 $('backHome').onclick=()=>goHome();
 $('selfRefChk').onchange=()=>{ compute(); render(); };
 $('safeChk').onchange=()=>{ compute(); render(); };
+['flipFrom','flipTo'].forEach(id=>$(id).onchange=()=>{ S.limit=0; compute(); render(); });
+$('flipSwap').onclick=()=>{ const a=$('flipFrom'), b=$('flipTo'); const t=a.value; a.value=b.value; b.value=t; S.limit=0; compute(); render(); };
 $('safeCraftChk').onchange=()=>{ S.limit=0; compute(); render(); };
 $('localChk').onchange=()=>{ S.limit=0; compute(); render(); };
 $('ovrReset').onclick=()=>{ S.overrides={}; saveOverrides(); compute(); render(); };
