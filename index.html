@@ -1418,64 +1418,56 @@ function render(){
     else det.style.display='none';
   });
 }
-// панель зелья/еды: материалы на ПАРТИЮ, себестоимость штуки, калькулятор
+// панель зелья/еды: одна таблица материалов, которая сразу пересчитывается
+// под нужное количество — чтобы не путать рецепт партии с реальной закупкой
 function detailConsHTML(r,idx){
   const it=r.it;
-  let m=`<b>Материалы на партию из ${it.batch} шт (цены в ${r.city}):</b><table><tr><th class="item">Ингредиент</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr>`;
-  for(const [mid,c] of Object.entries(it.mats)){
-    const p=matPrice(mid, r.city);
-    const nm=(DATA.matNames||{})[mid]||{};
-    const noRetMark = (it.noRet||[]).includes(mid) ? ' <i style="color:var(--muted)">без возврата</i>' : '';
-    m+=`<tr><td class="item">${icon(mid)} <div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${mid}')">${nm.en||mid}</b><span>${nm.ru||''}${noRetMark}${p&&p.ovr?' <span style="color:var(--accent)">✎ моя цена</span>':''}</span></div></td><td>${c}</td>
-      <td><input type="number" style="width:90px" value="${p?Math.round(p.price):''}" placeholder="—"
-        onclick="event.stopPropagation()"
-        onchange="setOverride('${mid}','${r.city}',this.value)"
-        title="Введи свою цену, если на рынке она другая. Пустое поле или 0 — вернуть цену из API."></td>
-      <td>${p?fmt(p.price*c):'—'}</td></tr>`;
-  }
-  m+='</table>';
-  m+=`Обычное сырьё: <b>${fmt(r.raw)}</b> · Возврат: <b>${(r.ret*100).toFixed(1)}%</b> → эффективно ${fmt(r.raw*(1-r.ret))}`+
-     (r.rawNoRet ? ` · Редкие компоненты <b>${fmt(r.rawNoRet)}</b> <i style="color:var(--muted)">без возврата</i>` : '')+
-     ` · Станок: <b>${fmt(r.fee)}</b><br>`+
-     `Партия обходится в <b>${fmt(r.costBatch)}</b> → себестоимость штуки <b>${fmt(r.cost)}</b> · `+
-     `Продажа: рынок ${r.channel}, ордер
-      <input type="number" style="width:100px" value="${Math.round(r.sellPrice||0)}"
-        onclick="event.stopPropagation()"
-        onchange="setSellOverride('${it.id}',this.value)"
-        title="По какой цене реально продашь. Пустое поле или 0 — вернуть цену из API.">${S.overrides['SELL|'+it.id]!=null?' <span style="color:var(--accent)">✎</span>':''}
-      → нетто <b>${fmt(r.rev)}</b>/шт · Фокус: ${fmt(it.focus)}/партию<br>`;
-  m+=`<br><b>🧮 Калькулятор:</b> хочу
-      <input type="number" value="${it.batch*10}" min="${it.batch}" step="${it.batch}" style="width:90px" id="calcConsN${idx}" oninput="calcConsUpd(${idx})"> шт.
-      <div id="calcConsOut${idx}" style="margin-top:6px"></div>`;
-  return m;
+  return `<div style="margin-bottom:8px">🧮 <b>Хочу</b>
+      <input type="number" value="${it.batch*10}" min="${it.batch}" step="${it.batch}" style="width:100px"
+        id="calcConsN${idx}" onclick="event.stopPropagation()" oninput="calcConsUpd(${idx})"> шт.
+      <span class="fresh">— крафтится партиями по ${it.batch}, таблица ниже пересчитывается сама</span></div>
+    <div id="calcConsOut${idx}"></div>`;
 }
 function calcConsUpd(idx){
   const r=(window.__consDetRows||{})[idx]; if(!r) return;
-  const it=r.it;
-  const want=+($('calcConsN'+idx)?.value||0); if(!want){ const el=$('calcConsOut'+idx); if(el) el.innerHTML=''; return; }
+  const it=r.it, el=$('calcConsOut'+idx); if(!el) return;
+  const want=+($('calcConsN'+idx)?.value||0);
+  if(!want){ el.innerHTML=''; return; }
   const batches=Math.ceil(want/it.batch), made=batches*it.batch;
-  const invest=r.costBatch*batches;
-  const profit=r.net*made;
-  const days=r.vol?(made/Math.max(1,r.vol*CFG.marketShare)).toFixed(1):null;
-  // список закупки под запрошенное количество: сколько чего реально нести в город
   const noRet=new Set(it.noRet||[]);
-  let shop=`<b>Закупить на ${fmt(made)} шт (${fmt(batches)} ${batches===1?'партия':'партий'}):</b>`+
-    '<table style="margin-top:4px"><tr><th class="item">Ингредиент</th><th>Всего нужно</th><th>Стоимость</th></tr>';
+  let m=`<b>Материалы на ${fmt(made)} шт (${fmt(batches)} ${batches===1?'партия':'партий'}), цены в ${r.city}:</b>`+
+    '<table><tr><th class="item">Ингредиент</th><th>На партию</th><th>Цена (ред.)</th><th>Нужно всего</th><th>Сумма</th></tr>';
   let sum=0;
   for(const [mid,cnt] of Object.entries(it.mats)){
     const p=matPrice(mid, r.city);
     const total=cnt*batches, cost=p?p.price*total:null;
     if(cost!=null) sum+=cost;
     const nm=(DATA.matNames||{})[mid]||{};
-    shop+=`<tr><td class="item">${icon(mid)} <div class="iname"><b>${nm.en||mid}</b><span>${nm.ru||''}${noRet.has(mid)?' <i style="color:var(--muted)">без возврата</i>':''}</span></div></td>`+
-      `<td><b>${fmt(total)}</b> <span class="fresh">(${cnt} × ${fmt(batches)})</span></td><td>${cost!=null?fmt(cost):'—'}</td></tr>`;
+    const mark=noRet.has(mid)?' <i style="color:var(--muted)">без возврата</i>':'';
+    m+=`<tr><td class="item">${icon(mid)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${mid}')">${nm.en||mid}</b>`+
+       `<span>${nm.ru||''}${mark}${p&&p.ovr?' <span style="color:var(--accent)">✎ моя цена</span>':''}</span></div></td>`+
+      `<td>${cnt}</td>`+
+      `<td><input type="number" style="width:90px" value="${p?Math.round(p.price):''}" placeholder="—"
+         onclick="event.stopPropagation()" onchange="setOverride('${mid}','${r.city}',this.value)"
+         title="Своя цена, если на рынке другая. Пусто или 0 — вернуть цену из API."></td>`+
+      `<td><b>${fmt(total)}</b></td><td>${cost!=null?fmt(cost):'—'}</td></tr>`;
   }
-  shop+=`<tr><td class="item"><b>Итого сырья</b></td><td></td><td><b>${fmt(sum)}</b></td></tr></table>`;
-  const el=$('calcConsOut'+idx);
-  if(el) el.innerHTML=shop+
-    `Партий: <b>${fmt(batches)}</b> (выйдет ${fmt(made)} шт) · Вложение с учётом возврата и станка: <b>${fmt(invest)}</b> · Фокус: ${fmt(batches*it.focus)}<br>`+
-    `Профит: <b class="${profit>=0?'pos':'neg'}">${fmt(profit)}</b>`+
-    (days?` · при объёме ${fmt(r.vol)}/д партия уйдёт за ~${days} дн. (25% рынка)`:'');
+  m+=`<tr><td class="item"><b>Итого сырья</b></td><td></td><td></td><td></td><td><b>${fmt(sum)}</b></td></tr></table>`;
+
+  const invest=r.costBatch*batches, profit=r.net*made;
+  const days=r.vol?(made/Math.max(1,r.vol*CFG.marketShare)).toFixed(1):null;
+  m+=`Обычное сырьё: <b>${fmt(r.raw*batches)}</b> · Возврат <b>${(r.ret*100).toFixed(1)}%</b> → эффективно ${fmt(r.raw*(1-r.ret)*batches)}`+
+     (r.rawNoRet?` · Редкие компоненты <b>${fmt(r.rawNoRet*batches)}</b> <i style="color:var(--muted)">без возврата</i>`:'')+
+     ` · Станок <b>${fmt(r.fee*batches)}</b><br>`+
+     `Себестоимость штуки: <b>${fmt(r.cost)}</b> · Продажа: рынок ${r.channel}, ордер
+      <input type="number" style="width:100px" value="${Math.round(r.sellPrice||0)}"
+        onclick="event.stopPropagation()" onchange="setSellOverride('${it.id}',this.value)"
+        title="По какой цене реально продашь. Пусто или 0 — вернуть цену из API.">${S.overrides['SELL|'+it.id]!=null?' <span style="color:var(--accent)">✎</span>':''}
+      → нетто <b>${fmt(r.rev)}</b>/шт<br>`+
+     `<b>Вложение: ${fmt(invest)}</b> · Фокус: ${fmt(batches*it.focus)} · `+
+     `<b>Профит: <span class="${profit>=0?'pos':'neg'}">${fmt(profit)}</span></b>`+
+     (days?` · при объёме ${fmt(r.vol)}/д уйдёт за ~${days} дн. (25% рынка)`:'');
+  el.innerHTML=m;
 }
 function detailHTML(r,idx){
   const it=r.it;
