@@ -1431,7 +1431,13 @@ function detailConsHTML(r,idx){
   return `<div style="margin-bottom:8px">🧮 <b>Хочу</b>
       <input type="number" value="${it.batch*10}" min="${it.batch}" step="${it.batch}" style="width:100px"
         id="calcConsN${idx}" onclick="event.stopPropagation()" oninput="calcConsUpd(${idx})"> шт.
-      <span class="fresh">— крафтится партиями по ${it.batch}, таблица ниже пересчитывается сама</span></div>
+      &nbsp; 🛒 <b>Закупка</b>
+      <select id="calcConsMode${idx}" onclick="event.stopPropagation()" onchange="calcConsUpd(${idx})">
+        <option value="full">на всё количество</option>
+        <option value="chain">впритык, с возвратом</option>
+      </select>
+      <span class="help" title="«На всё количество» — покупаешь полный рецепт на все партии. Просто, но в конце останется гора материалов: возврат ресурсов вернёт тебе около четверти закупки.&#10;&#10;«Впритык, с возвратом» — возврат падает в сумку сразу после каждой партии, значит его можно скормить в следующую. Тогда закупить надо только на первую партию плюс на то, что не вернётся дальше. Наличных нужно меньше примерно на четверть, остатков почти не будет.&#10;&#10;Профит от выбора НЕ меняется: остатки стоят ровно столько, сколько ты не потратил. Разница только в замороженных деньгах — и в том, что остатки пришлось бы продавать дешевле, чем покупал.&#10;&#10;Возврат случайный, 24.8% это среднее. Поэтому в режиме «впритык» добавлено 5% страховки. Учти: станок проверяет материалы на весь заказ, так что 100 штук одной кнопкой поставить не выйдет — крафтить придётся кусками, подбирая возврат.">?</span>
+      <span class="fresh">— партии по ${it.batch}, таблица пересчитывается сама</span></div>
     <div id="calcConsOut${idx}"></div>`;
 }
 function calcConsUpd(idx){
@@ -1441,13 +1447,29 @@ function calcConsUpd(idx){
   if(!want){ el.innerHTML=''; return; }
   const batches=Math.ceil(want/it.batch), made=batches*it.batch;
   const noRet=new Set(it.noRet||[]);
-  let m=`<b>Материалы на ${fmt(made)} шт (${fmt(batches)} ${batches===1?'партия':'партий'}), цены в ${r.city}:</b>`+
-    '<table><tr><th class="item">Ингредиент</th><th>На партию</th><th>Цена (ред.)</th><th>Нужно всего</th><th>Сумма</th></tr>';
-  let sum=0;
+  const mode=$('calcConsMode'+idx)?.value||'full';
+  const chain=mode==='chain';
+  // «впритык»: возврат с каждой партии уходит в следующую, поэтому докупать надо
+  // только первую партию плюс несгораемую долю остальных. +5% на случайность возврата.
+  const CHAIN_BUF=1.05;
+  const needOf=(cnt)=>{
+    if(!chain || batches<2) return cnt*batches;
+    return Math.ceil(cnt*(1+(batches-1)*(1-r.ret))*CHAIN_BUF);
+  };
+  let m=`<b>Материалы на ${fmt(made)} шт (${fmt(batches)} ${batches===1?'партия':'партий'}), цены в ${r.city}`+
+    (chain&&batches>1?', закупка впритык':'')+':</b>'+
+    '<table><tr><th class="item">Ингредиент</th><th>На партию</th><th>Цена (ред.)</th><th>Купить</th><th>Сумма</th></tr>';
+  let sum=0, leftVal=0;
   for(const [mid,cnt] of Object.entries(it.mats)){
     const p=matPrice(mid, r.city);
-    const total=cnt*batches, cost=p?p.price*total:null;
+    const total=noRet.has(mid) ? cnt*batches : needOf(cnt);
+    const cost=p?p.price*total:null;
     if(cost!=null) sum+=cost;
+    // что останется в сумке: купленное минус безвозвратно сгоревшее
+    if(!noRet.has(mid)){
+      const left=Math.max(0, total-cnt*batches*(1-r.ret));
+      if(p) leftVal+=left*p.price;
+    }
     const nm=(DATA.matNames||{})[mid]||{};
     const mark=noRet.has(mid)?' <i style="color:var(--muted)">без возврата</i>':'';
     m+=`<tr><td class="item">${icon(mid)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${mid}')">${nm.en||mid}</b>`+
@@ -1470,9 +1492,9 @@ function calcConsUpd(idx){
         onclick="event.stopPropagation()" onchange="setSellOverride('${it.id}',this.value)"
         title="По какой цене реально продашь. Пусто или 0 — вернуть цену из API.">${S.overrides['SELL|'+it.id]!=null?' <span style="color:var(--accent)">✎</span>':''}
       → нетто <b>${fmt(r.rev)}</b>/шт<br>`+
-     `<b>Наличных на закупку: ${fmt((r.cashBatch||r.costBatch)*batches)}</b>
-      <span class="help" title="Столько серебра нужно иметь на руках прямо сейчас: за сырьё платишь полную цену. Возврат ресурсов вернётся материалами в инвентарь уже после крафта — это не серебро, но его можно продать или пустить в следующую партию. Поэтому «вложение» ниже меньше.">?</span>`+
-     ` → вернётся материалами ~${fmt(r.raw*r.ret*batches)}<br>`+
+     `<b>Наличных на закупку: ${fmt(sum + r.fee*batches)}</b>
+      <span class="help" title="Столько серебра нужно иметь на руках прямо сейчас: сырьё оплачивается полной ценой, станок тоже. Возврат ресурсов придёт материалами в инвентарь уже после крафта — это не серебро, но его можно продать или пустить в следующую партию. Поэтому «вложение» ниже меньше.">?</span>`+
+     ` → останется материалами ~${fmt(leftVal)}<br>`+
      `<b>Вложение (за вычетом возврата): ${fmt(invest)}</b> · Фокус: ${fmt(batches*it.focus)} · `+
      `<b>Профит: <span class="${profit>=0?'pos':'neg'}">${fmt(profit)}</span></b>`+
      (days?` · при объёме ${fmt(r.vol)}/д уйдёт за ~${days} дн. (25% рынка)`:'');
