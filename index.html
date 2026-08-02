@@ -243,7 +243,8 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
       </select>
     </label>
     <label class="ctl toggle" id="wrapFocus"><input type="checkbox" id="focusChk"> Фокус</label>
-    <label class="ctl toggle" id="wrapSafe"><input type="checkbox" id="safeChk"> Безопасные маршруты<span class="help" title="Убирает Caerleon и Brecilien из перевозок: дорога в Карлеон идёт через красные/чёрные зоны, в Бресильен — через Туманы, там ганкают.&#10;&#10;Действует на «Лучший маршрут» в Переработке и на Флиппинг между городами — остаются только 5 королевских городов, связанных синими/жёлтыми зонами.&#10;&#10;Не влияет на: локальные циклы (там нет перевозок) и продажу на ЧР во вкладке Крафт (доставку туда ты и так планируешь сам).">?</span></label>
+    <label class="ctl toggle" id="wrapSafeCraft"><input type="checkbox" id="safeCraftChk"> 🛡 Безопасный крафт<span class="help" title="Убирает из расчёта опасную логистику.&#10;&#10;Крафт и продажа только там, куда можно дойти безопасно: 5 королевских городов и Бресильен. Карлеон исключается целиком — он на чёрном острове, туда и оттуда везут через красные и чёрные зоны. Вместе с ним отключается чёрный рынок: он как раз в Карлеоне.&#10;&#10;Цена безопасности: бонус +15% даётся только в «своём» городе категории. У кастетов, посохов оборотня и всей еды он в Карлеоне — в этом режиме ты их крафтишь без бонуса, с базовым возвратом. Зелья, плащи и сумки не страдают: их бонус в Бресильене, а туда дорога безопасная.">?</span></label>
+    <label class="ctl toggle" id="wrapSafe"><input type="checkbox" id="safeChk"> Безопасные маршруты<span class="help" title="Убирает Карлеон из перевозок: дорога туда идёт через красные и чёрные зоны. Бресильен остаётся — до него есть безопасный путь.&#10;&#10;Действует на «Лучший маршрут» в Переработке и на Флиппинг между городами.&#10;&#10;Не влияет на: локальные циклы (там нет перевозок) и на продажу на ЧР во Флиппинге — туда доставку ты и так планируешь сам. Для полного исключения Карлеона из крафта есть отдельный переключатель «Безопасный крафт».">?</span></label>
     <label class="ctl toggle" id="wrapSelfRef"><input type="checkbox" id="selfRefChk"> Сырьё сам<span class="help" title="Для каждого материала сайт сравнивает два пути: купить готовый ресурс (бруски, кожу…) на рынке или купить сырьё (руду, шкуры…) и переработать самому в городе крафта — с учётом возврата и платы за станок. В себестоимость идёт то, что дешевле. В карточке предмета видно, где выгоднее переработать самому (метка ⚒).">?</span></label>
     <label class="ctl toggle"><input type="checkbox" id="premChk" checked> Премиум (4%)</label>
     <label class="ctl" id="wrapFee">Станок/100 пит.
@@ -326,7 +327,13 @@ let DATA = null; // загружается из items.json;
 const API = 'https://europe.albion-online-data.com/api/v2/stats';
 const CITIES = ['Martlock','Bridgewatch','Lymhurst','Fort Sterling','Thetford','Caerleon','Brecilien'];
 const ROYAL_CITIES = ['Martlock','Bridgewatch','Lymhurst','Fort Sterling','Thetford']; // связаны безопасными зонами
-function routeCities(){ return $('safeChk')?.checked ? ROYAL_CITIES : CITIES; }
+// Бресильен тоже безопасен: до королевских городов есть безопасный путь.
+// Опасен только Карлеон — он на чёрном острове, туда и оттуда везут через красные и чёрные зоны.
+const SAFE_CITIES = [...ROYAL_CITIES, 'Brecilien'];
+function routeCities(){ return $('safeChk')?.checked ? SAFE_CITIES : CITIES; }
+// «Безопасный крафт»: и варим, и продаём только в королевской пятёрке, ЧР выключен
+function safeCraft(){ return !!$('safeCraftChk')?.checked; }
+function craftCities(){ return safeCraft() ? SAFE_CITIES : CITIES; }
 const CITY_BONUS = {
   'Martlock':      ['axe','quarterstaff','froststaff','plate_shoes','offhand'],
   'Bridgewatch':   ['plate_armor','crossbow','dagger','cursestaff','cloth_shoes'],
@@ -817,20 +824,30 @@ function compute(){
   if(need('craft')||need('ref')) buildSelfCosts(focus);
   const rows=[];
   if(need('craft')) for(const it of DATA.items){
-    const tryCities = citySel==='ALL' ? [BONUS_CITY_OF[it.cat]].filter(Boolean) : [citySel];
+    // в безопасном режиме бонусный город может быть недоступен (Карлеон/Бресильен) —
+    // тогда перебираем королевскую пятёрку и берём лучший из безопасных
+    let tryCities;
+    if(citySel!=='ALL') tryCities = safeCraft() && !SAFE_CITIES.includes(citySel) ? [] : [citySel];
+    else {
+      const home = BONUS_CITY_OF[it.cat];
+      tryCities = !safeCraft() ? [home].filter(Boolean)
+        : (home && SAFE_CITIES.includes(home)) ? [home] : SAFE_CITIES;
+    }
     for(const city of tryCities){
       const cc = craftCostIn(it, city, focus);
       if(!cc) continue;
       const bm = S.bm[it.id];
       const sellOvr = S.overrides['SELL|'+it.id];
-      const bmPrice = sellOvr!=null ? sellOvr : bmExpected(bm, qualMode);
+      const bmPrice = safeCraft() ? null : (sellOvr!=null ? sellOvr : bmExpected(bm, qualMode));
       const bmSrc = (bmQ(bm,1)||bmQ(bm,2)||{}).src || null; // чем посчитали цену ЧР
       // канал 1: ЧР
       const revBM = bmPrice!=null ? bmPrice*(1-tax) : null;
       // канал 2: лучший рынок города, обычное качество (ордер на продажу: налог + 2.5% сбор)
       let bestCity=null, bestCityPrice=0;
       const cp = S.cityPrices[it.id]||{};
+      const sellAllowed = craftCities();
       for(const [c,byQ] of Object.entries(cp)){
+        if(!sellAllowed.includes(c)) continue;
         const v = byQ[1]; if(!v) continue;
         if(hoursAgo(v.ts)>CFG.staleHours) continue;
         if(v.sell>bestCityPrice){ bestCityPrice=v.sell; bestCity=c; }
@@ -1051,7 +1068,11 @@ function compute(){
   const consRows=[];
   if(need('cons')) for(const c of (DATA.cons||[])){
     const home = CONS_BONUS_CITY[c.cat];
-    const tryCities = citySel==='ALL' ? [home] : [citySel];
+    // бонус на еду в Карлеоне: в безопасном режиме он недоступен, варим в королевских
+    let tryCities;
+    if(citySel!=='ALL') tryCities = safeCraft() && !SAFE_CITIES.includes(citySel) ? [] : [citySel];
+    else tryCities = !safeCraft() ? [home]
+      : (SAFE_CITIES.includes(home) ? [home] : SAFE_CITIES);
     for(const city of tryCities){
       let raw=0, worst=0, missing=false;
       for(const [m,n] of Object.entries(c.mats)){
@@ -1067,7 +1088,9 @@ function compute(){
       const cost = costBatch/c.batch; // за одну штуку
       // канал продажи: лучший городской селл-ордер (ЧР потребляемые не берёт)
       let sellCity=null, sellPrice=0, sellTs=null;
+      const sellAllowed = craftCities();
       for(const [cc,byQ] of Object.entries(S.cityPrices[c.id]||{})){
+        if(!sellAllowed.includes(cc)) continue;
         const v=byQ[1]; if(!v||!v.sell) continue;
         if(hoursAgo(v.ts)>CFG.staleHours) continue;
         if(v.sell>sellPrice){ sellPrice=v.sell; sellCity=cc; sellTs=v.ts; }
@@ -2003,16 +2026,16 @@ $('reloadBtn').onclick=async ()=>{ lastCheck=Date.now(); await loadAll(true); S.
 const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', cons:'🧪 Зелья и еда', item:'🔍 Цены предмета', roads:'🛡 Дороги в Карлеон · БЕТА'};
 // какие контролы нужны на каждой вкладке (премиум, возраст данных, обновление и поиск — всегда)
 const TAB_CONTROLS={
-  craft:   ['wrapCity','wrapFocus','wrapSelfRef','wrapQual','wrapFee','wrapCat'],
+  craft:   ['wrapCity','wrapFocus','wrapSelfRef','wrapQual','wrapFee','wrapCat','wrapSafeCraft'],
   ref:     ['wrapCity','wrapFocus','wrapSafe','wrapFee','refModeWrap'],
   flip:    ['wrapCity','wrapSafe','wrapCat'],
   cityflip:['wrapSafe','wrapCat'],
   ench:    ['wrapCity','wrapSafe','wrapCat'],
-  cons:    ['wrapCity','wrapFocus','wrapFee'],
+  cons:    ['wrapCity','wrapFocus','wrapFee','wrapSafeCraft'],
   item:    [],
   roads:   [],
 };
-const ALL_WRAPS=['wrapCity','wrapFocus','wrapSafe','wrapSelfRef','wrapQual','wrapFee','wrapCat','refModeWrap'];
+const ALL_WRAPS=['wrapCity','wrapFocus','wrapSafe','wrapSafeCraft','wrapSelfRef','wrapQual','wrapFee','wrapCat','refModeWrap'];
 function setTab(t){
   S.tab=t;
   const el=$('secName'); if(el) el.textContent=TAB_NAMES[t]||'';
@@ -2028,6 +2051,7 @@ $('refModeSel').onchange=()=>{ compute(); render(); };
 $('backHome').onclick=()=>goHome();
 $('selfRefChk').onchange=()=>{ compute(); render(); };
 $('safeChk').onchange=()=>{ compute(); render(); };
+$('safeCraftChk').onchange=()=>{ S.limit=0; compute(); render(); };
 $('ovrReset').onclick=()=>{ S.overrides={}; saveOverrides(); compute(); render(); };
 window.setOverride=(mid,city,val)=>{
   const v=parseFloat(val);
