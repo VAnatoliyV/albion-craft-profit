@@ -729,7 +729,7 @@ function buildSelfCosts(focus){
       const bonus = DATA.refBonus[rmat.chain]===city;
       const ret = refReturnRate(bonus, focus);
       const fee = rmat.iv*CFG.nutritionFactor*fee100/100;
-      S.selfCost[rmat.id+'|'+city] = {cost:(raws+catCost)*(1-ret)+fee, ret, bonus, fee, stale:worst};
+      S.selfCost[rmat.id+'|'+city] = {cost:(raws+catCost)*(1-ret)+fee, cash:(raws+catCost)+fee, ret, bonus, fee, stale:worst};
     }
   }
 }
@@ -772,7 +772,8 @@ function craftCostIn(item, city, focus){
   const bonus = BONUS_CITY_OF[item.cat]===city;
   const ret = returnRate(bonus,focus);
   const fee = item.iv*CFG.nutritionFactor*(+$('feeInp').value||0)/100;
-  return {cost: raw*(1-ret)+artCost+fee, bonus, ret, fee, raw, artCost, artInfo, stale:worst, selfMats};
+  return {cost: raw*(1-ret)+artCost+fee, cash: raw+artCost+fee,
+    bonus, ret, fee, raw, artCost, artInfo, stale:worst, selfMats};
 }
 // ─── «Золотая середина»: сколько реально заработать с позиции ───
 // Раньше рейтинг был профит × объём × 0.25. Но одинаковый множитель у всех строк
@@ -782,11 +783,14 @@ function craftCostIn(item, city, focus){
 // при большом — возвращается к обороту. Плюс плавная поправка на возраст цены вместо
 // обрыва «свежо / несвежо».
 let GOLD = {B:0, T:1};
-function goldOf(net, cost, vol, staleH){
+function goldOf(net, cost, vol, staleH, cash){
   const unit = Math.max(net||0, 0);
   if(!unit || !cost || !vol) return {real:0, lim:null, q:0};
   const qMarket = CFG.marketShare * vol * (GOLD.T||1);
-  const qBudget = GOLD.B > 0 ? GOLD.B / cost : Infinity;
+  // бюджет ограничивает НАЛИЧНЫМИ: за сырьё платишь полную цену вперёд,
+  // возврат ресурсов приходит материалами уже после крафта, потратить его в кассе нельзя
+  const perUnit = cash || cost;
+  const qBudget = GOLD.B > 0 ? GOLD.B / perUnit : Infinity;
   const q = Math.min(qBudget, qMarket);
   const fresh = Math.pow(0.5, Math.max(0, staleH||0) / CFG.goldHalfLifeH);
   return {real: unit*q*fresh, lim: (qBudget < qMarket ? 'бюджет' : 'рынок'), q};
@@ -882,7 +886,7 @@ function compute(){
       // «сомнительное»: аномальная маржа или жирная маржа при мизерном объёме
       const warn = margin>300 || (margin>100 && (vol||0)<10);
       rows.push({it, city, cost:cc.cost, bonus:cc.bonus, rev, channel, net, margin,
-        vol, pool: vol*Math.max(net,0), ...goldOf(net, cc.cost, vol, stale), stale, warn,
+        vol, pool: vol*Math.max(net,0), cash:cc.cash, ...goldOf(net, cc.cost, vol, stale, cc.cash), stale, warn,
         bmPrice, bmSrc, cityPrice:bestCityPrice||null, fee:cc.fee, ret:cc.ret, raw:cc.raw,
         artCost:cc.artCost||0, artInfo:cc.artInfo||null});
     }
@@ -969,7 +973,7 @@ function compute(){
         const warn = margin>300 || (margin>100 && vol!=null && vol<10);
         refRows.push({rmat, city, cost:sc.cost, sell, net, margin, vol,
           pool: vol!=null?vol*Math.max(net,0):null,
-          ...goldOf(net, sc.cost, vol, stale),
+          cash:sc.cash, ...goldOf(net, sc.cost, vol, stale, sc.cash),
           bonus:sc.bonus, ret:sc.ret, fee:sc.fee, stale, warn});
       }
     }
@@ -1110,6 +1114,8 @@ function compute(){
       const fee = c.iv*CFG.nutritionFactor*(+$('feeInp').value||0)/100; // за партию
       const costBatch = raw*(1-ret) + rawNoRet + fee; // возврат только на обычное сырьё
       const cost = costBatch/c.batch; // за одну штуку
+      // сколько серебра надо на руках: сырьё оплачивается целиком, возврат придёт материалами
+      const cashBatch = raw + rawNoRet + fee, cash = cashBatch/c.batch;
       // канал продажи: лучший городской селл-ордер (ЧР потребляемые не берёт)
       let sellCity=null, sellPrice=0, sellTs=null;
       const sellOvr = S.overrides['SELL|'+c.id];
@@ -1128,10 +1134,10 @@ function compute(){
       const vol = S.cityHist?.[c.id]?.[sellCity]?.[1] ?? null;
       const stale = Math.max(worst, hoursAgo(sellTs));
       const warn = margin>300 || (margin>100 && (vol||0)<10);
-      consRows.push({it:c, city, bonus, cost, costBatch, raw, rawNoRet, ret, fee, rev,
+      consRows.push({it:c, city, bonus, cost, costBatch, cash, cashBatch, raw, rawNoRet, ret, fee, rev,
         channel:sellCity, sellPrice, net, margin, vol,
         pool: vol!=null?vol*Math.max(net,0):null,
-        ...goldOf(net, cost, vol, stale), stale, warn});
+        ...goldOf(net, cost, vol, stale, cash), stale, warn});
     }
   }
   S.consRows = (citySel==='ALL' && (localOnly()||safeCraft())) ? bestPerItem(consRows) : consRows;
@@ -1464,7 +1470,10 @@ function calcConsUpd(idx){
         onclick="event.stopPropagation()" onchange="setSellOverride('${it.id}',this.value)"
         title="По какой цене реально продашь. Пусто или 0 — вернуть цену из API.">${S.overrides['SELL|'+it.id]!=null?' <span style="color:var(--accent)">✎</span>':''}
       → нетто <b>${fmt(r.rev)}</b>/шт<br>`+
-     `<b>Вложение: ${fmt(invest)}</b> · Фокус: ${fmt(batches*it.focus)} · `+
+     `<b>Наличных на закупку: ${fmt((r.cashBatch||r.costBatch)*batches)}</b>
+      <span class="help" title="Столько серебра нужно иметь на руках прямо сейчас: за сырьё платишь полную цену. Возврат ресурсов вернётся материалами в инвентарь уже после крафта — это не серебро, но его можно продать или пустить в следующую партию. Поэтому «вложение» ниже меньше.">?</span>`+
+     ` → вернётся материалами ~${fmt(r.raw*r.ret*batches)}<br>`+
+     `<b>Вложение (за вычетом возврата): ${fmt(invest)}</b> · Фокус: ${fmt(batches*it.focus)} · `+
      `<b>Профит: <span class="${profit>=0?'pos':'neg'}">${fmt(profit)}</span></b>`+
      (days?` · при объёме ${fmt(r.vol)}/д уйдёт за ~${days} дн. (25% рынка)`:'');
   el.innerHTML=m;
