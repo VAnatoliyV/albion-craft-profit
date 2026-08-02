@@ -222,6 +222,8 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
       <span>Купить дёшево в одном городе, продать дорого в другом. С объёмами продаж города-получателя. Перевозку и риск бери на себя.</span></div>
     <div class="card" onclick="enterApp('ench')"><b>💎 Рунофикация</b>
       <span>Купить шмотку, докинуть руны/души/реликты, поднять зачарование (например 4.2 → 4.3) и продать дороже на чёрном рынке. С объёмами продаж по каждому качеству.</span></div>
+    <div class="card" onclick="enterApp('cons')"><b>🧪 Зелья и еда</b>
+      <span>Алхимия и кухня: зелья крафтятся партиями по 5, еда по 10. Бонус на зелья — Бресилиен, на еду — Карлеон. Чёрный рынок их не берёт, продажа на городские рынки, где решает оборот.</span></div>
     <div class="card" onclick="enterApp('item')"><b>🔍 Цены предмета</b>
       <span>Сколько стоит любая вещь или ресурс: цены по всем семи городам и качествам, бай-ордера (за сколько сдать сразу) и средние сделок на чёрном рынке.</span></div>
     <div class="card" onclick="enterApp('roads')"><b>🛡 Дороги в Карлеон <span class="badge b-warn" style="vertical-align:2px">бета</span></b>
@@ -360,6 +362,8 @@ const CFG = {
   famePerMat:  {4:22.5, 5:90,   6:270,  7:645,  8:1395},
 };
 const rr = b => b/(1+b); // возврат из суммы бонусов
+// бонусные города потребляемых: алхимия — Бресилиен, кухня — Карлеон
+const CONS_BONUS_CITY = {potion:'Brecilien', meal:'Caerleon'};
 
 // ─── Состояние ───
 const S = {
@@ -1042,6 +1046,46 @@ function compute(){
     }
   }
   S.enchRows=enchRows;
+
+  // ─── Зелья и еда: партия → себестоимость штуки → лучший городской рынок ───
+  const consRows=[];
+  if(need('cons')) for(const c of (DATA.cons||[])){
+    const home = CONS_BONUS_CITY[c.cat];
+    const tryCities = citySel==='ALL' ? [home] : [citySel];
+    for(const city of tryCities){
+      let raw=0, worst=0, missing=false;
+      for(const [m,n] of Object.entries(c.mats)){
+        const pMat=matPrice(m, city);
+        if(!pMat){ missing=true; break; }
+        raw+=pMat.price*n; worst=Math.max(worst,pMat.age);
+      }
+      if(missing) continue;
+      const bonus = city===home;
+      const ret = returnRate(bonus, focus);
+      const fee = c.iv*CFG.nutritionFactor*(+$('feeInp').value||0)/100; // за партию
+      const costBatch = raw*(1-ret)+fee;
+      const cost = costBatch/c.batch; // за одну штуку
+      // канал продажи: лучший городской селл-ордер (ЧР потребляемые не берёт)
+      let sellCity=null, sellPrice=0, sellTs=null;
+      for(const [cc,byQ] of Object.entries(S.cityPrices[c.id]||{})){
+        const v=byQ[1]; if(!v||!v.sell) continue;
+        if(hoursAgo(v.ts)>CFG.staleHours) continue;
+        if(v.sell>sellPrice){ sellPrice=v.sell; sellCity=cc; sellTs=v.ts; }
+      }
+      if(!sellCity) continue;
+      const rev = sellPrice*(1-tax-CFG.setupFee);
+      const net = rev-cost;
+      const margin = net/cost*100;
+      const vol = S.cityHist?.[c.id]?.[sellCity]?.[1] ?? null;
+      const stale = Math.max(worst, hoursAgo(sellTs));
+      const warn = margin>300 || (margin>100 && (vol||0)<10);
+      consRows.push({it:c, city, bonus, cost, costBatch, raw, ret, fee, rev,
+        channel:sellCity, sellPrice, net, margin, vol,
+        pool: vol!=null?vol*Math.max(net,0):null,
+        ...goldOf(net, cost, vol, stale), stale, warn});
+    }
+  }
+  S.consRows=consRows;
 }
 // объёмы рынков городов — догружаем историю только для лучших кандидатов межгородского флипа
 let cityVolLoading=false;
@@ -1073,6 +1117,10 @@ async function loadCityVolumes(){
 }
 
 // ─── Рендер ───
+const COLS_CONS = [
+  ['item','Предмет'],['city','Город крафта'],['cost','Себестоимость/шт'],['channel','Продажа'],
+  ['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['real','Мне за день'],['stale','Данные'],
+];
 const COLS_CRAFT = [
   ['item','Предмет'],['city','Город'],['cost','Себестоимость'],['rev','Выручка (нетто)'],
   ['channel','Канал'],['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['real','Мне за день'],['stale','Данные'],
@@ -1162,11 +1210,11 @@ function render(){
   let minM=+$('minMargin').value||0, minV=+$('minVol').value||0;
   if(S.gold){ minM=Math.max(minM,10); minV=Math.max(minV,50); }
   const craft = S.tab==='craft';
-  const source = craft?S.rows : S.tab==='flip'?S.flipRows : S.tab==='cityflip'?S.cityFlipRows : S.tab==='ench'?(S.enchRows||[]) : (S.refRows||[]);
+  const source = craft?S.rows : S.tab==='flip'?S.flipRows : S.tab==='cityflip'?S.cityFlipRows : S.tab==='ench'?(S.enchRows||[]) : S.tab==='cons'?(S.consRows||[]) : (S.refRows||[]);
   let rows = source.filter(r=>{
     const it=r.it||r.rmat;
     if(q && !(it.en.toLowerCase().includes(q)||(it.ru||'').toLowerCase().includes(q))) return false;
-    if(cat && it.cat!==cat && S.tab!=='ref') return false;
+    if(cat && it.cat!==cat && S.tab!=='ref' && S.tab!=='cons') return false;
     if(tier && String(it.tier)!==tier) return false;
     if(ench!=='' && String(it.ench)!==ench) return false;
     if(r.margin < minM) return false;
@@ -1186,7 +1234,7 @@ function render(){
     const A=va??-1e18, B=vb??-1e18;
     return dir<0 ? B-A : A-B;
   });
-  const cols = craft?COLS_CRAFT : S.tab==='flip'?COLS_FLIP : S.tab==='cityflip'?COLS_CITYFLIP : S.tab==='ench'?COLS_ENCH : COLS_REF;
+  const cols = craft?COLS_CRAFT : S.tab==='flip'?COLS_FLIP : S.tab==='cityflip'?COLS_CITYFLIP : S.tab==='ench'?COLS_ENCH : S.tab==='cons'?COLS_CONS : COLS_REF;
   let html='<table><thead><tr>'+cols.map(([k,t])=>
     `<th class="${k==='item'?'item':''}" data-k="${k}"${COL_TIPS[k]?` title="${COL_TIPS[k]}"`:''}>${t}${COL_TIPS[k]?'<span class="help">?</span>':''}${key===k?(dir<0?' ↓':' ↑'):''}</th>`).join('')+'</tr></thead><tbody>';
   const qualMode = $('qualSel').value;
@@ -1216,6 +1264,18 @@ function render(){
         <td><b>${r.real?fmt(r.real):'—'}</b></td>
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
       html+=`<tr class="det" style="display:none"><td colspan="11" id="det${i}"></td></tr>`;
+    } else if(S.tab==='cons'){
+      const bonusBadge = r.bonus?'<span class="badge b-bonus">бонус</span>':'';
+      html+=`<tr class="row" data-i="${i}"><td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${it.en}</b>${topBadge+limBadge+warnBadge+staleBadge}
+        <span>${it.ru||''} · T${it.tier}${it.ench?'.'+it.ench:''} · ${it.cat==='potion'?'Зелье':'Еда'} · партия ${it.batch} шт</span></div></td>
+        <td>${r.city}${bonusBadge}</td><td>${fmt(r.cost)}</td>
+        <td><span class="badge b-ch">${r.channel}</span></td>
+        <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
+        <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
+        <td>${r.vol!=null?fmt(r.vol):'—'}</td><td>${r.pool!=null?fmt(r.pool):'—'}</td>
+        <td><b>${r.real?fmt(r.real):'—'}</b></td>
+        <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
+      html+=`<tr class="det" style="display:none"><td colspan="10" id="cdet${i}"></td></tr>`;
     } else if(S.tab==='flip'){
       html+=`<tr class="row">${nameCellQ(it, r.q, topBadge+limBadge+warnBadge+staleBadge)}
         <td>${QUAL_RU[r.q]}</td>
@@ -1288,6 +1348,16 @@ function render(){
     }
     else det.style.display='none';
   });
+  if(S.tab==='cons') wrap.querySelectorAll('tr.row').forEach(tr=>tr.onclick=()=>{
+    const i=+tr.dataset.i, det=tr.nextElementSibling, r=rows[i];
+    if(det.style.display==='none'){
+      det.style.display='';
+      (window.__consDetRows ||= {})[i]=r;
+      $('cdet'+i).innerHTML=detailConsHTML(r,i);
+      calcConsUpd(i);
+    }
+    else det.style.display='none';
+  });
   if(S.tab==='ref') wrap.querySelectorAll('tr.row').forEach(tr=>tr.onclick=()=>{
     const i=+tr.dataset.i, det=tr.nextElementSibling, r=rows[i];
     if(det.style.display==='none'){
@@ -1298,6 +1368,38 @@ function render(){
     }
     else det.style.display='none';
   });
+}
+// панель зелья/еды: материалы на ПАРТИЮ, себестоимость штуки, калькулятор
+function detailConsHTML(r,idx){
+  const it=r.it;
+  let m=`<b>Материалы на партию из ${it.batch} шт (цены в ${r.city}):</b><table><tr><th class="item">Ингредиент</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr>`;
+  for(const [mid,c] of Object.entries(it.mats)){
+    const p=matPrice(mid, r.city);
+    const nm=(DATA.matNames||{})[mid]||{};
+    m+=`<tr><td class="item">${icon(mid)} <div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${mid}')">${nm.en||mid}</b><span>${nm.ru||''}</span></div></td><td>${c}</td>
+      <td>${p?fmt(p.price):'—'}</td><td>${p?fmt(p.price*c):'—'}</td></tr>`;
+  }
+  m+='</table>';
+  m+=`Сырьё на партию: <b>${fmt(r.raw)}</b> · Возврат: <b>${(r.ret*100).toFixed(1)}%</b> → эффективно ${fmt(r.raw*(1-r.ret))} · Станок: <b>${fmt(r.fee)}</b><br>`+
+     `Партия обходится в <b>${fmt(r.costBatch)}</b> → себестоимость штуки <b>${fmt(r.cost)}</b> · `+
+     `Продажа: рынок ${r.channel}, ордер ${fmt(r.sellPrice)} → нетто ${fmt(r.rev)}/шт · Фокус: ${fmt(it.focus)}/партию<br>`;
+  m+=`<br><b>🧮 Калькулятор:</b> хочу
+      <input type="number" value="${it.batch*10}" min="${it.batch}" step="${it.batch}" style="width:90px" id="calcConsN${idx}" oninput="calcConsUpd(${idx})"> шт.
+      <div id="calcConsOut${idx}" style="margin-top:6px"></div>`;
+  return m;
+}
+function calcConsUpd(idx){
+  const r=(window.__consDetRows||{})[idx]; if(!r) return;
+  const it=r.it;
+  const want=+($('calcConsN'+idx)?.value||0); if(!want){ const el=$('calcConsOut'+idx); if(el) el.innerHTML=''; return; }
+  const batches=Math.ceil(want/it.batch), made=batches*it.batch;
+  const invest=r.costBatch*batches;
+  const profit=r.net*made;
+  const days=r.vol?(made/Math.max(1,r.vol*CFG.marketShare)).toFixed(1):null;
+  const el=$('calcConsOut'+idx);
+  if(el) el.innerHTML=`Партий: <b>${fmt(batches)}</b> (выйдет ${fmt(made)} шт) · Вложение: <b>${fmt(invest)}</b> · Фокус: ${fmt(batches*it.focus)}<br>`+
+    `Профит: <b class="${profit>=0?'pos':'neg'}">${fmt(profit)}</b>`+
+    (days?` · при объёме ${fmt(r.vol)}/д партия уйдёт за ~${days} дн. (25% рынка)`:'');
 }
 function detailHTML(r,idx){
   const it=r.it;
@@ -1767,6 +1869,7 @@ function roadsHTML(){
 function itemIndex(){
   if(S._idx) return S._idx;
   const list = DATA.items.map(it=>({id:it.id, en:it.en, ru:it.ru, tier:it.tier, ench:it.ench, cat:it.cat, kind:'item'}));
+  for(const c of (DATA.cons||[])) list.push({id:c.id, en:c.en, ru:c.ru, tier:c.tier, ench:c.ench, cat:c.cat, kind:'item'});
   for(const [mid,nm] of Object.entries(DATA.matNames||{})){
     const m = /^T(\d)/.exec(mid);
     list.push({id:mid, en:nm.en||mid, ru:nm.ru||'', tier:m?+m[1]:0, ench:(/@(\d)/.exec(mid)?.[1]|0), cat:'resource', kind:'mat'});
@@ -1897,7 +2000,7 @@ setInterval(async ()=>{
 checkSnapshot();
 $('goldBtn').onclick=()=>{ S.gold=!S.gold; $('goldBtn').classList.toggle('active',S.gold); render(); };
 $('reloadBtn').onclick=async ()=>{ lastCheck=Date.now(); await loadAll(true); S.builtAt=null; checkSnapshot(); };
-const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', item:'🔍 Цены предмета', roads:'🛡 Дороги в Карлеон · БЕТА'};
+const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', cons:'🧪 Зелья и еда', item:'🔍 Цены предмета', roads:'🛡 Дороги в Карлеон · БЕТА'};
 // какие контролы нужны на каждой вкладке (премиум, возраст данных, обновление и поиск — всегда)
 const TAB_CONTROLS={
   craft:   ['wrapCity','wrapFocus','wrapSelfRef','wrapQual','wrapFee','wrapCat'],
@@ -1905,6 +2008,7 @@ const TAB_CONTROLS={
   flip:    ['wrapCity','wrapSafe','wrapCat'],
   cityflip:['wrapSafe','wrapCat'],
   ench:    ['wrapCity','wrapSafe','wrapCat'],
+  cons:    ['wrapCity','wrapFocus','wrapFee'],
   item:    [],
   roads:   [],
 };

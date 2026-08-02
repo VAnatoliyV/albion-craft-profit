@@ -88,7 +88,11 @@ async function main(){
   const matIds = [
     ...Object.keys(items.resval), ...(items.rawIds||[]),
     ...(items.extraMatIds||[]), ...(items.stoneIds||[]), ...(items.arts||[]),
+    ...(items.consMatIds||[]), // ингредиенты алхимии и кухни: травы, яйца, хлеб, экстракты
   ];
+  // Зелья и еда: чёрный рынок их не покупает (проверено: 1 мусорный ордер на 55 id),
+  // поэтому им нужны только городские цены и объёмы — секции ЧР для них не запускаются.
+  const consIds = (items.cons||[]).map(c=>c.id);
   const journalIds = [];
   for(const arch of ['WARRIOR','HUNTER','MAGE','TOOLMAKER'])
     for(const t of [4,5,6,7,8]) journalIds.push(`T${t}_JOURNAL_${arch}_FULL`);
@@ -115,8 +119,8 @@ async function main(){
   }), 'mats')
 
   // 2) цены предметов на городских рынках — все качества
-  console.log(`item city prices: ${itemIds.length} ids`);
-  await runPool(chunks(itemIds, PRICE_BATCH).map(ch => async ()=>{
+  console.log(`item city prices: ${itemIds.length}+${consIds.length} ids`);
+  await runPool(chunks([...itemIds, ...consIds], PRICE_BATCH).map(ch => async ()=>{
     const d = await getJSON(`${API}/prices/${encodeURIComponent(ch.join(','))}.json?locations=${encodeURIComponent(CITIES.join(','))}`);
     for(const e of d||[]){
       const ci = CITY_IDX[e.city]; if(ci===undefined) continue;
@@ -190,9 +194,9 @@ async function main(){
   }), 'ref-volumes')
 
   // 5) объёмы продаж предметов на городских рынках (межгородской флип, канал «город»)
-  console.log(`city market volumes: ${itemIds.length} ids`);
+  console.log(`city market volumes: ${itemIds.length}+${consIds.length} ids`);
   out.ch = {};
-  await runPool(chunks(itemIds, HIST_BATCH).map(ch => async ()=>{
+  await runPool(chunks([...itemIds, ...consIds], HIST_BATCH).map(ch => async ()=>{
     const d = await getJSON(`${API}/history/${encodeURIComponent(ch.join(','))}.json?locations=${encodeURIComponent(CITIES.join(','))}&time-scale=24`);
     for(const e of d||[]){
       const ci = CITY_IDX[e.location]; if(ci===undefined) continue;
