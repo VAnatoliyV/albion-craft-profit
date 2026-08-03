@@ -1548,7 +1548,11 @@ function render(){
     tr.onclick=()=>{
       const det=tr.nextElementSibling;
       if(det.style.display==='none'){ S.open[tr.dataset.k]=S.open[tr.dataset.k]||{}; openDet(); }
-      else { det.style.display='none'; delete S.open[tr.dataset.k]; }
+      else {
+        det.style.display='none'; delete S.open[tr.dataset.k];
+        // закрыли последнюю карточку — обещали пересортировать, сортируем
+        if(!Object.keys(S.open).length) render();
+      }
     };
     if(S.open[tr.dataset.k]) openDet();
   });
