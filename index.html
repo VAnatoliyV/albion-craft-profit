@@ -898,10 +898,13 @@ function compute(){
     else {
       const home = BONUS_CITY_OF[it.cat];
       const pool = craftCities();
-      // «на месте» — вопрос «в каком городе выгоднее и сварить, и продать», перебираем все
+      // У фракционных плащей бонусного города нет вообще (возврат ресурсов на компоненты
+      // не действует), поэтому перебираем все города и оставляем лучший — иначе список
+      // городов выходил пустым и позиция просто не появлялась в таблице.
       tryCities = localOnly() ? pool
-        : !safeCraft() ? [home].filter(Boolean)
-        : (home && SAFE_CITIES.includes(home)) ? [home] : pool;
+        : !home ? pool
+        : !safeCraft() ? [home]
+        : SAFE_CITIES.includes(home) ? [home] : pool;
     }
     for(const city of tryCities){
       const cc = craftCostIn(it, city, focus);
@@ -942,7 +945,13 @@ function compute(){
         artCost:cc.artCost||0, artInfo:cc.artInfo||null});
     }
   }
-  S.rows = (citySel==='ALL' && (localOnly()||safeCraft())) ? bestPerItem(rows) : rows;
+  // Предметы без бонусного города дали бы по строке на каждый город — оставляем лучшую.
+  if(citySel==='ALL' && (localOnly()||safeCraft())) S.rows = bestPerItem(rows);
+  else if(citySel==='ALL'){
+    const noHome = rows.filter(r=>!BONUS_CITY_OF[r.it.cat]);
+    S.rows = noHome.length ? rows.filter(r=>BONUS_CITY_OF[r.it.cat]).concat(bestPerItem(noHome)) : rows;
+  }
+  else S.rows = rows;
   // флиппинг → ЧР: купить в любом городе (или выбранном), продать на чёрный рынок
   const flip=[];
   if(need('flip')){
