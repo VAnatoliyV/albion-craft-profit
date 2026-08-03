@@ -2092,12 +2092,17 @@ function itemIndex(){
   S._idx = list;
   return list;
 }
-function priceCell(v){
-  if(!v) return '<span class="fresh">—</span>';
+function priceCell(v, vol){
+  // vol — сколько штук в день реально уходит в этом городе. Цена без оборота
+  // обманчива: дорогой город, где не покупают, везти туда нечего.
+  const volLine = (vol!=null && vol>0)
+    ? `<br><span class="fresh" title="Продаж в день в этом городе (среднее за неделю)">⇅ ${vol<10?vol.toFixed(1):fmt(vol)}/д</span>` : '';
+  if(!v) return '<span class="fresh">—</span>'+volLine;
   const sell = v.sell ?? v.price ?? 0, buy = v.buy||0;
   const ts = v.ts, bts = v.buyTs;
   return `${sell?`<b>${fmt(sell)}</b> <span class="fresh">${fmtAge(hoursAgo(ts))}</span>`:'<span class="fresh">нет ордеров</span>'}`
-    + (buy?`<br><span style="color:var(--blue)">${fmt(buy)}</span> <span class="fresh">${fmtAge(hoursAgo(bts))}</span>`:'');
+    + (buy?`<br><span style="color:var(--blue)">${fmt(buy)}</span> <span class="fresh">${fmtAge(hoursAgo(bts))}</span>`:'')
+    + volLine;
 }
 function itemCardHTML(id){
   const it = DATA.items.find(x=>x.id===id);
@@ -2129,14 +2134,20 @@ function itemCardHTML(id){
 
   // таблица по городам
   const quals = isMat ? [1] : [1,2,3,4,5];
+  const volOf = (c,q)=> isMat ? (S.matHist?.[id]?.[c] ?? null) : (S.cityHist?.[id]?.[c]?.[q] ?? null);
+  const cityTotal = c => quals.reduce((a,q)=>a+(volOf(c,q)||0), 0);
+  const bestVol = Math.max(...CITIES.map(cityTotal), 0);
   out += '<table><thead><tr><th class="item" style="text-align:left">Город</th>'
       + quals.map(q=>`<th>${isMat?'Цена':QUAL_RU[q]}</th>`).join('')
-      + (isMat?'<th>Объём/д</th>':'') + '</tr></thead><tbody>';
+      + `<th title="Сколько штук в день здесь реально продаётся — сумма по всем качествам, среднее за неделю. Это и есть ответ на вопрос «куда везти»: в дорогом городе без оборота товар просто зависнет.">Продаж/д<span class="help">?</span></th>`
+      + '</tr></thead><tbody>';
   for(const c of CITIES){
-    const has = isMat ? byCity[c] : quals.some(q=>byCity[c]?.[q]);
-    out += `<tr><td class="item" style="display:table-cell"><b>${c}</b></td>`
-      + quals.map(q=>`<td>${priceCell(isMat?byCity[c]:byCity[c]?.[q])}</td>`).join('')
-      + (isMat?`<td>${S.matHist?.[id]?.[c]?fmt(S.matHist[id][c]):'<span class="fresh">—</span>'}</td>`:'')
+    const tot = cityTotal(c);
+    const lead = bestVol>0 && tot===bestVol
+      ? ' <span class="badge b-bonus" title="Здесь больше всего сделок по этому предмету — сюда везти надёжнее всего">лучший сбыт</span>' : '';
+    out += `<tr><td class="item" style="display:table-cell"><b>${c}</b>${lead}</td>`
+      + quals.map(q=>`<td>${priceCell(isMat?byCity[c]:byCity[c]?.[q], volOf(c,q))}</td>`).join('')
+      + `<td>${tot>0?'<b>'+(tot<10?tot.toFixed(1):fmt(tot))+'</b>':'<span class="fresh">—</span>'}</td>`
       + '</tr>';
   }
   out += '</tbody></table>';
@@ -2164,12 +2175,25 @@ function itemTabHTML(){
     <div style="margin-top:10px"><input type="text" id="itemQ" value="${(S.itemQ||'').replace(/"/g,'&quot;')}"
       placeholder="Название на английском или русском: bow, посох, metal bar…" style="width:100%;max-width:460px;font-size:14px;padding:9px 12px"></div>`;
   if(q.length<2){
-    out += '<div class="fresh" style="margin-top:10px">Введи хотя бы две буквы. Ищет по 4 456 предметам и всем материалам: цены по семи городам, бай-ордера и средние сделок на чёрном рынке.</div></div>';
+    out += '<div class="fresh" style="margin-top:10px">Введи хотя бы две буквы — хватит и трёх первых от каждого слова: «мас пла» найдёт «Плащ (мастер)», «und cap» — «Undead Cape». Ищет по названию на двух языках и по коду предмета.</div></div>';
     return out;
   }
-  const hits = itemIndex().filter(x=>x.en.toLowerCase().includes(q) || (x.ru||'').toLowerCase().includes(q) || x.id.toLowerCase().includes(q))
-    .sort((a,b)=>(a.tier-b.tier)||(a.ench-b.ench)||a.en.localeCompare(b.en));
-  out += `<div class="fresh" style="margin:10px 0">Найдено: ${hits.length}${hits.length>60?' — показаны первые 60':''}</div>`;
+  // Ищем по кускам: каждое слово запроса должно найтись где-то в названии.
+  // «мас пла» → «Плащ (мастер)», порядок слов не важен.
+  const words = q.split(/\s+/).filter(Boolean);
+  const scoreOf = x=>{
+    const en=x.en.toLowerCase(), ru=(x.ru||'').toLowerCase(), id=x.id.toLowerCase();
+    const hay = en+' '+ru+' '+id;
+    for(const w of words) if(!hay.includes(w)) return null;   // не все слова нашлись
+    // ранжирование: точное начало названия > начало слова внутри названия > просто вхождение
+    const starts = t => words.every(w=>new RegExp('(^|[\\s(\'"_-])'+w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).test(t));
+    if(en.startsWith(q) || ru.startsWith(q)) return 0;
+    if(starts(en) || starts(ru)) return 1;
+    return 2;
+  };
+  const hits = itemIndex().map(x=>{ const s=scoreOf(x); return s==null?null:{...x, _s:s}; }).filter(Boolean)
+    .sort((a,b)=>(a._s-b._s)||(a.tier-b.tier)||(a.ench-b.ench)||a.en.localeCompare(b.en));
+  out += `<div class="fresh" style="margin:10px 0">Найдено: ${hits.length}${hits.length>60?' — показаны первые 60, уточни запрос':''}</div>`;
   out += '<table><tbody>';
   for(const h of hits.slice(0,60)){
     out += `<tr class="row" data-open="${h.id}"><td class="item">
