@@ -1688,18 +1688,40 @@ function calcUpd(idx){
     const emptyCost=nJ*ji.empty;
     const perCraft=CFG.journalCap[it.tier] ? fame/CFG.journalCap[it.tier] : 0;
     const fullId=`T${it.tier}_JOURNAL_${it.j}_FULL`;
+    const emptyId=`T${it.tier}_JOURNAL_${it.j}_EMPTY`;
+    // Журналы возим не мы: пустые покупаем в городе крафта, полные там же и сдаём.
+    // Цена пустых по городам гуляет вдвое, поэтому справочные 2000/4000/… берём
+    // только как запасной вариант, когда на рынке ордеров нет.
+    const eLoc = matPrice(emptyId, r.city);
+    const fLoc = matPrice(fullId, r.city);
+    const emptyUnit = eLoc ? eLoc.price : ji.empty;
+    const emptySrc  = eLoc ? `рынок ${r.city}` : 'справочник';
+    const emptyCostReal = nJ*emptyUnit;
+    // для справки: где полные берут дороже всего
     let best=null;
     for(const [c,v] of Object.entries(S.matPrices[fullId]||{}))
-      if(!best || v.price>best.price) best={...v, city:c};
-    if(best){
-      const fullNet=best.price*(1-tax-CFG.setupFee);
-      jNet=nJ*(fullNet-ji.empty);
-      jHtml=`Журналы (${it.j.toLowerCase()}, Т${it.tier}): нужно <b>${fmt(nJ)}</b> шт · пустые ${fmt(emptyCost)} · `+
-            `полные продаются ~${fmt(best.price)} (${best.city}) → <b class="${jNet>=0?'pos':'neg'}">${jNet>=0?'+':''}${fmt(jNet)}</b> к профиту партии<br>`+
-            `<span class="fresh">один крафт даёт ${fmt(fame)} славы, журнал вмещает ${fmt(CFG.journalCap[it.tier])} → ${perCraft.toFixed(2)} журнала на штуку</span><br>`;
+      if(v.price && (!best || v.price>best.price)) best={...v, city:c};
+    const jn = (id)=>{ const n=(DATA.matNames||{})[id]; return n?`${n.en}${n.ru?' <span class="fresh">'+n.ru+'</span>':''}`:id; };
+    const head = `<div style="margin:8px 0 4px">${icon(fullId)} <b>Журналы</b> — ${jn(fullId)}</div>`;
+    const tail = `<span class="fresh">один крафт даёт ${fmt(fame)} славы, журнал вмещает ${fmt(CFG.journalCap[it.tier])} → ${perCraft.toFixed(2)} журнала на штуку</span><br>`;
+    if(fLoc && fLoc.price){
+      const fullNet=fLoc.price*(1-tax-CFG.setupFee);
+      jNet=nJ*(fullNet-emptyUnit);
+      const better = best && best.city!==r.city && best.price>fLoc.price
+        ? ` <span class="fresh">— в ${best.city} дают ${fmt(best.price)}, но туда надо везти</span>` : '';
+      jHtml = head +
+        `Нужно <b>${fmt(nJ)}</b> шт · пустые по <b>${fmt(emptyUnit)}</b> (${emptySrc}) = ${fmt(emptyCostReal)} · `+
+        `полные сдаём в <b>${r.city}</b> по ${fmt(fLoc.price)}${better} → `+
+        `<b class="${jNet>=0?'pos':'neg'}">${jNet>=0?'+':''}${fmt(jNet)}</b> к профиту партии<br>` + tail;
+    } else if(best){
+      // в городе крафта полные не продаются — считаем без них, но показываем куда везти
+      jHtml = head +
+        `Нужно <b>${fmt(nJ)}</b> шт · пустые по <b>${fmt(emptyUnit)}</b> (${emptySrc}) = ${fmt(emptyCostReal)}<br>`+
+        `<span class="fresh">В ${r.city} полные журналы никто не покупает. Дороже всего берут в ${best.city} — ${fmt(best.price)} за штуку, это ${fmt(nJ*(best.price*(1-tax-CFG.setupFee)-emptyUnit))} за партию, но туда надо везти. В профит не включено.</span><br>` + tail;
     } else {
-      jHtml=`Журналы: нужно <b>${fmt(nJ)}</b> шт (Т${it.tier} ${it.j.toLowerCase()}), пустые обойдутся в ${fmt(emptyCost)}; цены полных на рынке не видно — в расчёт не включены<br>`+
-            `<span class="fresh">один крафт даёт ${fmt(fame)} славы, журнал вмещает ${fmt(CFG.journalCap[it.tier])} → ${perCraft.toFixed(2)} журнала на штуку</span><br>`;
+      jHtml = head +
+        `Нужно <b>${fmt(nJ)}</b> шт · пустые по <b>${fmt(emptyUnit)}</b> (${emptySrc}) = ${fmt(emptyCostReal)}<br>`+
+        `<span class="fresh">Цен на полные журналы на рынке не видно — в расчёт не включены.</span><br>` + tail;
     }
   }
   const invest=matTotal+feeN+ (jNet<0?0:0);

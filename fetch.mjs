@@ -93,9 +93,14 @@ async function main(){
   // Зелья и еда: чёрный рынок их не покупает (проверено: 1 мусорный ордер на 55 id),
   // поэтому им нужны только городские цены и объёмы — секции ЧР для них не запускаются.
   const consIds = (items.cons||[]).map(c=>c.id);
-  const journalIds = [];
-  for(const arch of ['WARRIOR','HUNTER','MAGE','TOOLMAKER'])
-    for(const t of [4,5,6,7,8]) journalIds.push(`T${t}_JOURNAL_${arch}_FULL`);
+  // Журналы: и полные, и ПУСТЫЕ. Пустые тоже торгуются, и цена гуляет по городам
+  // (T6 охотника: 4 292 в Лимхёрсте против 9 493 в Мартлоке) — фиксированной ценой
+  // из справочника считать нельзя.
+  const journalIds = items.journalIds || (()=>{
+    const a=[]; for(const arch of ['WARRIOR','HUNTER','MAGE','TOOLMAKER'])
+      for(const t of [4,5,6,7,8]) for(const s of ['EMPTY','FULL']) a.push(`T${t}_JOURNAL_${arch}_${s}`);
+    return a;
+  })();
   const refIds = (items.refining||[]).map(r=>r.id);
 
   const startedAt = Date.now();
