@@ -809,7 +809,7 @@ function craftCostIn(item, city, focus){
 let GOLD = {B:0, T:1};
 function goldOf(net, cost, vol, staleH, cash){
   const unit = Math.max(net||0, 0);
-  if(!unit || !cost || !vol) return {real:0, lim:null, q:0};
+  if(!unit || !cost || !vol) return {real:0, lim:null, qty:0};
   const qMarket = CFG.marketShare * vol * (GOLD.T||1);
   // бюджет ограничивает НАЛИЧНЫМИ: за сырьё платишь полную цену вперёд,
   // возврат ресурсов приходит материалами уже после крафта, потратить его в кассе нельзя
@@ -817,7 +817,7 @@ function goldOf(net, cost, vol, staleH, cash){
   const qBudget = GOLD.B > 0 ? GOLD.B / perUnit : Infinity;
   const q = Math.min(qBudget, qMarket);
   const fresh = Math.pow(0.5, Math.max(0, staleH||0) / CFG.goldHalfLifeH);
-  return {real: unit*q*fresh, lim: (qBudget < qMarket ? 'бюджет' : 'рынок'), q};
+  return {real: unit*q*fresh, lim: (qBudget < qMarket ? 'бюджет' : 'рынок'), qty:q};
 }
 
 // Слава за один крафт — формула из вики Albion:
@@ -1266,7 +1266,7 @@ function nameCellQ(it, q, extra){
 // ключ строки, переживающий пересчёт и пересортировку: вкладка + предмет + город
 function rowKey(r){
   const it=r.it||r.rmat||{};
-  return [S.tab, it.id||'', r.city||'', r.q||''].join('|');
+  return [S.tab, it.id||'', r.city||''].join('|');
 }
 function render(){
   const wrap=$('tableWrap');
