@@ -1296,7 +1296,7 @@ function render(){
   if(S.gold){ minM=Math.max(minM,10); minV=Math.max(minV,50); }
   const craft = S.tab==='craft';
   const source = craft?S.rows : S.tab==='flip'?S.flipRows : S.tab==='cityflip'?S.cityFlipRows : S.tab==='ench'?(S.enchRows||[]) : S.tab==='cons'?(S.consRows||[]) : (S.refRows||[]);
-  let rows = source.filter(r=>{
+  const passesFilters = r=>{
     const it=r.it||r.rmat;
     if(q && !(it.en.toLowerCase().includes(q)||(it.ru||'').toLowerCase().includes(q))) return false;
     if(cat && it.cat!==cat && S.tab!=='ref' && S.tab!=='cons') return false;
@@ -1308,6 +1308,14 @@ function render(){
     if(S.gold && r.stale>maxAge) return false;
     if(S.gold && r.warn) return false; // сомнительные не попадают в «золотую середину»
     return true;
+  };
+  // Строку, которую ты держишь раскрытой, фильтры не выкидывают. Иначе правка цены
+  // в минус выбрасывала позицию из таблицы вместе с панелью — и откатить свою же
+  // цену было уже негде.
+  let rows = source.filter(r=>{
+    const ok = passesFilters(r);
+    r.keptOpen = !ok && !!S.open[rowKey(r)];
+    return ok || r.keptOpen;
   });
   const key = S.gold?'real':S.sortKey, dir=S.gold?-1:S.sortDir; // dir=-1 → по убыванию
   rows.sort((a,b)=>{
@@ -1336,11 +1344,15 @@ function render(){
       ? `<span class="badge b-lim" title="Ограничение — твой бюджет: рынок готов поглотить больше, чем ты можешь профинансировать. В этом режиме выигрывают позиции с высокой отдачей на вложенное серебро, то есть с маржой.">💰 упёрлось в бюджет</span>`
       : `<span class="badge b-lim2" title="Ограничение — рынок: серебра хватает с запасом, но больше этого объёма в день без демпинга не продать. Тут выигрывает оборот.">📦 упёрлось в рынок</span>`) : '';
     const warnBadge = r.warn?`<span class="badge b-warn" title="${WARN_TIP}">⚠ проверить</span>`:'';
+    // видна только потому, что раскрыта: под фильтры уже не проходит
+    const openBadge = r.keptOpen
+      ? `<span class="badge b-lim2" title="Эта строка сейчас не проходит фильтры — например, после твоей правки цены профит ушёл в минус. Она осталась в таблице только потому, что ты держишь её раскрытой: чтобы можно было увидеть результат и откатить цену. Закроешь панель — строка уйдёт.">👁 держим открытой</span>`
+      : '';
     if(craft){
       const bonusBadge = r.bonus?'<span class="badge b-bonus">бонус</span>':'';
       const chLabel = r.channel==='ЧР' ? `ЧР · ${qualMode==='q1'?'обыч. кач.':'все кач.'}` : r.channel+' · обыч. кач.';
       const qualText = qualMode==='q1' ? 'Обычное' : 'Все качества (взвеш.)';
-      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}">${nameCell(it, topBadge+limBadge+warnBadge+staleBadge, qualText)}
+      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}">${nameCell(it, topBadge+limBadge+openBadge+warnBadge+staleBadge, qualText)}
         <td>${r.city}${bonusBadge}</td><td>${fmt(r.cost)}</td><td>${fmt(r.rev)}</td>
         <td><span class="badge b-ch">${chLabel}</span></td>
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
@@ -1351,7 +1363,7 @@ function render(){
       html+=`<tr class="det" style="display:none"><td colspan="11" id="det${i}"></td></tr>`;
     } else if(S.tab==='cons'){
       const bonusBadge = r.bonus?'<span class="badge b-bonus">бонус</span>':'';
-      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${it.en}</b>${topBadge+limBadge+warnBadge+staleBadge}
+      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${it.en}</b>${topBadge+limBadge+openBadge+warnBadge+staleBadge}
         <span>${it.ru||''} · T${it.tier}${it.ench?'.'+it.ench:''} · ${it.cat==='potion'?'Зелье':'Еда'} · партия ${it.batch} шт</span></div></td>
         <td>${r.city}${bonusBadge}</td><td>${fmt(r.cost)}</td>
         <td><span class="badge b-ch">${r.channel}</span></td>
@@ -1399,7 +1411,7 @@ function render(){
       const route = r.sellCity
         ? `<span class="fresh">🛒 купить сырьё: <b style="color:var(--text)">${r.buyCities.join(', ')}</b><br>⚒ переработать: <b style="color:var(--text)">${r.city}</b> ${bonusBadge}<br>💰 продать: <b style="color:var(--text)">${r.sellCity}</b></span>`
         : `<b>${r.city}</b> ${bonusBadge}<br><span class="fresh">купить сырьё, переработать и продать — всё в этом городе</span>`;
-      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(rm.id)}<div class="iname"><b>${rm.en}${topBadge+limBadge+warnBadge+staleBadge}</b>
+      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(rm.id)}<div class="iname"><b>${rm.en}${topBadge+limBadge+openBadge+warnBadge+staleBadge}</b>
           <span>${rm.ru||''} · T${rm.tier}${rm.ench?'.'+rm.ench:''} · ${CHAIN_RU[rm.chain]}</span></div></td>
         <td>${route}</td>
         <td>${fmt(r.cost)}</td><td>${fmt(r.sell)}</td>
