@@ -1323,6 +1323,7 @@ function render(){
   // цену было уже негде.
   let rows = source.filter(r=>{
     const ok = passesFilters(r);
+    r.pinned = false;
     r.keptOpen = !ok && !!S.open[rowKey(r)];
     return ok || r.keptOpen;
   });
@@ -1344,7 +1345,15 @@ function render(){
   const STEP = isMobile ? 50 : 150;
   if(!S.limit) S.limit = STEP;
   const shown = Math.min(S.limit, rows.length);
-  rows.slice(0, shown).forEach((r,i)=>{
+  // Раскрытая строка после правки цены может улететь в хвост сортировки и не попасть
+  // в показываемые 150. Тогда поднимаем её наверх — туда, где ты сейчас смотришь.
+  let visible = rows.slice(0, shown);
+  {
+    const inView = new Set(visible.map(rowKey));
+    const rescued = rows.filter(r=>{ const k=rowKey(r); return S.open[k] && !inView.has(k); });
+    if(rescued.length){ rescued.forEach(r=>{ r.pinned=true; }); visible = rescued.concat(visible); }
+  }
+  visible.forEach((r,i)=>{
     const it=r.it;
     const topBadge = S.gold&&i<10?'<span class="badge b-top" title="Топ-10 «Золотой середины»: лучший баланс маржи и объёма продаж среди позиций со свежими данными. Сортировка — по реалистичному профиту в день (профит со штуки × 25% дневного объёма рынка).">ТОП</span>':'';
     const staleBadge = r.stale>CFG.staleHours?'<span class="badge b-stale">старые данные</span>':'';
@@ -1354,8 +1363,8 @@ function render(){
       : `<span class="badge b-lim2" title="Ограничение — рынок: серебра хватает с запасом, но больше этого объёма в день без демпинга не продать. Тут выигрывает оборот.">📦 упёрлось в рынок</span>`) : '';
     const warnBadge = r.warn?`<span class="badge b-warn" title="${WARN_TIP}">⚠ проверить</span>`:'';
     // видна только потому, что раскрыта: под фильтры уже не проходит
-    const openBadge = r.keptOpen
-      ? `<span class="badge b-lim2" title="Эта строка сейчас не проходит фильтры — например, после твоей правки цены профит ушёл в минус. Она осталась в таблице только потому, что ты держишь её раскрытой: чтобы можно было увидеть результат и откатить цену. Закроешь панель — строка уйдёт.">👁 держим открытой</span>`
+    const openBadge = (r.keptOpen || r.pinned)
+      ? `<span class="badge b-lim2" title="Эта строка сейчас не проходит фильтры — например, после твоей правки цены профит ушёл в минус. Она осталась в таблице только потому, что ты держишь её раскрытой: чтобы можно было увидеть результат и откатить цену. Закроешь панель — строка встанет на своё место.">👁 держим открытой</span>`
       : '';
     if(craft){
       const bonusBadge = r.bonus?'<span class="badge b-bonus">бонус</span>':'';
@@ -1452,7 +1461,7 @@ function render(){
     : null;
   if(cfg) wrap.querySelectorAll('tr.row').forEach(tr=>{
     const openDet=()=>{
-      const i=+tr.dataset.i, det=tr.nextElementSibling, r=rows[i];
+      const i=+tr.dataset.i, det=tr.nextElementSibling, r=visible[i];
       det.style.display='';
       (window[cfg.store] ||= {})[i]=r;
       const td=$(cfg.pfx+i);
