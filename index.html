@@ -359,7 +359,16 @@ function bestPerItem(rows){
     const cur=best.get(k);
     if(!cur || (r.real||0)>(cur.real||0) || ((r.real||0)===(cur.real||0) && r.net>cur.net)) best.set(k,r);
   }
-  return [...best.values()];
+  const out=[...best.values()];
+  // Раскрытую строку схлопывание не съедает. Иначе так: правишь цену в своём городе,
+  // профит уходит в минус, победителем по предмету становится другой город — и твоя
+  // позиция исчезает из таблицы вместе с панелью, откатить цену уже негде.
+  const have=new Set(out.map(r=>rowKey(r)));
+  for(const r of rows){
+    const k=rowKey(r);
+    if(S.open[k] && !have.has(k)){ out.push(r); have.add(k); }
+  }
+  return out;
 }
 const CITY_BONUS = {
   'Martlock':      ['axe','quarterstaff','froststaff','plate_shoes','offhand'],
@@ -2211,6 +2220,17 @@ window.goHome=()=>{
 // ─── старт: сначала база рецептов, потом цены ───
 (async function boot(){
   try{ localStorage.removeItem('acp_snap'); }catch(e){} // старый кэш снимка больше не используется
+  // Chrome при обычной перезагрузке восстанавливает прошлые значения полей: из-за этого
+  // «данные не старше» открывалось на 12 ч вместо 24 ч, а галочки стояли со вчера.
+  // Возвращаем то, что записано в разметке как значение по умолчанию.
+  document.querySelectorAll('#appHeader select, #filters select').forEach(sel=>{
+    const def=[...sel.options].find(o=>o.defaultSelected);
+    if(def && sel.value!==def.value) sel.value=def.value;
+  });
+  document.querySelectorAll('#appHeader input, #filters input').forEach(inp=>{
+    if(inp.type==='checkbox'){ if(inp.checked!==inp.defaultChecked) inp.checked=inp.defaultChecked; }
+    else if(inp.value!==inp.defaultValue) inp.value=inp.defaultValue;
+  });
   const hs=$('homeStatus');
   try{
     if(hs) hs.textContent='Загружаю базу предметов…';
