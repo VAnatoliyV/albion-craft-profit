@@ -390,7 +390,7 @@ const CAT_RU = {axe:'Топоры',quarterstaff:'Боевые посохи',fros
   leather_shoes:'Кожаные ботинки',cloth_armor:'Робы',plate_helmet:'Латные шлемы',hammer:'Молоты',spear:'Копья',
   holystaff:'Посохи света',mace:'Булавы',firestaff:'Огненные посохи',naturestaff:'Посохи природы',
   leather_armor:'Кожаные куртки',cloth_helmet:'Тканевые капюшоны',knuckles:'Кастеты',shapeshifterstaff:'Посохи оборотня',
-  cape:'Плащи',bag:'Сумки'};
+  cape:'Плащи',cape_faction:'Плащи фракций',bag:'Сумки'};
 // Крупные группы для полоски над таблицей: мелкий фильтр категорий остаётся,
 // но глазами двадцать восемь строк списка никто не разбирает.
 // Офхенды отнесены к оружию: это экипировка в слот оружия, и на ЧР уходит так же.
@@ -404,7 +404,7 @@ const GROUPS = [
   ['gear',  '⚔ Вещи',     [...CAT_WEAPON, ...CAT_ARMOR]],
   ['weapon','🗡 Оружие',   CAT_WEAPON],
   ['armor', '🛡 Броня',    CAT_ARMOR],
-  ['cape',  '🧣 Плащи',    ['cape']],
+  ['cape',  '🧣 Плащи',    ['cape','cape_faction']],
   ['bag',   '🎒 Сумки',    ['bag']],
 ];
 const GROUP_CATS = Object.fromEntries(GROUPS.map(([k,,c])=>[k, c&&new Set(c)]));
@@ -799,11 +799,15 @@ function artBest(artId){
   return best;
 }
 function craftCostIn(item, city, focus){
-  let raw=0, worst=0, missing=false, selfMats=0;
+  // noRet — компоненты, на которые возврат ресурсов не действует (maxreturnamount=0).
+  // У фракционных плащей это вообще всё: сам плащ, герб и жетоны.
+  const noRet = item.noRet ? new Set(item.noRet) : null;
+  let raw=0, rawNoRet=0, worst=0, missing=false, selfMats=0;
   for(const [m,c] of Object.entries(item.mats)){
     const p = effMatPrice(m, city);
     if(!p){ missing=true; break; }
-    raw += p.price*c; worst=Math.max(worst,p.age);
+    if(noRet && noRet.has(m)) rawNoRet += p.price*c; else raw += p.price*c;
+    worst=Math.max(worst,p.age);
     if(p.self) selfMats++;
   }
   if(missing) return null;
@@ -818,8 +822,8 @@ function craftCostIn(item, city, focus){
   const bonus = BONUS_CITY_OF[item.cat]===city;
   const ret = returnRate(bonus,focus);
   const fee = item.iv*CFG.nutritionFactor*(+$('feeInp').value||0)/100;
-  return {cost: raw*(1-ret)+artCost+fee, cash: raw+artCost+fee,
-    bonus, ret, fee, raw, artCost, artInfo, stale:worst, selfMats};
+  return {cost: raw*(1-ret)+rawNoRet+artCost+fee, cash: raw+rawNoRet+artCost+fee,
+    bonus, ret, fee, raw, rawNoRet, artCost, artInfo, stale:worst, selfMats};
 }
 // ─── «Золотая середина»: сколько реально заработать с позиции ───
 // Раньше рейтинг был профит × объём × 0.25. Но одинаковый множитель у всех строк
@@ -847,6 +851,7 @@ function goldOf(net, cost, vol, staleH, cash){
 // где A — количество неартефактных материалов. Зачарование прибавляет линейно,
 // а НЕ удваивает: проверено на вики-таблице переработки (Т5.0 = 135, Т8.3 = 8300).
 function craftFame(it){
+  if(it.nofame) return 0; // фракционные плащи славы не дают
   const per = CFG.famePerMat[it.tier]; if(!per) return 0;
   let A = 0; for(const c of Object.values(it.mats||{})) A += c;
   const base = A * per;
@@ -933,7 +938,7 @@ function compute(){
       const warn = margin>300 || (margin>100 && (vol||0)<10);
       rows.push({it, city, cost:cc.cost, bonus:cc.bonus, rev, channel, net, margin,
         vol, pool: vol*Math.max(net,0), cash:cc.cash, ...goldOf(net, cc.cost, vol, stale, cc.cash), stale, warn,
-        bmPrice, bmSrc, cityPrice:bestCityPrice||null, fee:cc.fee, ret:cc.ret, raw:cc.raw,
+        bmPrice, bmSrc, cityPrice:bestCityPrice||null, fee:cc.fee, ret:cc.ret, raw:cc.raw, rawNoRet:cc.rawNoRet||0,
         artCost:cc.artCost||0, artInfo:cc.artInfo||null});
     }
   }
@@ -1594,11 +1599,14 @@ function calcConsUpd(idx){
 function detailHTML(r,idx){
   const it=r.it;
   let m='<b>Материалы (цены в '+r.city+', можно править ✎):</b><table><tr><th class="item">Ресурс</th><th>Кол-во</th><th>Цена (ред.)</th><th>Сумма</th></tr>';
+  const noRetSet = it.noRet ? new Set(it.noRet) : null;
   for(const [mid,c] of Object.entries(it.mats)){
     const p=matPrice(mid, r.city);
     const pe=effMatPrice(mid, r.city);
     const selfMark = pe&&pe.self ? ` <span style="color:var(--green)" title="Дешевле переработать самому из сырья: ${fmt(pe.price)} против ${p?fmt(p.price):'—'} на рынке. Уже учтено в себестоимости.">⚒ сам ${fmt(pe.price)}</span>` : '';
-    m+=`<tr><td class="item">${icon(mid)} ${mid}${p&&p.ovr?' <span style="color:var(--accent)">✎</span>':''}${selfMark}</td><td>${c}</td>
+    const noRetMark = noRetSet&&noRetSet.has(mid) ? ' <i style="color:var(--muted)">без возврата</i>' : '';
+    const mn=(DATA.matNames||{})[mid];
+    m+=`<tr><td class="item">${icon(mid)} ${mn?mn.en:mid}${mn&&mn.ru?' <span class="fresh">'+mn.ru+'</span>':''}${noRetMark}${p&&p.ovr?' <span style="color:var(--accent)">✎</span>':''}${selfMark}</td><td>${c}</td>
       <td><input type="number" style="width:90px" value="${p?Math.round(p.price):''}" placeholder="—"
         onchange="setOverride('${mid}','${r.city}',this.value)"
         title="Введи свою цену, если на рынке она другая. Пустое поле или 0 — вернуть цену из API."></td>
@@ -1609,8 +1617,10 @@ function detailHTML(r,idx){
   }
   m+='</table>';
   const sOvr = S.overrides['SELL|'+it.id]!=null;
-  m+=`Сырьё: <b>${fmt(r.raw)}</b> · Возврат: <b>${(r.ret*100).toFixed(1)}%</b> → эффективно ${fmt(r.raw*(1-r.ret))} · `+
-     `Станок: <b>${fmt(r.fee)}</b> · Итого себестоимость: <b>${fmt(r.cost)}</b><br>`+
+  m+=(r.raw ? `Сырьё: <b>${fmt(r.raw)}</b> · Возврат: <b>${(r.ret*100).toFixed(1)}%</b> → эффективно ${fmt(r.raw*(1-r.ret))} · ` : '')+
+     (r.rawNoRet ? `Компоненты: <b>${fmt(r.rawNoRet)}</b> <i style="color:var(--muted)">без возврата</i> · ` : '')+
+     (r.fee ? `Станок: <b>${fmt(r.fee)}</b> · ` : '')+
+     `Итого себестоимость: <b>${fmt(r.cost)}</b><br>`+
      `Продажа: ${r.channel==='ЧР'?`ЧР, ${sOvr?'моя цена':(r.bmSrc==='ордер'?'бай-ордер сейчас':r.bmSrc==='сделки'?'последние сделки':'средняя за 7 дней')}`:`рынок ${r.channel}, ордер`}${sOvr?' <span style="color:var(--accent)">✎</span>':''}
       <input type="number" style="width:100px" value="${Math.round(r.bmPrice??r.cityPrice??0)}"
         onchange="setSellOverride('${it.id}',this.value)"
@@ -1635,14 +1645,17 @@ function calcUpd(idx){
   const r = (window.__detRows||{})[idx]; if(!r) return;
   const N = Math.max(1, +($('calcN'+idx)?.value||100));
   const it=r.it, tax=$('premChk').checked?0.04:0.08;
-  let html='<table><tr><th class="item">Ресурс</th><th>Всего (с учётом возврата)</th><th>Стоимость</th></tr>';
+  const noRetSet = it.noRet ? new Set(it.noRet) : null;
+  let html='<table><tr><th class="item">Ресурс</th><th>Купить всего</th><th>Стоимость</th></tr>';
   let matTotal=0;
   for(const [mid,c] of Object.entries(it.mats)){
     const p=matPrice(mid, r.city);
-    const need=Math.ceil(c*N*(1-r.ret));
+    const noR = noRetSet && noRetSet.has(mid);   // на такие возврат не действует — берём полное количество
+    const need=noR ? c*N : Math.ceil(c*N*(1-r.ret));
     const cost=p?need*p.price:null;
     if(cost!=null) matTotal+=cost;
-    html+=`<tr><td class="item">${icon(mid)} ${mid}${p&&p.ovr?' <span style="color:var(--accent)">✎</span>':''}</td><td>${fmt(need)}</td><td>${cost!=null?fmt(cost):'—'}</td></tr>`;
+    const mn=(DATA.matNames||{})[mid];
+    html+=`<tr><td class="item">${icon(mid)} ${mn?mn.en:mid}${noR?' <i style="color:var(--muted)">без возврата</i>':''}${p&&p.ovr?' <span style="color:var(--accent)">✎</span>':''}</td><td>${fmt(need)}</td><td>${cost!=null?fmt(cost):'—'}</td></tr>`;
   }
   if(it.art && r.artInfo){
     const cost=N*it.art.n*r.artInfo.price; matTotal+=cost;
@@ -1676,7 +1689,7 @@ function calcUpd(idx){
   const invest=matTotal+feeN+ (jNet<0?0:0);
   const revenue=N*r.rev;
   const profit=N*r.net + jNet;
-  html+=`${jHtml}Станок за партию: <b>${fmt(feeN)}</b> · Вложение (материалы+станок): <b>${fmt(invest)}</b><br>`+
+  html+=jHtml+(feeN?`Станок за партию: <b>${fmt(feeN)}</b> · `:'')+`Вложение: <b>${fmt(invest)}</b><br>`+
     `Выручка: <b>${fmt(revenue)}</b> (${r.channel==='ЧР'?'чёрный рынок':'рынок '+r.channel}) · `+
     `<b>Итоговый профит партии: <span class="${profit>=0?'pos':'neg'}">${fmt(profit)}</span></b>`+
     (r.vol?` · при объёме рынка ${fmt(r.vol)}/д партия уйдёт за ~${(N/Math.max(1,r.vol*CFG.marketShare)).toFixed(1)} дн. (25% рынка)`:'');
