@@ -43,6 +43,8 @@ button{background:var(--panel2);color:var(--text);border:1px solid var(--border2
 button:hover{border-color:var(--accent);color:var(--accent2);transform:translateY(-1px)}
 button:active{transform:translateY(0)}
 button.mini{padding:4px 8px;font-size:13px;line-height:1}
+button.grp{padding:5px 11px;font-size:13px;border-radius:14px}
+button.grp.on{background:var(--accent);color:#181203;border-color:var(--accent);font-weight:600}
 button.gold{background:linear-gradient(135deg,#a37b22,#d4a942);color:#181203;border:1px solid #e3bd58;font-weight:700;
   box-shadow:0 2px 12px rgba(238,188,78,.25);text-shadow:0 1px 0 rgba(255,255,255,.15)}
 button.gold:hover{background:linear-gradient(135deg,#b98c28,#e8bd4d);color:#181203;transform:translateY(-1px);
@@ -300,6 +302,9 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
 </header>
 <main id="appMain" style="display:none">
   <div id="status">Загрузка цен с Albion Online Data Project…</div>
+  <div id="grpRow" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+    <span class="fresh" style="margin-right:2px">Показывать:</span>
+  </div>
   <div class="filters" id="filters">
     <input type="text" id="searchInp" placeholder="Поиск предмета…" style="min-width:200px">
     <span id="ovrChip" style="display:none;font-size:12px;color:var(--accent)">✎ своих цен: <b id="ovrCnt">0</b>
@@ -386,6 +391,23 @@ const CAT_RU = {axe:'Топоры',quarterstaff:'Боевые посохи',fros
   holystaff:'Посохи света',mace:'Булавы',firestaff:'Огненные посохи',naturestaff:'Посохи природы',
   leather_armor:'Кожаные куртки',cloth_helmet:'Тканевые капюшоны',knuckles:'Кастеты',shapeshifterstaff:'Посохи оборотня',
   cape:'Плащи',bag:'Сумки'};
+// Крупные группы для полоски над таблицей: мелкий фильтр категорий остаётся,
+// но глазами двадцать восемь строк списка никто не разбирает.
+// Офхенды отнесены к оружию: это экипировка в слот оружия, и на ЧР уходит так же.
+// «Аксессуары» намеренно оставлены маленькими, иначе плащи в них снова потеряются.
+const CAT_WEAPON = ['axe','sword','bow','crossbow','dagger','spear','quarterstaff','hammer','mace','knuckles',
+  'firestaff','froststaff','arcanestaff','holystaff','naturestaff','cursestaff','shapeshifterstaff','offhand'];
+const CAT_ARMOR = ['plate_helmet','plate_armor','plate_shoes','leather_helmet','leather_armor','leather_shoes',
+  'cloth_helmet','cloth_armor','cloth_shoes'];
+const GROUPS = [
+  ['all',   'Всё',        null],
+  ['gear',  '⚔ Вещи',     [...CAT_WEAPON, ...CAT_ARMOR]],
+  ['weapon','🗡 Оружие',   CAT_WEAPON],
+  ['armor', '🛡 Броня',    CAT_ARMOR],
+  ['cape',  '🧣 Плащи',    ['cape']],
+  ['bag',   '🎒 Сумки',    ['bag']],
+];
+const GROUP_CATS = Object.fromEntries(GROUPS.map(([k,,c])=>[k, c&&new Set(c)]));
 const BONUS_CITY_OF = {}; // cat -> city
 for (const [c,cats] of Object.entries(CITY_BONUS)) cats.forEach(k=>BONUS_CITY_OF[k]=c);
 const CFG = {
@@ -415,7 +437,7 @@ const S = {
   cityPrices:{},       // itemId -> {city: {q: {sell, ts}}}
   bm:{},               // itemId -> {qs:{q:{price,vol}}, vol, last}
   cityHist:{},         // itemId -> {city: {q: vol/день}}  (объёмы рынков городов, догружается)
-  loaded:false, rows:[], flipRows:[], cityFlipRows:[], sortKey:'pool', sortDir:-1, open:{},
+  loaded:false, rows:[], flipRows:[], cityFlipRows:[], sortKey:'pool', sortDir:-1, open:{}, grp:'all',
   roads:{loaded:false, loading:false, kills:[], fetched:0, err:null, at:null},
 };
 // ручные правки цен ресурсов/артефактов: "MATID|Город" -> цена
@@ -1308,6 +1330,8 @@ function render(){
   const passesFilters = r=>{
     const it=r.it||r.rmat;
     if(q && !(it.en.toLowerCase().includes(q)||(it.ru||'').toLowerCase().includes(q))) return false;
+    const gc = GROUP_CATS[S.grp];
+    if(gc && !gc.has(it.cat)) return false;
     if(cat && it.cat!==cat && S.tab!=='ref' && S.tab!=='cons') return false;
     if(tier && String(it.tier)!==tier) return false;
     if(ench!=='' && String(it.ench)!==ench) return false;
@@ -2185,6 +2209,7 @@ function setTab(t){
   const vis=TAB_CONTROLS[t]||[];
   for(const id of ALL_WRAPS){ const w=$(id); if(w) w.style.display = vis.includes(id)?'':'none'; }
   const flt=$('filters'); if(flt) flt.style.display = (t==='roads'||t==='item')?'none':'';
+  const gr=$('grpRow'); if(gr) gr.style.display = (TAB_CONTROLS[t]||[]).includes('wrapCat') ? 'flex' : 'none';
   if(t==='roads' && !S.roads.loaded && !S.roads.loading) loadRoads(); // ленивая загрузка при входе
   S.limit = 0; // сбросить порцию строк
   if(S.loaded && t!=='roads') compute();
@@ -2193,6 +2218,23 @@ function setTab(t){
 $('refModeSel').onchange=()=>{ compute(); render(); };
 $('backHome').onclick=()=>goHome();
 $('selfRefChk').onchange=()=>{ compute(); render(); };
+// Полоска групп. Группа и точная категория не воюют: выбрал группу — точная
+// категория сбрасывается, выбрал точную категорию — группа возвращается на «Всё».
+function paintGroups(){
+  const row=$('grpRow'); if(!row) return;
+  row.querySelectorAll('button.grp').forEach(b=>b.classList.toggle('on', b.dataset.g===S.grp));
+}
+{
+  const row=$('grpRow');
+  for(const [key,label] of GROUPS.map(g=>[g[0],g[1]])){
+    const b=document.createElement('button');
+    b.className='grp'; b.dataset.g=key; b.textContent=label;
+    b.onclick=()=>{ S.grp=key; const cs=$('catSel'); if(cs) cs.value=''; S.limit=0; paintGroups(); render(); };
+    row.appendChild(b);
+  }
+  paintGroups();
+}
+$('catSel').addEventListener('change', ()=>{ if($('catSel').value){ S.grp='all'; paintGroups(); } });
 $('safeChk').onchange=()=>{ compute(); render(); };
 ['flipFrom','flipTo'].forEach(id=>$(id).onchange=()=>{ S.limit=0; compute(); render(); });
 $('flipSwap').onclick=()=>{ const a=$('flipFrom'), b=$('flipTo'); const t=a.value; a.value=b.value; b.value=t; S.limit=0; compute(); render(); };
