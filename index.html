@@ -406,7 +406,7 @@ const S = {
   cityPrices:{},       // itemId -> {city: {q: {sell, ts}}}
   bm:{},               // itemId -> {qs:{q:{price,vol}}, vol, last}
   cityHist:{},         // itemId -> {city: {q: vol/день}}  (объёмы рынков городов, догружается)
-  loaded:false, rows:[], flipRows:[], cityFlipRows:[], sortKey:'pool', sortDir:-1,
+  loaded:false, rows:[], flipRows:[], cityFlipRows:[], sortKey:'pool', sortDir:-1, open:{},
   roads:{loaded:false, loading:false, kills:[], fetched:0, err:null, at:null},
 };
 // ручные правки цен ресурсов/артефактов: "MATID|Город" -> цена
@@ -1254,8 +1254,19 @@ function nameCellQ(it, q, extra){
   return `<td class="item">${icon(it.id,q)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${it.en}</b>${extra||''}`+`
     <span>${it.ru||''} · T${it.tier}${it.ench?'.'+it.ench:''} · ${CAT_RU[it.cat]||it.cat} · ${QUAL_RU[q]}</span></div></td>`;
 }
+// ключ строки, переживающий пересчёт и пересортировку: вкладка + предмет + город
+function rowKey(r){
+  const it=r.it||r.rmat||{};
+  return [S.tab, it.id||'', r.city||'', r.q||''].join('|');
+}
 function render(){
   const wrap=$('tableWrap');
+  // снять введённые вручную числа с раскрытых панелей, пока разметка ещё жива
+  wrap.querySelectorAll('tr.det').forEach(det=>{
+    if(det.style.display==='none') return;
+    const tr=det.previousElementSibling, k=tr&&tr.dataset.k;
+    if(k && S.open[k]) S.open[k]=snapshotDetState(det.firstElementChild);
+  });
   if(S.tab==='item'){
     wrap.innerHTML = itemTabHTML();
     const q=$('itemQ');
@@ -1329,7 +1340,7 @@ function render(){
       const bonusBadge = r.bonus?'<span class="badge b-bonus">бонус</span>':'';
       const chLabel = r.channel==='ЧР' ? `ЧР · ${qualMode==='q1'?'обыч. кач.':'все кач.'}` : r.channel+' · обыч. кач.';
       const qualText = qualMode==='q1' ? 'Обычное' : 'Все качества (взвеш.)';
-      html+=`<tr class="row" data-i="${i}">${nameCell(it, topBadge+limBadge+warnBadge+staleBadge, qualText)}
+      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}">${nameCell(it, topBadge+limBadge+warnBadge+staleBadge, qualText)}
         <td>${r.city}${bonusBadge}</td><td>${fmt(r.cost)}</td><td>${fmt(r.rev)}</td>
         <td><span class="badge b-ch">${chLabel}</span></td>
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
@@ -1340,7 +1351,7 @@ function render(){
       html+=`<tr class="det" style="display:none"><td colspan="11" id="det${i}"></td></tr>`;
     } else if(S.tab==='cons'){
       const bonusBadge = r.bonus?'<span class="badge b-bonus">бонус</span>':'';
-      html+=`<tr class="row" data-i="${i}"><td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${it.en}</b>${topBadge+limBadge+warnBadge+staleBadge}
+      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${it.en}</b>${topBadge+limBadge+warnBadge+staleBadge}
         <span>${it.ru||''} · T${it.tier}${it.ench?'.'+it.ench:''} · ${it.cat==='potion'?'Зелье':'Еда'} · партия ${it.batch} шт</span></div></td>
         <td>${r.city}${bonusBadge}</td><td>${fmt(r.cost)}</td>
         <td><span class="badge b-ch">${r.channel}</span></td>
@@ -1388,7 +1399,7 @@ function render(){
       const route = r.sellCity
         ? `<span class="fresh">🛒 купить сырьё: <b style="color:var(--text)">${r.buyCities.join(', ')}</b><br>⚒ переработать: <b style="color:var(--text)">${r.city}</b> ${bonusBadge}<br>💰 продать: <b style="color:var(--text)">${r.sellCity}</b></span>`
         : `<b>${r.city}</b> ${bonusBadge}<br><span class="fresh">купить сырьё, переработать и продать — всё в этом городе</span>`;
-      html+=`<tr class="row" data-i="${i}"><td class="item">${icon(rm.id)}<div class="iname"><b>${rm.en}${topBadge+limBadge+warnBadge+staleBadge}</b>
+      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(rm.id)}<div class="iname"><b>${rm.en}${topBadge+limBadge+warnBadge+staleBadge}</b>
           <span>${rm.ru||''} · T${rm.tier}${rm.ench?'.'+rm.ench:''} · ${CHAIN_RU[rm.chain]}</span></div></td>
         <td>${route}</td>
         <td>${fmt(r.cost)}</td><td>${fmt(r.sell)}</td>
@@ -1412,35 +1423,42 @@ function render(){
     if(S.sortKey===k) S.sortDir*=-1; else {S.sortKey=k; S.sortDir=-1;}
     S.gold=false; $('goldBtn').classList.remove('active'); render();
   });
-  if(craft) wrap.querySelectorAll('tr.row').forEach(tr=>tr.onclick=()=>{
-    const i=+tr.dataset.i, det=tr.nextElementSibling, r=rows[i];
-    if(det.style.display==='none'){
+  // Раскрытые панели переживают перерисовку. Иначе правка цены схлопывала строку,
+  // и её приходилось искать заново — а после пересчёта она ещё и уезжала по сортировке.
+  const cfg = craft ? {store:'__detRows', pfx:'det', html:detailHTML, upd:calcUpd}
+    : S.tab==='cons' ? {store:'__consDetRows', pfx:'cdet', html:detailConsHTML, upd:calcConsUpd}
+    : S.tab==='ref'  ? {store:'__refDetRows', pfx:'rdet', html:detailRefHTML, upd:calcRefUpd}
+    : null;
+  if(cfg) wrap.querySelectorAll('tr.row').forEach(tr=>{
+    const openDet=()=>{
+      const i=+tr.dataset.i, det=tr.nextElementSibling, r=rows[i];
       det.style.display='';
-      (window.__detRows ||= {})[i]=r;
-      $('det'+i).innerHTML=detailHTML(r,i);
-      calcUpd(i);
-    }
-    else det.style.display='none';
+      (window[cfg.store] ||= {})[i]=r;
+      const td=$(cfg.pfx+i);
+      td.innerHTML=cfg.html(r,i);
+      restoreDetState(td, S.open[tr.dataset.k]); // вернуть введённое количество и режим
+      cfg.upd(i);
+    };
+    tr.onclick=()=>{
+      const det=tr.nextElementSibling;
+      if(det.style.display==='none'){ S.open[tr.dataset.k]=S.open[tr.dataset.k]||{}; openDet(); }
+      else { det.style.display='none'; delete S.open[tr.dataset.k]; }
+    };
+    if(S.open[tr.dataset.k]) openDet();
   });
-  if(S.tab==='cons') wrap.querySelectorAll('tr.row').forEach(tr=>tr.onclick=()=>{
-    const i=+tr.dataset.i, det=tr.nextElementSibling, r=rows[i];
-    if(det.style.display==='none'){
-      det.style.display='';
-      (window.__consDetRows ||= {})[i]=r;
-      $('cdet'+i).innerHTML=detailConsHTML(r,i);
-      calcConsUpd(i);
-    }
-    else det.style.display='none';
-  });
-  if(S.tab==='ref') wrap.querySelectorAll('tr.row').forEach(tr=>tr.onclick=()=>{
-    const i=+tr.dataset.i, det=tr.nextElementSibling, r=rows[i];
-    if(det.style.display==='none'){
-      det.style.display='';
-      (window.__refDetRows ||= {})[i]=r;
-      $('rdet'+i).innerHTML=detailRefHTML(r,i);
-      calcRefUpd(i);
-    }
-    else det.style.display='none';
+}
+// Панели пересобираются из шаблона, поэтому введённые вручную числа надо снять до
+// перерисовки и вернуть после. Ключ — id без хвостового номера строки: calcConsN7 → calcConsN.
+function snapshotDetState(td){
+  const st={};
+  td.querySelectorAll('input[id],select[id]').forEach(el=>{ st[el.id.replace(/\d+$/,'')]=el.value; });
+  return st;
+}
+function restoreDetState(td, st){
+  if(!st) return;
+  td.querySelectorAll('input[id],select[id]').forEach(el=>{
+    const v=st[el.id.replace(/\d+$/,'')];
+    if(v!=null) el.value=v;
   });
 }
 // панель зелья/еды: одна таблица материалов, которая сразу пересчитывается
@@ -2132,7 +2150,7 @@ const TAB_CONTROLS={
 };
 const ALL_WRAPS=['wrapCity','wrapRoute','wrapFocus','wrapSafe','wrapSafeCraft','wrapLocal','wrapSelfRef','wrapQual','wrapFee','wrapCat','refModeWrap'];
 function setTab(t){
-  S.tab=t;
+  S.tab=t; S.open={};
   const el=$('secName'); if(el) el.textContent=TAB_NAMES[t]||'';
   const vis=TAB_CONTROLS[t]||[];
   for(const id of ALL_WRAPS){ const w=$(id); if(w) w.style.display = vis.includes(id)?'':'none'; }
