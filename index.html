@@ -440,7 +440,7 @@ const S = {
   cityPrices:{},       // itemId -> {city: {q: {sell, ts}}}
   bm:{},               // itemId -> {qs:{q:{price,vol}}, vol, last}
   cityHist:{},         // itemId -> {city: {q: vol/день}}  (объёмы рынков городов, догружается)
-  loaded:false, rows:[], flipRows:[], cityFlipRows:[], sortKey:'real', sortDir:-1, open:{}, grp:'all',
+  loaded:false, rows:[], flipRows:[], cityFlipRows:[], sortKey:'real', sortDir:-1, open:{}, lastOrder:null, grp:'all',
   roads:{loaded:false, loading:false, kills:[], fetched:0, err:null, at:null},
 };
 // ручные правки цен ресурсов/артефактов: "MATID|Город" -> цена
@@ -1385,7 +1385,7 @@ function render(){
     return ok || r.keptOpen;
   });
   const key = S.gold?'real':S.sortKey, dir=S.gold?-1:S.sortDir; // dir=-1 → по убыванию
-  rows.sort((a,b)=>{
+  const cmp=(a,b)=>{
     let va=a[key], vb=b[key];
     if(key==='item'){ va=(a.it||a.rmat).en; vb=(b.it||b.rmat).en; }
     if(typeof va==='string' || typeof vb==='string'){
@@ -1393,7 +1393,21 @@ function render(){
     }
     const A=va??-1e18, B=vb??-1e18;
     return dir<0 ? B-A : A-B;
-  });
+  };
+  // Пока хоть одна карточка раскрыта, порядок строк заморожен. Иначе правишь цену,
+  // профит проваливается — и строка уезжает вниз из-под курсора, ищи её заново.
+  const anyOpen = Object.keys(S.open).length>0;
+  const frozen = anyOpen && S.lastOrder;
+  if(frozen){
+    const pos=S.lastOrder;
+    rows.sort((a,b)=>{
+      const ia=pos[rowKey(a)] ?? 1e9, ib=pos[rowKey(b)] ?? 1e9;
+      return ia!==ib ? ia-ib : cmp(a,b);
+    });
+  } else {
+    rows.sort(cmp);
+    S.lastOrder = Object.fromEntries(rows.map((r,i)=>[rowKey(r), i]));
+  }
   const cols = craft?COLS_CRAFT : S.tab==='flip'?COLS_FLIP : S.tab==='cityflip'?COLS_CITYFLIP : S.tab==='ench'?COLS_ENCH : S.tab==='cons'?COLS_CONS : COLS_REF;
   let html='<table><thead><tr>'+cols.map(([k,t])=>
     `<th class="${k==='item'?'item':''}" data-k="${k}"${COL_TIPS[k]?` title="${COL_TIPS[k]}"`:''}>${t}${COL_TIPS[k]?'<span class="help">?</span>':''}${key===k?(dir<0?' ↓':' ↑'):''}</th>`).join('')+'</tr></thead><tbody>';
@@ -1503,6 +1517,7 @@ function render(){
     }
   });
   html+='</tbody></table>';
+  if(frozen) html = `<div class="fresh" style="margin:0 0 8px">🔒 Пока карточка раскрыта, порядок строк не меняется — чтобы позиция не убегала вниз при правке цены. Закрой карточку, и таблица пересортируется.</div>` + html;
   if(rows.length>shown) html+=`<div style="text-align:center;margin:12px 0">
       <button id="moreBtn">Показать ещё ${Math.min(STEP, rows.length-shown)} из ${rows.length-shown}</button>
       <div class="fresh" style="margin-top:4px">Показано ${shown} из ${rows.length} — так страница не грузит телефон</div></div>`;
@@ -2302,7 +2317,7 @@ const TAB_CONTROLS={
 };
 const ALL_WRAPS=['wrapCity','wrapRoute','wrapFocus','wrapSafe','wrapSafeCraft','wrapLocal','wrapSelfRef','wrapQual','wrapFee','wrapCat','refModeWrap'];
 function setTab(t){
-  S.tab=t; S.open={};
+  S.tab=t; S.open={}; S.lastOrder=null;
   const el=$('secName'); if(el) el.textContent=TAB_NAMES[t]||'';
   const vis=TAB_CONTROLS[t]||[];
   for(const id of ALL_WRAPS){ const w=$(id); if(w) w.style.display = vis.includes(id)?'':'none'; }
