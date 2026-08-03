@@ -792,6 +792,20 @@ function effMatPrice(mid, city){
   if(s && (!p || s.cost < p.price)) return {price:s.cost, ts:null, ovr:false, age:s.stale, self:true};
   return p ? {...p, self:false} : null;
 }
+// Где выгоднее купить материал среди списка городов.
+// Своя цена всегда сильнее рынка: иначе правка молча тонула — движок просто брал
+// следующий по дешевизне город, и введённое число ни на что не влияло.
+function bestBuy(mid, cities){
+  let ovr=null, mkt=null;
+  for(const c of cities){
+    const p=matPrice(mid, c);
+    if(!p) continue;
+    if(p.ovr){ if(!ovr || p.price<ovr.price) ovr={...p, city:c}; continue; }
+    if(p.age>CFG.staleHours) continue;
+    if(!mkt || p.price<mkt.price) mkt={...p, city:c};
+  }
+  return ovr || mkt;
+}
 function artBest(artId){
   // Артефакт: минимальная цена по всем городам (лёгкий, легко перевезти).
   // Своя цена сильнее рынка: если ты вписал её руками, значит знаешь, почём он тебе
@@ -1064,12 +1078,7 @@ function compute(){
         // сырьё: каждый компонент в самом дешёвом городе
         let raws=0, ok=true, worst=0; const buyCities=new Set();
         for(const [rid,c] of Object.entries(rmat.raws)){
-          let bp=null;
-          for(const bc of rcities){
-            const p=matPrice(rid,bc);
-            if(!p || (!p.ovr && p.age>CFG.staleHours)) continue;
-            if(!bp || p.price<bp.price) bp={...p, city:bc};
-          }
+          const bp = bestBuy(rid, rcities);
           if(!bp){ ok=false; break; }
           raws+=bp.price*c; worst=Math.max(worst,bp.age); buyCities.add(bp.city);
         }
@@ -1077,11 +1086,8 @@ function compute(){
         // катализатор: мин(рынок по всем городам, самопереработка в городе rc)
         let catCost=0;
         if(rmat.cat){
-          let cm=Infinity;
-          for(const bc of rcities){
-            const p=matPrice(rmat.cat.id,bc);
-            if(p && (p.ovr || p.age<=CFG.staleHours)) cm=Math.min(cm,p.price);
-          }
+          const cb = bestBuy(rmat.cat.id, rcities);
+          const cm = cb ? cb.price : Infinity;
           const self_=S.selfCost[rmat.cat.id+'|'+rc];
           const eff = isFinite(cm) ? cm : (self_?self_.cost:Infinity); // рынок; своя переработка — только если нигде не продаётся
           if(!isFinite(eff)) continue;
@@ -1757,13 +1763,7 @@ function refRawBest(rid, r){
     const p=matPrice(rid, r.city);
     return p?{...p, city:r.city}:null;
   }
-  let bp=null;
-  for(const c of routeCities()){
-    const p=matPrice(rid,c);
-    if(!p || (!p.ovr && p.age>CFG.staleHours)) continue;
-    if(!bp || p.price<bp.price) bp={...p, city:c};
-  }
-  return bp;
+  return bestBuy(rid, routeCities());
 }
 function detailRefHTML(r, idx){
   const rm=r.rmat;
@@ -1790,11 +1790,8 @@ function detailRefHTML(r, idx){
     if(localMode){
       cp = matPrice(rm.cat.id, r.city);
     } else {
-      for(const c of routeCities()){
-        const p=matPrice(rm.cat.id, c);
-        if(!p || (!p.ovr && p.age>CFG.staleHours)) continue;
-        if(!cp || p.price<cp.price){ cp=p; catCity=c; }
-      }
+      const b=bestBuy(rm.cat.id, routeCities());
+      if(b){ cp=b; catCity=b.city; }
     }
     const selfFallback = cp ? null : S.selfCost[rm.cat.id+'|'+r.city]; // если в продаже нет вовсе
     const shown = cp ? cp.price : (selfFallback?selfFallback.cost:null);
