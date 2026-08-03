@@ -432,12 +432,15 @@ const CONS_BONUS_CITY = {potion:'Brecilien', meal:'Caerleon'};
 
 // ─── Состояние ───
 const S = {
-  tab:'craft', gold:false,
+  tab:'craft',
+  // «Золотая середина» включена сразу: сортировка по «Пул/день» исходит из того, что ты
+  // забираешь ВЕСЬ дневной оборот рынка, и наверх лезут единичные ордера с дикой маржой.
+  gold:true,
   matPrices:{},        // matId -> {city: {price, ts}}
   cityPrices:{},       // itemId -> {city: {q: {sell, ts}}}
   bm:{},               // itemId -> {qs:{q:{price,vol}}, vol, last}
   cityHist:{},         // itemId -> {city: {q: vol/день}}  (объёмы рынков городов, догружается)
-  loaded:false, rows:[], flipRows:[], cityFlipRows:[], sortKey:'pool', sortDir:-1, open:{}, grp:'all',
+  loaded:false, rows:[], flipRows:[], cityFlipRows:[], sortKey:'real', sortDir:-1, open:{}, grp:'all',
   roads:{loaded:false, loading:false, kills:[], fetched:0, err:null, at:null},
 };
 // ручные правки цен ресурсов/артефактов: "MATID|Город" -> цена
@@ -2210,7 +2213,8 @@ setInterval(async ()=>{
   await checkSnapshot();
 }, 30000);
 checkSnapshot();
-$('goldBtn').onclick=()=>{ S.gold=!S.gold; $('goldBtn').classList.toggle('active',S.gold); render(); };
+$('goldBtn').onclick=()=>{ S.gold=!S.gold; $('goldBtn').classList.toggle('active',S.gold); S.limit=0; render(); };
+$('goldBtn').classList.toggle('active', S.gold); // включена по умолчанию — подсветить кнопку сразу
 $('reloadBtn').onclick=async ()=>{ lastCheck=Date.now(); await loadAll(true); S.builtAt=null; checkSnapshot(); };
 const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', cons:'🧪 Зелья и еда', item:'🔍 Цены предмета', roads:'🛡 Дороги в Карлеон · БЕТА'};
 // какие контролы нужны на каждой вкладке (премиум, возраст данных, обновление и поиск — всегда)
