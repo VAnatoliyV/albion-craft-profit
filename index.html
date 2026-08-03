@@ -1249,19 +1249,19 @@ const COLS_CRAFT = [
 ];
 const COLS_FLIP = [
   ['item','Предмет'],['q','Качество'],['buy','Купить'],['bmPrice','Продать (ЧР)'],
-  ['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['stale','Данные'],
+  ['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['real','Мне за день'],['stale','Данные'],
 ];
 const COLS_CITYFLIP = [
   ['item','Предмет'],['q','Качество'],['buy','Купить'],['sell','Продать'],
-  ['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д (город)'],['pool','Пул/день'],['stale','Данные'],
+  ['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д (город)'],['pool','Пул/день'],['real','Мне за день'],['stale','Данные'],
 ];
 const COLS_REF = [
   ['item','Ресурс'],['city','Город'],['cost','Себестоимость'],['sell','Цена продажи'],
-  ['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д (город)'],['pool','Пул/день'],['stale','Данные'],
+  ['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д (город)'],['pool','Пул/день'],['real','Мне за день'],['stale','Данные'],
 ];
 const COLS_ENCH = [
   ['item','Предмет'],['q','Качество'],['buy','Купить шмотку'],['stoneCost','Камни'],
-  ['sell','Продать (ЧР)'],['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['stale','Данные'],
+  ['sell','Продать (ЧР)'],['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['real','Мне за день'],['stale','Данные'],
 ];
 const STONE_RU = {RUNE:'руны', SOUL:'души', RELIC:'реликты'};
 const stoneKind = id => STONE_RU[id.split('_')[1]]||id;
@@ -1439,6 +1439,7 @@ function render(){
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
         <td>${fmt(r.vol)}</td><td>${fmt(r.pool)}</td>
+        <td><b>${r.real?fmt(r.real):'—'}</b></td>
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
     } else if(S.tab==='ench'){
       const tgt = r.targetId;
@@ -1451,6 +1452,7 @@ function render(){
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
         <td>${fmt(r.vol)}</td><td>${fmt(r.pool)}</td>
+        <td><b>${r.real?fmt(r.real):'—'}</b></td>
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
     } else if(S.tab==='cityflip'){
       html+=`<tr class="row">${nameCellQ(it, r.q, topBadge+limBadge+warnBadge+staleBadge)}
@@ -1461,6 +1463,7 @@ function render(){
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
         <td>${r.vol!=null?fmt(r.vol):'<span class="fresh" title="Нет данных об объёме продаж этого предмета в городе продажи — сделок за неделю не зафиксировано либо сборщик их не получил">—</span>'}</td>
         <td>${r.pool!=null?fmt(r.pool):'—'}</td>
+        <td><b>${r.real?fmt(r.real):'—'}</b></td>
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
     } else {
       const rm=r.rmat;
@@ -1478,8 +1481,9 @@ function render(){
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
         <td>${r.vol!=null?fmt(r.vol):'—'}</td>
         <td>${r.pool!=null?fmt(r.pool):'—'}</td>
+        <td><b>${r.real?fmt(r.real):'—'}</b></td>
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
-      html+=`<tr class="det" style="display:none"><td colspan="9" id="rdet${i}"></td></tr>`;
+      html+=`<tr class="det" style="display:none"><td colspan="10" id="rdet${i}"></td></tr>`;
     }
   });
   html+='</tbody></table>';
