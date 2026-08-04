@@ -280,7 +280,7 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
         <option value="12">12 ч</option><option value="24" selected>24 ч</option>
       </select>
     </label>
-    <button class="gold" id="goldBtn" title="Что это такое?&#10;&#10;Один клик — и таблица ранжируется по тому, сколько серебра позиция реально принесёт ЛИЧНО ТЕБЕ за день.&#10;&#10;Количество = min(бюджет ÷ себестоимость; 25% дневного объёма × дней). То есть берётся то, что упрётся раньше: твой кошелёк или ёмкость рынка. Если бюджет не задан, капитал считается безграничным и всё сводится к обороту.&#10;&#10;Важное следствие: при небольшом капитале наверх сами собой выходят позиции с высокой маржой (отдача на вложенное), а при большом — массовые с оборотом. Бейдж в строке говорит, чем именно она ограничена.&#10;&#10;Возраст цены учитывается плавно: сутки — вес 0.5, двое суток — 0.25.&#10;&#10;Отсекаются: маржа ниже 10%, объём ниже 50 шт/день, устаревшие данные и строки с флагом «⚠ проверить». Топ-10 помечается бейджем ТОП.">⭐ Золотая середина</button>
+    <button class="gold" id="goldBtn" title="Что это такое?&#10;&#10;Один клик — и таблица ранжируется по тому, сколько серебра позиция реально принесёт ЛИЧНО ТЕБЕ за день.&#10;&#10;Количество = min(бюджет ÷ себестоимость; 10% дневного объёма × дней). То есть берётся то, что упрётся раньше: твой кошелёк или ёмкость рынка. Если бюджет не задан, капитал считается безграничным и всё сводится к обороту.&#10;&#10;Важное следствие: при небольшом капитале наверх сами собой выходят позиции с высокой маржой (отдача на вложенное), а при большом — массовые с оборотом. Бейдж в строке говорит, чем именно она ограничена.&#10;&#10;Возраст цены учитывается плавно: сутки — вес 0.5, двое суток — 0.25.&#10;&#10;Отсекаются: маржа ниже 10%, объём ниже 50 шт/день, устаревшие данные и строки с флагом «⚠ проверить». Топ-10 помечается бейджем ТОП.">⭐ Золотая середина</button>
     <label class="ctl" id="wrapBudget" title="Сколько серебра ты реально готов вложить в ОДНУ позицию.&#10;&#10;Пока поле пустое, сайт считает капитал безграничным и ранжирует по ёмкости рынка — как раньше.&#10;&#10;Как только введёшь сумму, в расчёт входит ограничение: нельзя изготовить больше, чем позволяет твоё серебро. При небольшом капитале рейтинг сам собой съезжает к марже (отдаче на вложенное), при большом — возвращается к обороту.">Бюджет
       <input type="number" id="budgetInp" placeholder="без лимита" min="0" step="100000" style="width:120px">
     </label>
@@ -412,9 +412,13 @@ const BONUS_CITY_OF = {}; // cat -> city
 for (const [c,cats] of Object.entries(CITY_BONUS)) cats.forEach(k=>BONUS_CITY_OF[k]=c);
 const CFG = {
   cityBase: 0.18, specialty: 0.15, focus: 0.59, refSpecialty: 0.40,
-  nutritionFactor: 0.1125, setupFee: 0.025, marketShare: 0.25,
+  nutritionFactor: 0.1125, setupFee: 0.025, marketShare: 0.10,
   goldHalfLifeH: 24,   // период полураспада доверия к цене: сутки → вес 0.5, двое суток → 0.25
   histDays: 7, staleHours: 24, cacheTTLmin: 15,
+  useBase: true,      // выручку считаем по обычной цене за месяц, а не по сегодняшней
+  spikeCut: 25,       // цена выше нормы на столько процентов — это всплеск, в топ не пускаем
+  swingCut: 60,       // цена за месяц гуляет шире этого — позиция непредсказуемая
+
   histBatch: 50, priceBatch: 150, concurrency: 4,
   // Журналы наполняются СЛАВОЙ, а не числом крафтов. Ёмкость пустого журнала по тирам
   // (вики) и слава за единицу материала — вместе они точно воспроизводят опубликованную
@@ -589,7 +593,7 @@ function applyServerData(d){
   for(const [id,rec] of Object.entries(d.b||{})){
     const qs={}; let vol=0;
     for(const [ql,v] of Object.entries(rec.q||{})){
-      qs[ql]={price:v[0], vol:v[1], last:v[2]||0, lastTs:(v[3]||0)*6e4};
+      qs[ql]={price:v[0], vol:v[1], last:v[2]||0, lastTs:(v[3]||0)*6e4, base:v[4]||0, spread:v[5]||0, days:v[6]||0};
       vol+=v[1];
     }
     S.bm[id]={qs, vol, last:rec.l||0};
@@ -894,12 +898,24 @@ function journalsFor(it, N){
 }
 // Что реально дадут за качество q на чёрном рынке. Приоритет: живой бай-ордер →
 // последняя суточная средняя сделок → средняя за 7 дней (самая грубая).
+// Цена ЧР для расчёта прибыли. Ключевое: НИКОГДА не берём цену выше «обычной»
+// за месяц. Иначе сайт по своему устройству показывает наверху то, что сейчас
+// на всплеске, — а всплеск сдувается за пару дней, ровно пока идёт крафт.
+// Живой пример: шипованные перчатки месяц стояли 32 000, за два дня взлетели
+// до 70 500 и вернулись обратно. По старой логике они были бы в топе.
 function bmQ(bm, q){
   const d = bm && bm.qs && bm.qs[q]; if(!d) return null;
-  if(d.order) return {price:d.order, ts:d.orderTs, src:'ордер', vol:d.vol};
-  if(d.last)  return {price:d.last,  ts:d.lastTs,  src:'сделки', vol:d.vol};
-  if(d.price) return {price:d.price, ts:0,         src:'средняя 7д', vol:d.vol};
-  return null;
+  const raw = d.order ? {price:d.order, ts:d.orderTs, src:'ордер', vol:d.vol}
+            : d.last  ? {price:d.last,  ts:d.lastTs,  src:'сделки', vol:d.vol}
+            : d.price ? {price:d.price, ts:0,         src:'средняя 7д', vol:d.vol}
+            : null;
+  if(!raw) return null;
+  raw.base = d.base||0; raw.spread = d.spread||0; raw.now = raw.price;
+  if(CFG.useBase && d.base && raw.price > d.base){
+    raw.spike = Math.round((raw.price/d.base - 1)*100);
+    raw.price = d.base;                       // считаем по обычной цене, не по пику
+  }
+  return raw;
 }
 function bmExpected(bm, mode){
   // консервативно: цена сделок обычного качества; взвешенно: средняя по всем качествам с весом объёма
@@ -965,10 +981,18 @@ function compute(){
       // возраст истории ЧР не учитываем: это средняя за 7 дней, суточная агрегация API отстаёт на 1–3 дня — это нормально
       const stale = cc.stale;
       // «сомнительное»: аномальная маржа или жирная маржа при мизерном объёме
-      const warn = margin>300 || (margin>100 && (vol||0)<10);
+      let warn = margin>300 || (margin>100 && (vol||0)<10);
+      // Всплеск и болтанка. Позицию, цена которой сейчас задрана над своей месячной
+      // нормой или которая весь месяц скачет, крафтить нельзя: пока сделаешь партию,
+      // цена вернётся. Такие в «Золотую середину» не попадают.
+      const bq1 = channel==='ЧР' ? (bmQ(bm,1)||bmQ(bm,2)) : null;
+      const spike = bq1 && bq1.spike ? bq1.spike : 0;
+      const swing = bq1 ? (bq1.spread||0) : 0;
+      if(spike > CFG.spikeCut || swing > CFG.swingCut) warn = true;
       rows.push({it, city, cost:cc.cost, bonus:cc.bonus, rev, channel, net, margin,
         vol, pool: vol*Math.max(net,0), cash:cc.cash, ...goldOf(net, cc.cost, vol, stale, cc.cash), stale, warn,
         bmPrice, bmSrc, cityPrice:bestCityPrice||null, fee:cc.fee, ret:cc.ret, raw:cc.raw, rawNoRet:cc.rawNoRet||0,
+        bmNow: bq1?bq1.now:null, bmBase: bq1?bq1.base:null, spike, swing,
         artCost:cc.artCost||0, artInfo:cc.artInfo||null});
     }
   }
@@ -1426,13 +1450,17 @@ function render(){
   }
   visible.forEach((r,i)=>{
     const it=r.it;
-    const topBadge = S.gold&&i<10?'<span class="badge b-top" title="Топ-10 «Золотой середины»: лучший баланс маржи и объёма продаж среди позиций со свежими данными. Сортировка — по реалистичному профиту в день (профит со штуки × 25% дневного объёма рынка).">ТОП</span>':'';
+    const topBadge = S.gold&&i<10?'<span class="badge b-top" title="Топ-10 «Золотой середины»: лучший баланс маржи и объёма продаж среди позиций со свежими данными. Сортировка — по реалистичному профиту в день (профит со штуки × 10% дневного объёма рынка).">ТОП</span>':'';
     const staleBadge = r.stale>CFG.staleHours?'<span class="badge b-stale">старые данные</span>':'';
     // чем упёрлась позиция: своим серебром или ёмкостью рынка
     const limBadge = (S.gold && GOLD.B>0 && r.lim) ? (r.lim==='бюджет'
       ? `<span class="badge b-lim" title="Ограничение — твой бюджет: рынок готов поглотить больше, чем ты можешь профинансировать. В этом режиме выигрывают позиции с высокой отдачей на вложенное серебро, то есть с маржой.">💰 упёрлось в бюджет</span>`
       : `<span class="badge b-lim2" title="Ограничение — рынок: серебра хватает с запасом, но больше этого объёма в день без демпинга не продать. Тут выигрывает оборот.">📦 упёрлось в рынок</span>`) : '';
     const warnBadge = r.warn?`<span class="badge b-warn" title="${WARN_TIP}">⚠ проверить</span>`:'';
+    // цена сейчас выше своей месячной нормы — это всплеск, крафтить под него нельзя
+    const spikeBadge = r.spike>CFG.spikeCut
+      ? `<span class="badge b-warn" title="Сейчас на чёрном рынке за это дают ${fmt(r.bmNow)} — на ${r.spike}% выше обычной цены ${fmt(r.bmBase)}, по которой предмет торгуется месяц.&#10;&#10;Всплески живут день-два. Пока ты скрафтишь партию, цена вернётся к обычной — именно так и вышло с шипованными перчатками: месяц стояли 32 000, за два дня взлетели до 70 500 и сдулись обратно.&#10;&#10;Профит здесь посчитан по ОБЫЧНОЙ цене, а не по всплеску. Крафтить под это не надо. А вот сдать то, что уже лежит в сундуке, — самое время.">📈 всплеск +${r.spike}%</span>`
+      : (r.swing>CFG.swingCut ? `<span class="badge b-warn" title="Цена этого предмета за месяц гуляет на ${r.swing}% — предсказать, сколько дадут через два дня, нельзя. В «Золотую середину» такие не попадают.">🎲 цена скачет</span>` : '');
     // видна только потому, что раскрыта: под фильтры уже не проходит
     const openBadge = (r.keptOpen || r.pinned)
       ? `<span class="badge b-lim2" title="Эта строка сейчас не проходит фильтры — например, после твоей правки цены профит ушёл в минус. Она осталась в таблице только потому, что ты держишь её раскрытой: чтобы можно было увидеть результат и откатить цену. Закроешь панель — строка встанет на своё место.">👁 держим открытой</span>`
@@ -1441,7 +1469,7 @@ function render(){
       const bonusBadge = r.bonus?'<span class="badge b-bonus">бонус</span>':'';
       const chLabel = r.channel==='ЧР' ? `ЧР · ${qualMode==='q1'?'обыч. кач.':'все кач.'}` : r.channel+' · обыч. кач.';
       const qualText = qualMode==='q1' ? 'Обычное' : 'Все качества (взвеш.)';
-      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}">${nameCell(it, topBadge+limBadge+openBadge+warnBadge+staleBadge, qualText)}
+      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}">${nameCell(it, topBadge+limBadge+openBadge+spikeBadge+warnBadge+staleBadge, qualText)}
         <td>${r.city}${bonusBadge}</td><td>${fmt(r.cost)}</td><td>${fmt(r.rev)}</td>
         <td><span class="badge b-ch">${chLabel}</span></td>
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
@@ -1644,7 +1672,7 @@ function calcConsUpd(idx){
      ` → останется материалами ~${fmt(leftVal)}<br>`+
      `<b>Вложение (за вычетом возврата): ${fmt(invest)}</b> · Фокус: ${fmt(batches*it.focus)} · `+
      `<b>Профит: <span class="${profit>=0?'pos':'neg'}">${fmt(profit)}</span></b>`+
-     (days?` · при объёме ${fmt(r.vol)}/д уйдёт за ~${days} дн. (25% рынка)`:'');
+     (days?` · при объёме ${fmt(r.vol)}/д уйдёт за ~${days} дн. (10% рынка)`:'');
   el.innerHTML=m;
 }
 function detailHTML(r,idx){
@@ -1683,7 +1711,10 @@ function detailHTML(r,idx){
         onchange="setSellOverride('${it.id}',this.value)"
         title="По какой цене реально продашь (правит цену ЧР). Пустое поле или 0 — вернуть среднюю сделок из API.">
       → нетто <b>${fmt(r.rev)}</b> · `+
-     `Реалистичный профит/день (25% рынка): <b>${fmt(r.real)}</b>`;
+     `Реалистичный профит/день: <b>${fmt(r.real)}</b>`+
+     (r.bmBase ? `<br><span class="fresh">Обычная цена ЧР за месяц: <b style="color:var(--text)">${fmt(r.bmBase)}</b>`+
+        (r.bmNow&&r.bmNow!==r.bmBase ? ` · сейчас дают ${fmt(r.bmNow)}${r.spike>0?` (<b style="color:var(--accent)">+${r.spike}% всплеск</b>, в расчёт не берём)`:''}` : '')+
+        (r.swing?` · за месяц цена гуляет на ${r.swing}%`:'')+'</span>' : '');
   const bm = S.bm[it.id];
   if(bm){
     m+='<br><b>ЧР по качествам:</b><table><tr><th>Качество</th><th>Бай-ордер</th><th>Средняя 7д</th><th>Объём/д</th></tr>';
@@ -1771,7 +1802,7 @@ function calcUpd(idx){
   html+=jHtml+(feeN?`Станок за партию: <b>${fmt(feeN)}</b> · `:'')+`Вложение: <b>${fmt(invest)}</b><br>`+
     `Выручка: <b>${fmt(revenue)}</b> (${r.channel==='ЧР'?'чёрный рынок':'рынок '+r.channel}) · `+
     `<b>Итоговый профит партии: <span class="${profit>=0?'pos':'neg'}">${fmt(profit)}</span></b>`+
-    (r.vol?` · при объёме рынка ${fmt(r.vol)}/д партия уйдёт за ~${(N/Math.max(1,r.vol*CFG.marketShare)).toFixed(1)} дн. (25% рынка)`:'');
+    (r.vol?` · при объёме рынка ${fmt(r.vol)}/д партия уйдёт за ~${(N/Math.max(1,r.vol*CFG.marketShare)).toFixed(1)} дн. (10% рынка)`:'');
   const el=$('calcOut'+idx); if(el) el.innerHTML=html;
 }
 
@@ -1856,7 +1887,7 @@ function calcRefUpd(idx){
   const feeN=r.fee*N, revenue=N*r.sell*(1-tax-CFG.setupFee), profit=N*r.net;
   html+=`Станок за партию: <b>${fmt(feeN)}</b> · Вложение всего: <b>${fmt(N*r.cost)}</b> · Выручка: <b>${fmt(revenue)}</b> · `+
     `<b>Профит партии: <span class="${profit>=0?'pos':'neg'}">${fmt(profit)}</span></b>`+
-    (r.vol?` · при объёме ${fmt(r.vol)}/д партия уйдёт за ~${(N/Math.max(1,r.vol*CFG.marketShare)).toFixed(1)} дн. (25% рынка)`:'');
+    (r.vol?` · при объёме ${fmt(r.vol)}/д партия уйдёт за ~${(N/Math.max(1,r.vol*CFG.marketShare)).toFixed(1)} дн. (10% рынка)`:'');
   const el=$('rcalcOut'+idx); if(el) el.innerHTML=html;
 }
 // ─── Дороги в Карлеон: киллборд + окна Bandit Assault ───

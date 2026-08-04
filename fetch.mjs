@@ -7,6 +7,9 @@ const API = 'https://europe.albion-online-data.com/api/v2/stats';
 const CITIES = ['Martlock','Bridgewatch','Lymhurst','Fort Sterling','Thetford','Caerleon','Brecilien'];
 const CITY_IDX = Object.fromEntries(CITIES.map((c,i)=>[c,i]));
 const HIST_DAYS = 7;
+// API и так отдаёт 30 суточных точек — раньше мы выбрасывали всё старше недели.
+// Теперь считаем по ним «обычную цену» предмета: медиану, которую всплеск не сдвигает.
+const BASE_DAYS = 30;
 const PRICE_BATCH = 80;
 const HIST_BATCH = 25;
 const DELAY_MS = 120;
@@ -160,8 +163,20 @@ async function main(){
         if(t < cutoff) continue;
         if(!lastT || t > lastT){ lastT = t; lastAvg = Math.round(p.avg_price); }
       }
+      // «обычная цена» за месяц и насколько она гуляет. Медиана и межквартильный
+      // размах: всплеск в пару дней их почти не двигает, а ровную цену видно сразу.
+      const baseCut = Date.now() - BASE_DAYS*864e5;
+      const hist = (e.data||[]).filter(p=>new Date(p.timestamp+'Z').getTime()>=baseCut && p.avg_price>0)
+                               .map(p=>p.avg_price).sort((a,b)=>a-b);
+      let base=0, spread=0;
+      if(hist.length){
+        const at = f => hist[Math.min(hist.length-1, Math.max(0, Math.round(f*(hist.length-1))))];
+        base = at(0.5);
+        spread = base>0 ? Math.round((at(0.75)-at(0.25))/base*100) : 0;
+      }
       const rec = (out.b[e.item_id] ||= {q:{}, l:0});
-      rec.q[q] = [Math.round(sum/cnt), Math.round(vol/HIST_DAYS*10)/10, lastAvg, lastT?Math.round(lastT/6e4):0];
+      rec.q[q] = [Math.round(sum/cnt), Math.round(vol/HIST_DAYS*10)/10, lastAvg, lastT?Math.round(lastT/6e4):0,
+                  Math.round(base), spread, hist.length];
       if(last){ const lm=minutes(last); if(lm>rec.l) rec.l=lm; }
     }
   }), 'bm-history')
