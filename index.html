@@ -287,6 +287,9 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
     <label class="ctl" id="wrapHorizon" title="За сколько дней ты рассчитываешь распродать партию.&#10;&#10;Чем больше срок, тем больше штук успеет поглотить рынок. Капитал при этом не удваивается: расчёт консервативный, деньги считаются вложенными один раз, без оборота.">Дней
       <input type="number" id="horizonInp" value="1" min="1" max="30" step="1" style="width:60px">
     </label>
+    <label class="ctl" id="wrapCarry" title="Сколько килограммов ты увозишь за один рейс.&#10;&#10;Пеший персонаж без сумки — примерно 50 кг: пять курток охотника по 5,1 кг уже дают 51% загрузки. С сумкой и маунтом — сотни.&#10;&#10;Само число штук сайт из-за веса не режет: рейсов можно сделать сколько угодно. Но под «Мне за день» будет написано, во сколько ходок это выльется, — иногда красивая цифра оказывается физически неувозимой.">Увожу, кг
+      <input type="number" id="carryInp" value="50" min="1" step="10" style="width:70px">
+    </label>
     <button id="reloadBtn" title="Сбросить кэш и загрузить свежие цены">⟳ Обновить</button>
     <label class="ctl">Автообновление
       <select id="refSel">
@@ -356,20 +359,36 @@ const SAFE_CITIES = [...ROYAL_CITIES, 'Brecilien'];
 // прайс. Сумка мастера в Бресильене стоит 799 991 при рынке около 50 000 — и такая строка давала
 // «мне за день 57 млн» из воздуха, потому что сайт выбирает САМЫЙ ДОРОГОЙ город. Сверяемся с
 // медианой по всем городам и с обычной ценой чёрного рынка за месяц: что выше порога — фантом.
-function askCapFor(id, q){
-  const liq=[], all=[];
-  for(const [c,byQ] of Object.entries(S.cityPrices[id]||{})){
-    const v=byQ[q]; if(!v||!v.sell) continue;
-    all.push(v.sell);
-    if((S.cityHist?.[id]?.[c]?.[q]||0) > 0) liq.push(v.sell);   // города, где этим реально торгуют
-  }
-  const src = liq.length>=3 ? liq : all;
-  if(!src.length) return Infinity;
-  src.sort((a,b)=>a-b);
-  const med = src[Math.floor(src.length/2)];
-  const bmBase = S.bm[id]?.qs?.[q]?.base || 0;
-  return Math.max(med, bmBase) * CFG.askCap;
+// «Обычная цена» предмета — медиана суточных сделок за месяц. Сначала городская (сборщик
+// считает её сразу по всем городам), потом месячная норма чёрного рынка, и только если ни
+// того ни другого нет — медиана текущих ордеров. Последнее слабо, но лучше, чем ничего.
+function normPrice(id, q){
+  const cb = S.cityBase?.[id]?.[q];
+  if(cb && cb.base) return {price:cb.base, days:cb.days||0, src:'города'};
+  const bq = S.bm[id]?.qs?.[q];
+  if(bq && bq.base) return {price:bq.base, days:bq.days||0, src:'ЧР'};
+  const all=[];
+  for(const byQ of Object.values(S.cityPrices[id]||{})){ const v=byQ[q]; if(v&&v.sell) all.push(v.sell); }
+  if(!all.length) return null;
+  all.sort((a,b)=>a-b);
+  return {price: all[Math.floor(all.length/2)], days:0, src:'ордера'};
 }
+function askCapFor(id, q){ const n=normPrice(id,q); return n ? n.price*CFG.askCap : Infinity; }
+// Вес вещи в килограммах: из дампа Albion, ключ без зачарования — оно на вес не влияет.
+function itemKg(it){ const id=(it&&it.id)||''; return (DATA&&DATA.weights) ? (DATA.weights[id.split('@')[0]]||0) : 0; }
+function carryKg(){ return Math.max(1, +($('carryInp')?.value) || CFG.carryKg); }
+// Ячейка «Мне за день» + во сколько рейсов это выльется. Число штук не режем: рейсов можно
+// сделать сколько угодно, но красивая цифра иногда оказывается физически неувозимой.
+function realCell(r){
+  const kg = itemKg(r.it||r.rmat);
+  const qty = r.qty||0;
+  const trips = (kg>0 && qty>0) ? Math.ceil(qty*kg/carryKg()) : 0;
+  const tip = trips>1 ? ` title="${fmt(Math.round(qty))} шт × ${kg} кг = ${fmt(Math.round(qty*kg))} кг, а увозишь ${fmt(carryKg())} кг за раз"` : '';
+  return `<td><b>${r.real?fmt(r.real):'—'}</b>${trips>1?`<br><span class="fresh"${tip}>рейсов: ${fmt(trips)}</span>`:''}</td>`;
+}
+// Зеркальная ловушка: одна вещь, выставленная по ошибке за копейки, делает строку сказочной.
+// Удалять такие нельзя — настоящая находка выглядит так же, — но в топ они попадать не должны.
+function tooCheap(id, q, price){ const n=normPrice(id,q); return !!(n && price < n.price*CFG.askFloor); }
 function routeCities(){ return $('safeChk')?.checked ? SAFE_CITIES : CITIES; }
 // «Безопасный крафт»: и варим, и продаём только в королевской пятёрке, ЧР выключен
 function safeCraft(){ return !!$('safeCraftChk')?.checked; }
@@ -438,6 +457,8 @@ const CFG = {
   spikeCut: 25,       // цена выше нормы на столько процентов — это всплеск, в топ не пускаем
   swingCut: 60,       // цена за месяц гуляет шире этого — позиция непредсказуемая
   askCap: 1.4,        // селл-ордер дороже нормы во столько раз — фантом, продать по нему нельзя
+  askFloor: 0.5,      // дешевле половины нормы — скорее всего одна вещь по ошибке, помечаем
+  carryKg: 50,        // грузоподъёмность по умолчанию: пеший персонаж без сумки
 
   histBatch: 50, priceBatch: 150, concurrency: 4,
   // Журналы наполняются СЛАВОЙ, а не числом крафтов. Ёмкость пустого журнала по тирам
@@ -464,6 +485,7 @@ const S = {
   cityPrices:{},       // itemId -> {city: {q: {sell, ts}}}
   bm:{},               // itemId -> {qs:{q:{price,vol}}, vol, last}
   cityHist:{},         // itemId -> {city: {q: vol/день}}  (объёмы рынков городов, догружается)
+  cityBase:{},         // itemId -> {q: {base, days}}      (обычная цена по городам за месяц)
   loaded:false, rows:[], flipRows:[], cityFlipRows:[], sortKey:'real', sortDir:-1, open:{}, lastOrder:null, grp:'all',
   roads:{loaded:false, loading:false, kills:[], fetched:0, err:null, at:null},
 };
@@ -638,6 +660,11 @@ function applyServerData(d){
       o[CI[ci]]=q;
     }
     S.cityHist[id]=o;
+  }
+  S.cityBase={};
+  for(const [id,byQ] of Object.entries(d.cb||{})){
+    const o={}; for(const [ql,v] of Object.entries(byQ)) o[ql]={base:v[0], days:v[1]};
+    S.cityBase[id]=o;
   }
 }
 async function loadServerData(force){
@@ -1082,7 +1109,8 @@ function compute(){
       const margin = net/lo.sell*100;
       const vol = S.cityHist[it.id]?.[hi.city]?.[q] ?? null; // объём города продажи (если догружен)
       const stale = Math.max(hoursAgo(lo.ts), hoursAgo(hi.ts));
-      const warn = margin>300 || (margin>100 && vol!=null && vol<10);
+      const cheap = tooCheap(it.id, q, lo.sell);
+      const warn = cheap || margin>300 || (margin>100 && vol!=null && vol<10);
       cflip.push({it, q, buy:lo.sell, buyCity:lo.city, sell:hi.sell, sellCity:hi.city,
         net, margin, vol, pool: vol!=null?vol*Math.max(net,0):null,
         ...goldOf(net, lo.sell, vol, stale), stale, warn});
@@ -1203,6 +1231,8 @@ function compute(){
       if(!cands.length) continue;
       // обычный режим — берём самый дешёвый город закупки; локальный — перебираем все
       const buys = localOnly() ? cands : [cands.reduce((a,b)=>b.sell<a.sell?b:a)];
+      const buyOvr  = S.overrides['BUY|'+it.id+'|'+q];
+      const sellOvr = S.overrides['SELL|'+targetId];
       for(const buy of buys){
         let stone = stoneBest;
         if(localOnly()){
@@ -1211,7 +1241,8 @@ function compute(){
         }
         if(!stone) continue;
         const stoneCost = stone.price*up.n;
-        const cost = buy.sell + stoneCost;
+        const buyPrice = buyOvr!=null ? buyOvr : buy.sell;
+        const cost = buyPrice + stoneCost;
         // канал 1: чёрный рынок Карлеона, мгновенно по живому бай-ордеру
         const tq = tgtBm ? bmQ(tgtBm, q) : null;
         const revBM = (tq && (!localOnly() || buy.city==='Caerleon')) ? tq.price*(1-tax) : null;
@@ -1230,6 +1261,7 @@ function compute(){
         if(revBM!=null && (revCity==null || revBM>=revCity)){ rev=revBM; channel='ЧР'; sell=tq.price; }
         else if(revCity!=null){ rev=revCity; channel=cityBest.city; sell=cityBest.sell; cityBid=cityBest.buy||0; }
         else continue;
+        if(sellOvr!=null){ sell=sellOvr; rev=sellOvr*(channel==='ЧР' ? (1-tax) : (1-tax-CFG.setupFee)); }
         const net = rev - cost, margin = net/cost*100;
         // Объём: сколько штук в день реально прогонишь. Раньше считался только сбыт, хотя
         // упирается обычно закупка — исходник на рынке города продаётся ограниченно.
@@ -1238,8 +1270,9 @@ function compute(){
         const buyVol  = S.cityHist?.[it.id]?.[buy.city]?.[q] ?? null;
         const vol = buyVol!=null ? Math.min(buyVol, sellVol) : sellVol;
         const stale = Math.max(hoursAgo(buy.ts), stone.age||0);
-        const warn = margin>300 || (margin>100 && vol<10);
-        enchRows.push({it, q, targetId, buy:buy.sell, buyCity:buy.city, channel, cityBid, buyVol, sellVol,
+        const warn = tooCheap(it.id, q, buy.sell) || margin>300 || (margin>100 && vol<10);
+        enchRows.push({it, q, targetId, buy:buyPrice, buyOvr:buyOvr!=null, sellOvr:sellOvr!=null,
+          buyCity:buy.city, channel, cityBid, buyVol, sellVol, rev,
           stoneRes:up.res, stoneN:up.n, stonePrice:stone.price, stoneCity:stone.city, stoneCost,
           cost, sell, net, margin, vol,
           pool:vol*Math.max(net,0), ...goldOf(net, cost, vol, stale), stale, warn});
@@ -1412,7 +1445,14 @@ function nameCellQ(it, q, extra){
 // ключ строки, переживающий пересчёт и пересортировку: вкладка + предмет + город
 function rowKey(r){
   const it=r.it||r.rmat||{};
-  return [S.tab, it.id||'', r.city||''].join('|');
+  // качество входит в ключ: на Рунофикации и Флиппинге на предмет приходится по строке
+  // на каждое качество, и без него панели всех пяти считались бы одной и той же
+  return [S.tab, it.id||'', r.city||'', r.q ?? ''].join('|');
+}
+function itemById(id){
+  if(!DATA) return null;
+  if(!DATA.__byId) DATA.__byId = Object.fromEntries(DATA.items.map(i=>[i.id,i]));
+  return DATA.__byId[id] || null;
 }
 function render(){
   const wrap=$('tableWrap');
@@ -1542,7 +1582,7 @@ function render(){
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
         <td>${r.vol?fmt(r.vol):'—'}</td><td>${r.pool?fmt(r.pool):'—'}</td>
-        <td><b>${r.real?fmt(r.real):'—'}</b></td>
+        ${realCell(r)}
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
       html+=`<tr class="det" style="display:none"><td colspan="11" id="det${i}"></td></tr>`;
     } else if(S.tab==='cons'){
@@ -1554,7 +1594,7 @@ function render(){
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
         <td>${r.vol!=null?fmt(r.vol):'—'}</td><td>${r.pool!=null?fmt(r.pool):'—'}</td>
-        <td><b>${r.real?fmt(r.real):'—'}</b></td>
+        ${realCell(r)}
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
       html+=`<tr class="det" style="display:none"><td colspan="10" id="cdet${i}"></td></tr>`;
     } else if(S.tab==='flip'){
@@ -1564,11 +1604,10 @@ function render(){
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
         <td>${fmt(r.vol)}</td><td>${fmt(r.pool)}</td>
-        <td><b>${r.real?fmt(r.real):'—'}</b></td>
+        ${realCell(r)}
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
     } else if(S.tab==='ench'){
-      const tgt = r.targetId;
-      html+=`<tr class="row"><td class="item">${icon(it.id,r.q)}<div class="iname"><b>${it.en}${topBadge+limBadge+warnBadge+staleBadge}</b>
+      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(it.id,r.q)}<div class="iname"><b>${it.en}${topBadge+limBadge+openBadge+warnBadge+staleBadge}</b>
           <span>${it.ru||''} · T${it.tier}${it.ench?'.'+it.ench:''} <b style="color:var(--accent)">→ .${it.ench+1}</b> · ${CAT_RU[it.cat]||it.cat} · ${QUAL_RU[r.q]}</span></div></td>
         <td>${QUAL_RU[r.q]}</td>
         <td>${fmt(r.buy)}<br><span class="fresh">${r.buyCity}</span></td>
@@ -1580,8 +1619,9 @@ function render(){
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
         <td title="Сбыт ${fmt(r.sellVol)}/д${r.buyVol!=null?`, закупка исходника в ${r.buyCity} ${fmt(r.buyVol)}/д — берём меньшее`:', объём закупки исходника неизвестен'}">${fmt(r.vol)}${
             r.buyVol!=null && r.buyVol<r.sellVol ? '<br><span class="fresh">упор в закупку</span>' : ''}</td><td>${fmt(r.pool)}</td>
-        <td><b>${r.real?fmt(r.real):'—'}</b></td>
+        ${realCell(r)}
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
+      html+=`<tr class="det" style="display:none"><td colspan="11" id="edet${i}"></td></tr>`;
     } else if(S.tab==='cityflip'){
       html+=`<tr class="row">${nameCellQ(it, r.q, topBadge+limBadge+warnBadge+staleBadge)}
         <td>${QUAL_RU[r.q]}</td>
@@ -1591,7 +1631,7 @@ function render(){
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
         <td>${r.vol!=null?fmt(r.vol):'<span class="fresh" title="Нет данных об объёме продаж этого предмета в городе продажи — сделок за неделю не зафиксировано либо сборщик их не получил">—</span>'}</td>
         <td>${r.pool!=null?fmt(r.pool):'—'}</td>
-        <td><b>${r.real?fmt(r.real):'—'}</b></td>
+        ${realCell(r)}
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
     } else {
       const rm=r.rmat;
@@ -1609,7 +1649,7 @@ function render(){
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
         <td>${r.vol!=null?fmt(r.vol):'—'}</td>
         <td>${r.pool!=null?fmt(r.pool):'—'}</td>
-        <td><b>${r.real?fmt(r.real):'—'}</b></td>
+        ${realCell(r)}
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
       html+=`<tr class="det" style="display:none"><td colspan="10" id="rdet${i}"></td></tr>`;
     }
@@ -1632,6 +1672,7 @@ function render(){
   const cfg = craft ? {store:'__detRows', pfx:'det', html:detailHTML, upd:calcUpd}
     : S.tab==='cons' ? {store:'__consDetRows', pfx:'cdet', html:detailConsHTML, upd:calcConsUpd}
     : S.tab==='ref'  ? {store:'__refDetRows', pfx:'rdet', html:detailRefHTML, upd:calcRefUpd}
+    : S.tab==='ench' ? {store:'__enchDetRows', pfx:'edet', html:detailEnchHTML, upd:calcEnchUpd}
     : null;
   if(cfg) wrap.querySelectorAll('tr.row').forEach(tr=>{
     const openDet=()=>{
@@ -1800,6 +1841,52 @@ function detailHTML(r,idx){
       <input type="number" value="100" min="1" step="10" style="width:90px" id="calcN${idx}" oninput="calcUpd(${idx})"> шт.
       <div id="calcOut${idx}" style="margin-top:6px"></div>`;
   return m;
+}
+// ─── Рунофикация: разбор строки и калькулятор партии ───
+function detailEnchHTML(r, idx){
+  const it=r.it, tgt=itemById(r.targetId);
+  const norm = normPrice(r.targetId, r.q);
+  const kg = itemKg(it);
+  let m = `<b>Покупаем ${it.en} (${QUAL_RU[r.q]}) в ${r.buyCity}, цену можно править ✎:</b>`
+    + `<table><tr><th class="item">Что</th><th>Кол-во</th><th>Цена (ред.)</th><th>Сумма</th></tr>`
+    + `<tr><td class="item">${icon(it.id, r.q)} ${it.en}${r.buyOvr?' <span style="color:var(--accent)">✎</span>':''}</td><td>1</td>`
+    + `<td><input type="number" style="width:100px" value="${Math.round(r.buy)}" onclick="event.stopPropagation()"
+         onchange="setBuyOverride('${it.id}',${r.q},this.value)" title="За сколько реально купишь эту вещь. Пусто или 0 — вернуть рыночную цену."></td>`
+    + `<td>${fmt(r.buy)}</td></tr>`
+    + `<tr><td class="item">${icon(r.stoneRes)} ${stoneKind(r.stoneRes)} (${r.stoneCity})</td><td>${fmt(r.stoneN)}</td>`
+    + `<td><input type="number" style="width:100px" value="${Math.round(r.stonePrice)}" onclick="event.stopPropagation()"
+         onchange="setOverride('${r.stoneRes}','${r.stoneCity}',this.value)" title="Цена одного камня. Пусто или 0 — вернуть рыночную."></td>`
+    + `<td>${fmt(r.stoneCost)}</td></tr></table>`;
+  m += `<br>Себестоимость штуки: <b>${fmt(r.cost)}</b>`;
+  m += `<br><b>Продаём ${tgt?tgt.en:r.targetId} .${it.ench+1} (${QUAL_RU[r.q]})</b> —${r.channel==='ЧР'?'чёрный рынок в Карлеоне, мгновенно по бай-ордеру':r.channel+', своим ордером'}`
+    + ` <input type="number" style="width:110px" value="${Math.round(r.sell)}" onclick="event.stopPropagation()"
+         onchange="setSellOverride('${r.targetId}',this.value)" title="За сколько реально продашь. Пусто или 0 — вернуть цену с рынка.">`
+    + `${r.sellOvr?' <span style="color:var(--accent)">✎</span>':''}`
+    + ` → на руки <b>${fmt(Math.round(r.rev))}</b> <span class="fresh">(${r.channel==='ЧР'?'налог':'налог + сбор 2,5%'})</span>`;
+  if(norm) m += `<br><span class="fresh">Обычная цена за месяц: <b style="color:var(--text)">${fmt(norm.price)}</b> (${norm.src}${norm.days?', '+norm.days+' дн':''})`
+    + `${r.sell>norm.price*1.25?` · сейчас просят на ${Math.round((r.sell/norm.price-1)*100)}% выше нормы`:''}</span>`;
+  m += `<br>Профит: <b class="${r.net>=0?'pos':'neg'}">${fmt(Math.round(r.net))}</b> с штуки, маржа ${r.margin.toFixed(1)}%`;
+  m += `<br><span class="fresh">Объём: сбыт ${fmt(r.sellVol)}/д${r.buyVol!=null?`, закупка в ${r.buyCity} ${fmt(r.buyVol)}/д`:''} → в расчёт ${fmt(r.vol)}/д</span>`;
+  m += `<br><br><b>🧮 Калькулятор партии:</b> берём
+      <input type="number" value="20" min="1" step="5" style="width:80px" id="ecalcN${idx}" onclick="event.stopPropagation()" oninput="calcEnchUpd(${idx})"> шт.
+      <div id="ecalcOut${idx}" style="margin-top:6px"></div>`;
+  if(!kg) m += `<br><span class="fresh">Вес этой вещи неизвестен — «рейсы» не считаются.</span>`;
+  return m;
+}
+function calcEnchUpd(idx){
+  const r = (window.__enchDetRows||{})[idx]; if(!r) return;
+  const N = Math.max(1, +($('ecalcN'+idx)?.value||20));
+  const buyAll = r.buy*N, stoneAll = r.stoneCost*N, invest = buyAll+stoneAll;
+  const revAll = r.rev*N, profit = revAll-invest;
+  const kg = itemKg(r.it), trips = kg? Math.ceil(N*kg/carryKg()) : 0;
+  let h = `<table><tr><th class="item">Что</th><th>Всего</th><th>Стоимость</th></tr>`
+    + `<tr><td class="item">${icon(r.it.id, r.q)} ${r.it.en}</td><td>${fmt(N)}</td><td>${fmt(Math.round(buyAll))}</td></tr>`
+    + `<tr><td class="item">${icon(r.stoneRes)} ${stoneKind(r.stoneRes)}</td><td>${fmt(r.stoneN*N)}</td><td>${fmt(Math.round(stoneAll))}</td></tr></table>`;
+  h += `Вложить: <b>${fmt(Math.round(invest))}</b> · выручка на руки: <b>${fmt(Math.round(revAll))}</b>`
+    + ` · <b class="${profit>=0?'pos':'neg'}">итог ${fmt(Math.round(profit))}</b>`;
+  if(kg) h += `<br><span class="fresh">Вес партии ${fmt(Math.round(N*kg))} кг при ${fmt(carryKg())} кг за раз — ${trips>1?`<b style="color:var(--text)">${fmt(trips)} рейс${trips<5?'а':'ов'}</b>`:'один рейс'}</span>`;
+  if(r.vol) h += `<br><span class="fresh">При объёме ${fmt(r.vol)}/д и доле рынка 10% партия уйдёт примерно за ${(N/Math.max(1,r.vol*CFG.marketShare)).toFixed(1)} дн.</span>`;
+  $('ecalcOut'+idx).innerHTML = h;
 }
 function calcUpd(idx){
   const r = (window.__detRows||{})[idx]; if(!r) return;
@@ -2380,6 +2467,7 @@ window.openItem = (id)=>{ S.itemSel=id; setTab('item'); };
 // ─── События ───
 ['citySel','focusChk','premChk','feeInp','qualSel'].forEach(id=>$(id).onchange=()=>{ compute(); render(); });
 ['budgetInp','horizonInp'].forEach(id=>$(id).oninput=()=>{ S.limit=0; compute(); render(); });
+$('carryInp').oninput=()=>render();   // вес на расчёт не влияет, только на подпись «рейсов»
 ['searchInp','minMargin','minVol'].forEach(id=>$(id).oninput=()=>{ S.limit=0; render(); });
 ['catSel','tierSel','enchSel','ageSel'].forEach(id=>$(id).onchange=()=>{ S.limit=0; render(); });
 // Автообновление. Сам снимок весит ~2 МБ, поэтому не тянем его по таймеру:
@@ -2469,6 +2557,12 @@ window.setOverride=(mid,city,val)=>{
   else S.overrides[mid+'|'+city]=v;
   saveOverrides(); compute(); render();
 };
+window.setBuyOverride=(iid,q,val)=>{
+  const v=parseFloat(val);
+  if(!v || v<=0) delete S.overrides['BUY|'+iid+'|'+q];
+  else S.overrides['BUY|'+iid+'|'+q]=v;
+  saveOverrides(); compute(); render();
+};
 window.setSellOverride=(iid,val)=>{
   const v=parseFloat(val);
   if(!v || v<=0) delete S.overrides['SELL|'+iid];
@@ -2510,6 +2604,9 @@ window.goHome=()=>{
     const r = await fetchTO('items.json?v=3', 30000);
     if(!r.ok) throw new Error('HTTP '+r.status);
     DATA = await r.json();
+    // вес предметов лежит отдельным файлом: он из дампа игры, а не с рынка, и меняется раз в патч
+    try{ DATA.weights = await (await fetchTO('weights.json?v=1', 20000)).json(); }
+    catch(e){ DATA.weights = {}; }
   }catch(e){
     if(hs) hs.innerHTML='<span style="color:var(--red)">Не удалось загрузить базу предметов (items.json). Обнови страницу.</span>';
     return;

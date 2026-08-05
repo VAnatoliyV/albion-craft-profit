@@ -219,21 +219,35 @@ async function main(){
   }), 'ref-volumes')
 
   // 5) объёмы продаж предметов на городских рынках (межгородской флип, канал «город»)
+  //    Здесь же — «обычная цена по королевству»: медиана суточных сделок за 30 дней по всем
+  //    городам сразу. Нужна, чтобы отличать живой селл-ордер от троллевого: минимальный ордер
+  //    сам по себе ничего не значит, когда реальные продавцы разобраны (сумка мастера в
+  //    Бресильене висела по 799 991 при рынке 50 000 и давала «мне за день 57 млн» из воздуха).
   console.log(`city market volumes: ${itemIds.length}+${consIds.length} ids`);
-  out.ch = {};
+  out.ch = {}; out.cb = {};
   await runPool(chunks([...itemIds, ...consIds], HIST_BATCH).map(ch => async ()=>{
     const d = await getJSON(`${API}/history/${encodeURIComponent(ch.join(','))}.json?locations=${encodeURIComponent(CITIES.join(','))}&time-scale=24`);
+    const baseCut = Date.now() - BASE_DAYS*864e5;
+    const acc = {};                                  // item|качество -> цены суток за месяц
     for(const e of d||[]){
       const ci = CITY_IDX[e.location]; if(ci===undefined) continue;
       const q = e.quality||1;
       let vol=0;
       for(const p of e.data||[]){
-        if(new Date(p.timestamp+'Z').getTime() < cutoff) continue;
+        const t = new Date(p.timestamp+'Z').getTime();
+        if(t >= baseCut && p.avg_price>0) (acc[e.item_id+'|'+q] ||= []).push(p.avg_price);
+        if(t < cutoff) continue;
         vol += p.item_count;
       }
       if(!vol) continue;
       const rec = ((out.ch[e.item_id] ||= {})[ci] ||= {});
       rec[q] = Math.round(((rec[q]||0) + vol/HIST_DAYS)*10)/10;
+    }
+    for(const [k, arr] of Object.entries(acc)){
+      if(arr.length < 3) continue;                   // на двух точках медиана ничего не стоит
+      arr.sort((a,b)=>a-b);
+      const [id, q] = k.split('|');
+      ((out.cb[id] ||= {}))[q] = [Math.round(arr[Math.floor(arr.length/2)]), arr.length];
     }
   }), 'city-volumes')
 
