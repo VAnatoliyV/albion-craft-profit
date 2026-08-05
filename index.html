@@ -1717,10 +1717,12 @@ function detailHTML(r,idx){
         (r.swing?` · за месяц цена гуляет на ${r.swing}%`:'')+'</span>' : '');
   const bm = S.bm[it.id];
   if(bm){
-    m+='<br><b>ЧР по качествам:</b><table><tr><th>Качество</th><th>Бай-ордер</th><th>Средняя 7д</th><th>Объём/д</th></tr>';
+    m+='<br><b>ЧР по качествам:</b><table><tr><th>Качество</th><th>Бай-ордер</th><th title="Медиана суточных цен за 30 дней — то, за сколько предмет реально уходит из месяца в месяц. Именно по ней считается профит, если бай-ордер сейчас выше неё.">Обычная за месяц</th><th>Средняя 7д</th><th>Объём/д</th></tr>';
     for(let q=1;q<=5;q++){ const d=bm.qs[q]; if(!d) continue;
+      const hot = d.base && d.order && d.order>d.base ? Math.round((d.order/d.base-1)*100) : 0;
       m+=`<tr><td style="text-align:left">${QUAL_RU[q]}</td>`
-       + `<td>${d.order?'<b>'+fmt(d.order)+'</b> <span class="fresh">'+ageTxt(d.orderTs)+'</span>':'<span class="fresh">—</span>'}</td>`
+       + `<td>${d.order?'<b>'+fmt(d.order)+'</b> <span class="fresh">'+ageTxt(d.orderTs)+'</span>'+(hot>CFG.spikeCut?' <span class="fresh" style="color:var(--accent)">+'+hot+'%</span>':''):'<span class="fresh">—</span>'}</td>`
+       + `<td>${d.base?'<b>'+fmt(d.base)+'</b> <span class="fresh">'+d.days+' дн</span>':'<span class="fresh">—</span>'}</td>`
        + `<td><span class="fresh">${d.price?fmt(d.price):'—'}</span></td><td>${fmt(d.vol)}</td></tr>`; }
     m+='</table>';
   }
@@ -2253,17 +2255,19 @@ function itemCardHTML(id){
   // чёрный рынок
   if(bm){
     out += '<div style="margin-top:14px"><b>🖤 Чёрный рынок</b></div>';
-    out += '<table style="margin-top:6px"><thead><tr><th class="item" style="text-align:left">Качество</th><th>Даёт сейчас</th><th>Посл. сделки</th><th>Средняя 7д</th><th>Объём/день</th></tr></thead><tbody>';
+    out += '<table style="margin-top:6px"><thead><tr><th class="item" style="text-align:left">Качество</th><th>Даёт сейчас</th><th title="Медиана суточных цен за 30 дней — то, за сколько предмет реально уходит из месяца в месяц. Именно по ней считается профит, если бай-ордер сейчас выше неё.">Обычная за месяц</th><th>Посл. сделки</th><th>Средняя 7д</th><th>Объём/день</th></tr></thead><tbody>';
     for(let q=1;q<=5;q++){ const d=bm.qs[q]; if(!d) continue;
+      const hot = d.base && d.order && d.order>d.base ? Math.round((d.order/d.base-1)*100) : 0;
       out += `<tr><td class="item" style="display:table-cell">${QUAL_RU[q]}</td>`
-        + `<td>${d.order?'<b>'+fmt(d.order)+'</b> <span class="fresh">'+ageTxt(d.orderTs)+'</span>':'<span class="fresh">—</span>'}</td>`
+        + `<td>${d.order?'<b>'+fmt(d.order)+'</b> <span class="fresh">'+ageTxt(d.orderTs)+'</span>'+(hot>CFG.spikeCut?' <span class="fresh" style="color:var(--accent)">+'+hot+'%</span>':''):'<span class="fresh">—</span>'}</td>`
+        + `<td>${d.base?'<b>'+fmt(d.base)+'</b> <span class="fresh">'+d.days+' дн</span>':'<span class="fresh">—</span>'}</td>`
         + `<td>${d.last?fmt(d.last)+' <span class="fresh">'+ageTxt(d.lastTs)+'</span>':'<span class="fresh">—</span>'}</td>`
         + `<td><span class="fresh">${d.price?fmt(d.price):'—'}</span></td><td>${fmt(d.vol)}</td></tr>`; }
     out += '</tbody></table>';
   } else if(!isMat){
     out += '<div class="fresh" style="margin-top:12px">На чёрном рынке сделок по этому предмету за неделю не зафиксировано.</div>';
   }
-  out += `<div class="fresh" style="margin-top:12px">Верхнее число — минимальный селл-ордер (за сколько купить), <span style="color:var(--blue)">синее</span> — максимальный бай-ордер (за сколько сдать мгновенно). Рядом возраст цены. По чёрному рынку в расчёт профита идёт колонка «даёт сейчас»: средняя за 7 дней завышает выручку, потому что история отстаёт на 2–4 дня.</div></div>`;
+  out += `<div class="fresh" style="margin-top:12px">Верхнее число — минимальный селл-ордер (за сколько купить), <span style="color:var(--blue)">синее</span> — максимальный бай-ордер (за сколько сдать мгновенно). Рядом возраст цены. По чёрному рынку в расчёт профита идёт «даёт сейчас», но не выше «обычной за месяц»: заявка НПС скачет по часам и регулярно висит вдвое выше того, за сколько предмет реально уходит. Число рядом с обычной ценой — сколько дней из тридцати по этому качеству вообще были сделки; если их мало, доверия к строке меньше.</div></div>`;
   return out;
 }
 function itemTabHTML(){

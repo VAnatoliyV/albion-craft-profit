@@ -155,16 +155,13 @@ async function main(){
         vol += p.item_count; sum += p.avg_price*p.item_count; cnt += p.item_count;
         if(!last || p.timestamp>last) last=p.timestamp;
       }
-      if(!cnt) continue;
-      // последняя суточная точка отдельно: средняя за неделю сильно врёт, когда цена ползёт
-      let lastAvg = 0, lastT = 0;
-      for(const p of e.data||[]){
-        const t = new Date(p.timestamp+'Z').getTime();
-        if(t < cutoff) continue;
-        if(!lastT || t > lastT){ lastT = t; lastAvg = Math.round(p.avg_price); }
-      }
       // «обычная цена» за месяц и насколько она гуляет. Медиана и межквартильный
       // размах: всплеск в пару дней их почти не двигает, а ровную цену видно сразу.
+      // СЧИТАЕМ ДО проверки на сделки этой недели. Иначе выходит ловушка: по качеству,
+      // где торговля заглохла (например у клирики T5.2 «обычное» — последняя сделка
+      // 10 дней назад, но до неё 20 дней и 993 штуки по ~61 400), запись выбрасывалась
+      // целиком, месячная норма терялась, и задранный бай-ордер НПС в 138 930 шёл
+      // в расчёт без всякой защиты — профит завышался вдвое.
       const baseCut = Date.now() - BASE_DAYS*864e5;
       const hist = (e.data||[]).filter(p=>new Date(p.timestamp+'Z').getTime()>=baseCut && p.avg_price>0)
                                .map(p=>p.avg_price).sort((a,b)=>a-b);
@@ -174,8 +171,16 @@ async function main(){
         base = at(0.5);
         spread = base>0 ? Math.round((at(0.75)-at(0.25))/base*100) : 0;
       }
+      if(!cnt && !hist.length) continue;   // за месяц вообще ни одной сделки — сохранять нечего
+      // последняя суточная точка отдельно: средняя за неделю сильно врёт, когда цена ползёт
+      let lastAvg = 0, lastT = 0;
+      for(const p of e.data||[]){
+        const t = new Date(p.timestamp+'Z').getTime();
+        if(t < cutoff) continue;
+        if(!lastT || t > lastT){ lastT = t; lastAvg = Math.round(p.avg_price); }
+      }
       const rec = (out.b[e.item_id] ||= {q:{}, l:0});
-      rec.q[q] = [Math.round(sum/cnt), Math.round(vol/HIST_DAYS*10)/10, lastAvg, lastT?Math.round(lastT/6e4):0,
+      rec.q[q] = [cnt?Math.round(sum/cnt):0, Math.round(vol/HIST_DAYS*10)/10, lastAvg, lastT?Math.round(lastT/6e4):0,
                   Math.round(base), spread, hist.length];
       if(last){ const lm=minutes(last); if(lm>rec.l) rec.l=lm; }
     }
