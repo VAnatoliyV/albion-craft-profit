@@ -420,7 +420,10 @@ const CITY_BONUS = {
   'Fort Sterling': ['cloth_armor','plate_helmet','hammer','spear','holystaff'],
   'Thetford':      ['mace','firestaff','naturestaff','leather_armor','cloth_helmet'],
   'Caerleon':      ['knuckles','shapeshifterstaff'],
-  'Brecilien':     ['cape','bag'],
+  // Кошели в дампе идут той же крафтовой категорией, что и сумки, — значит и бонус тот же.
+  // У снаряжения собирателя, инструментов, наживки и королевских сетов своей категории
+  // бонуса ни в одном городе нет: считаем их по базовому возврату, без +15%.
+  'Brecilien':     ['cape','bag','satchel'],
 };
 const CAT_RU = {axe:'Топоры',quarterstaff:'Боевые посохи',froststaff:'Посохи мороза',plate_shoes:'Латные сапоги',
   offhand:'Офхенды',plate_armor:'Латная броня',crossbow:'Арбалеты',dagger:'Кинжалы',cursestaff:'Посохи проклятий',
@@ -428,7 +431,8 @@ const CAT_RU = {axe:'Топоры',quarterstaff:'Боевые посохи',fros
   leather_shoes:'Кожаные ботинки',cloth_armor:'Робы',plate_helmet:'Латные шлемы',hammer:'Молоты',spear:'Копья',
   holystaff:'Посохи света',mace:'Булавы',firestaff:'Огненные посохи',naturestaff:'Посохи природы',
   leather_armor:'Кожаные куртки',cloth_helmet:'Тканевые капюшоны',knuckles:'Кастеты',shapeshifterstaff:'Посохи оборотня',
-  cape:'Плащи',cape_faction:'Плащи фракций',bag:'Сумки'};
+  cape:'Плащи',cape_faction:'Плащи фракций',bag:'Сумки',
+  gatherer:'Снаряжение собирателя',tool:'Инструменты',bait:'Наживка',satchel:'Кошели',royal:'Королевские сеты'};
 // Крупные группы для полоски над таблицей: мелкий фильтр категорий остаётся,
 // но глазами двадцать восемь строк списка никто не разбирает.
 // Офхенды отнесены к оружию: это экипировка в слот оружия, и на ЧР уходит так же.
@@ -436,14 +440,15 @@ const CAT_RU = {axe:'Топоры',quarterstaff:'Боевые посохи',fros
 const CAT_WEAPON = ['axe','sword','bow','crossbow','dagger','spear','quarterstaff','hammer','mace','knuckles',
   'firestaff','froststaff','arcanestaff','holystaff','naturestaff','cursestaff','shapeshifterstaff','offhand'];
 const CAT_ARMOR = ['plate_helmet','plate_armor','plate_shoes','leather_helmet','leather_armor','leather_shoes',
-  'cloth_helmet','cloth_armor','cloth_shoes'];
+  'cloth_helmet','cloth_armor','cloth_shoes','royal'];
 const GROUPS = [
   ['all',   'Всё',        null],
   ['gear',  '⚔ Вещи',     [...CAT_WEAPON, ...CAT_ARMOR]],
   ['weapon','🗡 Оружие',   CAT_WEAPON],
   ['armor', '🛡 Броня',    CAT_ARMOR],
   ['cape',  '🧣 Плащи',    ['cape','cape_faction']],
-  ['bag',   '🎒 Сумки',    ['bag']],
+  ['bag',   '🎒 Сумки',    ['bag','satchel']],
+  ['gath',  '⛏ Сбор',     ['gatherer','tool','bait']],
 ];
 const GROUP_CATS = Object.fromEntries(GROUPS.map(([k,,c])=>[k, c&&new Set(c)]));
 const BONUS_CITY_OF = {}; // cat -> city
