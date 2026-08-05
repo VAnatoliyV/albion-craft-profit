@@ -262,7 +262,7 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
     <label class="ctl toggle" id="wrapFocus"><input type="checkbox" id="focusChk"> Фокус</label>
     <label class="ctl toggle" id="wrapLocal"><input type="checkbox" id="localChk"> 📍 Продать на месте<span class="help" title="Продажа только в том же городе, где скрафтил. В Рунофикации — шмотка, камни и продажа всё в одном городе. Никакой перевозки вообще — ни между городами, ни на чёрный рынок.&#10;&#10;Сайт по умолчанию ищет лучшую цену среди всех городов и молча предполагает, что ты туда повезёшь. Этот режим отвечает на другой вопрос: сколько выйдет, если никуда не ехать.&#10;&#10;Исключение — крафт в Карлеоне: там чёрный рынок под боком, поэтому продажа на ЧР считается продажей на месте.&#10;&#10;В режиме «все города» перебираются все доступные города и остаётся лучший вариант по каждому предмету.">?</span></label>
     <label class="ctl toggle" id="wrapSafeCraft"><input type="checkbox" id="safeCraftChk"> 🛡 Безопасный крафт<span class="help" title="Убирает из расчёта опасную логистику.&#10;&#10;Крафт и продажа только там, куда можно дойти безопасно: 5 королевских городов и Бресильен. Карлеон исключается целиком — он на чёрном острове, туда и оттуда везут через красные и чёрные зоны. Вместе с ним отключается чёрный рынок: он как раз в Карлеоне.&#10;&#10;Цена безопасности: бонус +15% даётся только в «своём» городе категории. У кастетов, посохов оборотня и всей еды он в Карлеоне — в этом режиме ты их крафтишь без бонуса, с базовым возвратом. Зелья, плащи и сумки не страдают: их бонус в Бресильене, а туда дорога безопасная.">?</span></label>
-    <label class="ctl toggle" id="wrapSafe"><input type="checkbox" id="safeChk"> Безопасные маршруты<span class="help" title="Убирает Карлеон из перевозок: дорога туда идёт через красные и чёрные зоны. Бресильен остаётся — до него есть безопасный путь.&#10;&#10;Действует на «Лучший маршрут» в Переработке и на Флиппинг между городами.&#10;&#10;Не влияет на: локальные циклы (там нет перевозок) и на продажу на ЧР во Флиппинге — туда доставку ты и так планируешь сам. Для полного исключения Карлеона из крафта есть отдельный переключатель «Безопасный крафт».">?</span></label>
+    <label class="ctl toggle" id="wrapSafe"><input type="checkbox" id="safeChk"> Безопасные маршруты<span class="help" title="Убирает Карлеон из перевозок: дорога туда идёт через красные и чёрные зоны. Бресильен остаётся — до него есть безопасный путь.&#10;&#10;Действует на «Лучший маршрут» в Переработке, на Флиппинг между городами и на Рунофикацию — там вместе с Карлеоном отключается и чёрный рынок: он стоит именно там, и везти туда вещь пришлось бы через красные зоны.&#10;&#10;Не влияет на: локальные циклы (там нет перевозок) и на продажу на ЧР во Флиппинге — этот раздел про чёрный рынок и есть, доставку туда ты планируешь сам. Для полного исключения Карлеона из крафта есть отдельный переключатель «Безопасный крафт».">?</span></label>
     <label class="ctl toggle" id="wrapSelfRef"><input type="checkbox" id="selfRefChk"> Сырьё сам<span class="help" title="Для каждого материала сайт сравнивает два пути: купить готовый ресурс (бруски, кожу…) на рынке или купить сырьё (руду, шкуры…) и переработать самому в городе крафта — с учётом возврата и платы за станок. В себестоимость идёт то, что дешевле. В карточке предмета видно, где выгоднее переработать самому (метка ⚒).">?</span></label>
     <label class="ctl toggle"><input type="checkbox" id="premChk" checked> Премиум (4%)</label>
     <label class="ctl" id="wrapFee">Станок/100 пит.
@@ -319,7 +319,7 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
       <select id="tierSel"><option value="">4–8</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select>
     </label>
     <label class="ctl">Зачар.
-      <select id="enchSel"><option value="">0–3</option><option>0</option><option>1</option><option>2</option><option>3</option></select>
+      <select id="enchSel"><option value="">0–4</option><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select>
     </label>
     <label class="ctl" id="refModeWrap" style="display:none">Режим переработки<span class="help" title="Локальный цикл — купил сырьё, переработал и продал в одном и том же городе: ноль перевозок и риска.&#10;&#10;Лучший маршрут — сайт подбирает максимальный профит: сырьё покупается там, где дешевле, переработка идёт в выбранном городе (или бонусном, если выбраны «Все города»), а готовый ресурс продаётся там, где дороже. Перевозка между городами — на тебе: вес, ходки и риск ганка в расчёт не входят.">?</span>
       <select id="refModeSel">
@@ -389,7 +389,8 @@ function realCell(r){
 // Зеркальная ловушка: одна вещь, выставленная по ошибке за копейки, делает строку сказочной.
 // Удалять такие нельзя — настоящая находка выглядит так же, — но в топ они попадать не должны.
 function tooCheap(id, q, price){ const n=normPrice(id,q); return !!(n && price < n.price*CFG.askFloor); }
-function routeCities(){ return $('safeChk')?.checked ? SAFE_CITIES : CITIES; }
+function safeRoutes(){ return !!$('safeChk')?.checked; }
+function routeCities(){ return safeRoutes() ? SAFE_CITIES : CITIES; }
 // «Безопасный крафт»: и варим, и продаём только в королевской пятёрке, ЧР выключен
 function safeCraft(){ return !!$('safeCraftChk')?.checked; }
 function craftCities(){ return safeCraft() ? SAFE_CITIES : CITIES; }
@@ -1248,9 +1249,12 @@ function compute(){
         const stoneCost = stone.price*up.n;
         const buyPrice = buyOvr!=null ? buyOvr : buy.sell;
         const cost = buyPrice + stoneCost;
-        // канал 1: чёрный рынок Карлеона, мгновенно по живому бай-ордеру
+        // канал 1: чёрный рынок Карлеона, мгновенно по живому бай-ордеру.
+        // Чёрный рынок стоит в Карлеоне, а туда везут через красные и чёрные зоны — поэтому
+        // при «безопасных маршрутах» этот канал отключается целиком, как и сам Карлеон.
         const tq = tgtBm ? bmQ(tgtBm, q) : null;
-        const revBM = (tq && (!localOnly() || buy.city==='Caerleon')) ? tq.price*(1-tax) : null;
+        const bmReachable = !safeRoutes() && (!localOnly() || buy.city==='Caerleon');
+        const revBM = (tq && bmReachable) ? tq.price*(1-tax) : null;
         // канал 2: городской рынок — ордером на продажу, поэтому налог + сбор 2,5%
         let cityBest=null;
         const capAsk = askCapFor(targetId, q);
