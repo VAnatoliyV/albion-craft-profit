@@ -260,7 +260,7 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
       <span class="help" title="Своя пара городов вместо автоподбора.&#10;&#10;По умолчанию сайт для каждого предмета сам берёт самый дешёвый город и самый дорогой — маршрут получается разный от строки к строке, и повезти всё одной ходкой нельзя.&#10;&#10;Задай «откуда» и «куда» — и останутся только те предметы, которые выгодно тащить именно по этому маршруту. Это уже готовый список закупки на одну поездку.&#10;&#10;Можно указать только одно поле: например «откуда: Бресильен, куда: любой» — что выгодно вывозить из Бресильена куда угодно.&#10;&#10;Явно выбранный город работает даже при включённых «безопасных маршрутах»: раз ты его назвал, значит дорогу туда планируешь сам.">?</span>
     </label>
     <label class="ctl toggle" id="wrapFocus"><input type="checkbox" id="focusChk"> Фокус</label>
-    <label class="ctl toggle" id="wrapLocal"><input type="checkbox" id="localChk"> 📍 Продать на месте<span class="help" title="Продажа только в том же городе, где скрафтил. Никакой перевозки вообще — ни между городами, ни на чёрный рынок.&#10;&#10;Сайт по умолчанию ищет лучшую цену среди всех городов и молча предполагает, что ты туда повезёшь. Этот режим отвечает на другой вопрос: сколько выйдет, если никуда не ехать.&#10;&#10;Исключение — крафт в Карлеоне: там чёрный рынок под боком, поэтому продажа на ЧР считается продажей на месте.&#10;&#10;В режиме «все города» перебираются все доступные города и остаётся лучший вариант по каждому предмету.">?</span></label>
+    <label class="ctl toggle" id="wrapLocal"><input type="checkbox" id="localChk"> 📍 Продать на месте<span class="help" title="Продажа только в том же городе, где скрафтил. В Рунофикации — шмотка, камни и продажа всё в одном городе. Никакой перевозки вообще — ни между городами, ни на чёрный рынок.&#10;&#10;Сайт по умолчанию ищет лучшую цену среди всех городов и молча предполагает, что ты туда повезёшь. Этот режим отвечает на другой вопрос: сколько выйдет, если никуда не ехать.&#10;&#10;Исключение — крафт в Карлеоне: там чёрный рынок под боком, поэтому продажа на ЧР считается продажей на месте.&#10;&#10;В режиме «все города» перебираются все доступные города и остаётся лучший вариант по каждому предмету.">?</span></label>
     <label class="ctl toggle" id="wrapSafeCraft"><input type="checkbox" id="safeCraftChk"> 🛡 Безопасный крафт<span class="help" title="Убирает из расчёта опасную логистику.&#10;&#10;Крафт и продажа только там, куда можно дойти безопасно: 5 королевских городов и Бресильен. Карлеон исключается целиком — он на чёрном острове, туда и оттуда везут через красные и чёрные зоны. Вместе с ним отключается чёрный рынок: он как раз в Карлеоне.&#10;&#10;Цена безопасности: бонус +15% даётся только в «своём» городе категории. У кастетов, посохов оборотня и всей еды он в Карлеоне — в этом режиме ты их крафтишь без бонуса, с базовым возвратом. Зелья, плащи и сумки не страдают: их бонус в Бресильене, а туда дорога безопасная.">?</span></label>
     <label class="ctl toggle" id="wrapSafe"><input type="checkbox" id="safeChk"> Безопасные маршруты<span class="help" title="Убирает Карлеон из перевозок: дорога туда идёт через красные и чёрные зоны. Бресильен остаётся — до него есть безопасный путь.&#10;&#10;Действует на «Лучший маршрут» в Переработке и на Флиппинг между городами.&#10;&#10;Не влияет на: локальные циклы (там нет перевозок) и на продажу на ЧР во Флиппинге — туда доставку ты и так планируешь сам. Для полного исключения Карлеона из крафта есть отдельный переключатель «Безопасный крафт».">?</span></label>
     <label class="ctl toggle" id="wrapSelfRef"><input type="checkbox" id="selfRefChk"> Сырьё сам<span class="help" title="Для каждого материала сайт сравнивает два пути: купить готовый ресурс (бруски, кожу…) на рынке или купить сырьё (руду, шкуры…) и переработать самому в городе крафта — с учётом возврата и платы за станок. В себестоимость идёт то, что дешевле. В карточке предмета видно, где выгоднее переработать самому (метка ⚒).">?</span></label>
@@ -351,6 +351,25 @@ const ROYAL_CITIES = ['Martlock','Bridgewatch','Lymhurst','Fort Sterling','Thetf
 // Бресильен тоже безопасен: до королевских городов есть безопасный путь.
 // Опасен только Карлеон — он на чёрном острове, туда и оттуда везут через красные и чёрные зоны.
 const SAFE_CITIES = [...ROYAL_CITIES, 'Brecilien'];
+// Потолок правдоподобной цены продажи на городском рынке. Минимальный селл-ордер сам по себе
+// ничего не доказывает: когда реальные продавцы разобраны, сверху остаётся чей-нибудь троллевый
+// прайс. Сумка мастера в Бресильене стоит 799 991 при рынке около 50 000 — и такая строка давала
+// «мне за день 57 млн» из воздуха, потому что сайт выбирает САМЫЙ ДОРОГОЙ город. Сверяемся с
+// медианой по всем городам и с обычной ценой чёрного рынка за месяц: что выше порога — фантом.
+function askCapFor(id, q){
+  const liq=[], all=[];
+  for(const [c,byQ] of Object.entries(S.cityPrices[id]||{})){
+    const v=byQ[q]; if(!v||!v.sell) continue;
+    all.push(v.sell);
+    if((S.cityHist?.[id]?.[c]?.[q]||0) > 0) liq.push(v.sell);   // города, где этим реально торгуют
+  }
+  const src = liq.length>=3 ? liq : all;
+  if(!src.length) return Infinity;
+  src.sort((a,b)=>a-b);
+  const med = src[Math.floor(src.length/2)];
+  const bmBase = S.bm[id]?.qs?.[q]?.base || 0;
+  return Math.max(med, bmBase) * CFG.askCap;
+}
 function routeCities(){ return $('safeChk')?.checked ? SAFE_CITIES : CITIES; }
 // «Безопасный крафт»: и варим, и продаём только в королевской пятёрке, ЧР выключен
 function safeCraft(){ return !!$('safeCraftChk')?.checked; }
@@ -418,6 +437,7 @@ const CFG = {
   useBase: true,      // выручку считаем по обычной цене за месяц, а не по сегодняшней
   spikeCut: 25,       // цена выше нормы на столько процентов — это всплеск, в топ не пускаем
   swingCut: 60,       // цена за месяц гуляет шире этого — позиция непредсказуемая
+  askCap: 1.4,        // селл-ордер дороже нормы во столько раз — фантом, продать по нему нельзя
 
   histBatch: 50, priceBatch: 150, concurrency: 4,
   // Журналы наполняются СЛАВОЙ, а не числом крафтов. Ёмкость пустого журнала по тирам
@@ -963,10 +983,12 @@ function compute(){
       let bestCity=null, bestCityPrice=0;
       const cp = S.cityPrices[it.id]||{};
       const sellAllowed = localOnly() ? [city] : craftCities();
+      const capAsk = askCapFor(it.id, 1);
       for(const [c,byQ] of Object.entries(cp)){
         if(!sellAllowed.includes(c)) continue;
         const v = byQ[1]; if(!v) continue;
         if(hoursAgo(v.ts)>CFG.staleHours) continue;
+        if(v.sell>capAsk) continue;                 // фантомный прайс, продать по нему нельзя
         if(v.sell>bestCityPrice){ bestCityPrice=v.sell; bestCity=c; }
       }
       const revCity = bestCity ? bestCityPrice*(1-tax-CFG.setupFee) : null;
@@ -1044,11 +1066,13 @@ function compute(){
     for(let q=1;q<=5;q++){
       let lo=null, hi=null;
       const allowed = routeCities();
+      const capAsk = askCapFor(it.id, q);
       for(const [c,byQ] of Object.entries(cp)){
         if(!allowed.includes(c) && c!==fFrom && c!==fTo) continue;
         const v=byQ[q]; if(!v) continue;
         if(hoursAgo(v.ts)>CFG.staleHours) continue;
         if((fFrom==='ANY'||c===fFrom) && (!lo || v.sell<lo.sell)) lo={...v, city:c};
+        if(v.sell>capAsk) continue;                 // фантомный прайс: везти туда не к кому
         if((fTo  ==='ANY'||c===fTo)   && (!hi || v.sell>hi.sell)) hi={...v, city:c};
       }
       if(!lo || !hi || lo.city===hi.city) continue;
@@ -1147,8 +1171,10 @@ function compute(){
   }
   }
   S.refRows=refRows;
-  // рунофикация: купить шмотку + камни (руны/души/реликты) → поднять зачарование → продать на ЧР
-  // выбран конкретный город — покупаем шмотку и камни только в нём; «Все города» — ищем где дешевле
+  // рунофикация: купить шмотку + камни (руны/души/реликты) → поднять зачарование → продать.
+  // Продаём куда выгоднее: на ЧР в Карлеоне или прямо на городском рынке. Раньше был только
+  // ЧР, из-за чего каждая строка молча предполагала рейс в Карлеон через чёрные зоны.
+  // «Продать на месте»: шмотка, камни и продажа — всё в одном городе, без перевозки вообще.
   const enchRows=[];
   const rcs = citySel==='ALL' ? routeCities() : [citySel];
   if(need('ench')) for(const it of DATA.items){
@@ -1156,40 +1182,79 @@ function compute(){
     const up = (DATA.upgrades||{})[base]?.[it.ench+1];
     if(!up) continue;
     const targetId = base+'@'+(it.ench+1);
-    const tgtBm = S.bm[targetId]; if(!tgtBm) continue;
-    // камень: минимальная цена по доступным городам
-    let stone=null;
+    const tgtBm = S.bm[targetId];
+    const cp = S.cityPrices[it.id]||{};
+    const tp = S.cityPrices[targetId]||{};
+    // камень: минимальная цена по доступным городам (в локальном режиме — только свой)
+    let stoneBest=null;
     for(const c of rcs){
       const p=matPrice(up.res,c);
       if(!p || (!p.ovr && p.age>CFG.staleHours)) continue;
-      if(!stone || p.price<stone.price) stone={...p, city:c};
+      if(!stoneBest || p.price<stoneBest.price) stoneBest={...p, city:c};
     }
-    if(!stone) continue;
-    const cp = S.cityPrices[it.id]||{};
     for(let q=1;q<=5;q++){
-      // покупка исходника: самый дешёвый город
-      let buy=null;
+      const cands=[];
       for(const [c,byQ] of Object.entries(cp)){
         if(!rcs.includes(c)) continue;
-        const v=byQ[q]; if(!v) continue;
+        const v=byQ[q]; if(!v || !v.sell) continue;
         if(hoursAgo(v.ts)>CFG.staleHours) continue;
-        if(!buy || v.sell<buy.sell) buy={...v, city:c};
+        cands.push({...v, city:c});
       }
-      if(!buy) continue;
-      const tq = bmQ(tgtBm, q); if(!tq) continue;
-      const stoneCost = stone.price*up.n;
-      const cost = buy.sell + stoneCost;
-      const net = tq.price*(1-tax) - cost;
-      const margin = net/cost*100;
-      const stale = Math.max(hoursAgo(buy.ts), stone.age||0);
-      const warn = margin>300 || (margin>100 && tq.vol<10);
-      enchRows.push({it, q, targetId, buy:buy.sell, buyCity:buy.city,
-        stoneRes:up.res, stoneN:up.n, stonePrice:stone.price, stoneCity:stone.city, stoneCost,
-        cost, sell:tq.price, net, margin, vol:tq.vol,
-        pool:tq.vol*Math.max(net,0), ...goldOf(net, cost, tq.vol, stale), stale, warn});
+      if(!cands.length) continue;
+      // обычный режим — берём самый дешёвый город закупки; локальный — перебираем все
+      const buys = localOnly() ? cands : [cands.reduce((a,b)=>b.sell<a.sell?b:a)];
+      for(const buy of buys){
+        let stone = stoneBest;
+        if(localOnly()){
+          const p = matPrice(up.res, buy.city);
+          stone = (p && (p.ovr || p.age<=CFG.staleHours)) ? {...p, city:buy.city} : null;
+        }
+        if(!stone) continue;
+        const stoneCost = stone.price*up.n;
+        const cost = buy.sell + stoneCost;
+        // канал 1: чёрный рынок Карлеона, мгновенно по живому бай-ордеру
+        const tq = tgtBm ? bmQ(tgtBm, q) : null;
+        const revBM = (tq && (!localOnly() || buy.city==='Caerleon')) ? tq.price*(1-tax) : null;
+        // канал 2: городской рынок — ордером на продажу, поэтому налог + сбор 2,5%
+        let cityBest=null;
+        const capAsk = askCapFor(targetId, q);
+        for(const [c,byQ] of Object.entries(tp)){
+          if(localOnly() ? c!==buy.city : !rcs.includes(c)) continue;
+          const v=byQ[q]; if(!v || !v.sell) continue;
+          if(hoursAgo(v.ts)>CFG.staleHours) continue;
+          if(v.sell>capAsk) continue;               // фантомный прайс
+          if(!cityBest || v.sell>cityBest.sell) cityBest={...v, city:c};
+        }
+        const revCity = cityBest ? cityBest.sell*(1-tax-CFG.setupFee) : null;
+        let rev, channel, sell, cityBid=null;
+        if(revBM!=null && (revCity==null || revBM>=revCity)){ rev=revBM; channel='ЧР'; sell=tq.price; }
+        else if(revCity!=null){ rev=revCity; channel=cityBest.city; sell=cityBest.sell; cityBid=cityBest.buy||0; }
+        else continue;
+        const net = rev - cost, margin = net/cost*100;
+        // Объём: сколько штук в день реально прогонишь. Раньше считался только сбыт, хотя
+        // упирается обычно закупка — исходник на рынке города продаётся ограниченно.
+        // T6_BAG: ЧР берёт 1364/д, а в Лимхерсте их торгуется 547/д — потолок именно 547.
+        const sellVol = channel==='ЧР' ? (tq.vol||0) : (S.cityHist?.[targetId]?.[channel]?.[q] ?? 0);
+        const buyVol  = S.cityHist?.[it.id]?.[buy.city]?.[q] ?? null;
+        const vol = buyVol!=null ? Math.min(buyVol, sellVol) : sellVol;
+        const stale = Math.max(hoursAgo(buy.ts), stone.age||0);
+        const warn = margin>300 || (margin>100 && vol<10);
+        enchRows.push({it, q, targetId, buy:buy.sell, buyCity:buy.city, channel, cityBid, buyVol, sellVol,
+          stoneRes:up.res, stoneN:up.n, stonePrice:stone.price, stoneCity:stone.city, stoneCost,
+          cost, sell, net, margin, vol,
+          pool:vol*Math.max(net,0), ...goldOf(net, cost, vol, stale), stale, warn});
+      }
     }
   }
-  S.enchRows=enchRows;
+  // в локальном режиме на предмет приходится по строке на каждый город — оставляем лучшую
+  if(localOnly() && citySel==='ALL'){
+    const best=new Map();
+    for(const r of enchRows){
+      const k=r.it.id+'|'+r.q, cur=best.get(k);
+      if(!cur || (r.real||0)>(cur.real||0) || ((r.real||0)===(cur.real||0) && r.net>cur.net)) best.set(k,r);
+    }
+    S.enchRows=[...best.values()];
+  } else S.enchRows=enchRows;
 
   // ─── Зелья и еда: партия → себестоимость штуки → лучший городской рынок ───
   const consRows=[];
@@ -1227,10 +1292,12 @@ function compute(){
       let sellCity=null, sellPrice=0, sellTs=null;
       const sellOvr = S.overrides['SELL|'+c.id];
       const sellAllowed = localOnly() ? [city] : craftCities();
+      const capAsk = askCapFor(c.id, 1);
       for(const [cc,byQ] of Object.entries(S.cityPrices[c.id]||{})){
         if(!sellAllowed.includes(cc)) continue;
         const v=byQ[1]; if(!v||!v.sell) continue;
         if(hoursAgo(v.ts)>CFG.staleHours) continue;
+        if(v.sell>capAsk) continue;                 // фантомный прайс
         if(v.sell>sellPrice){ sellPrice=v.sell; sellCity=cc; sellTs=v.ts; }
       }
       if(!sellCity) continue;
@@ -1301,7 +1368,7 @@ const COLS_REF = [
 ];
 const COLS_ENCH = [
   ['item','Предмет'],['q','Качество'],['buy','Купить шмотку'],['stoneCost','Камни'],
-  ['sell','Продать (ЧР)'],['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['real','Мне за день'],['stale','Данные'],
+  ['sell','Продать'],['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['real','Мне за день'],['stale','Данные'],
 ];
 const STONE_RU = {RUNE:'руны', SOUL:'души', RELIC:'реликты'};
 const stoneKind = id => STONE_RU[id.split('_')[1]]||id;
@@ -1315,7 +1382,7 @@ const COL_TIPS = {
   channel: 'Куда выгоднее продать: ЧР — чёрный рынок в Карлеоне (по живому бай-ордеру: столько дадут за вещь прямо сейчас) или конкретный городской рынок. Тут же указано, по какому качеству посчитана цена.',
   net: 'Чистый профит с одной штуки = выручка (после налогов) минус себестоимость. Зелёное — зарабатываешь, красное — теряешь.',
   margin: 'Маржа = профит ÷ себестоимость × 100%. Сколько процентов ты зарабатываешь на каждое вложенное серебро. 20–40% — отлично; выше 300% — подозрительно (см. флаг «проверить»).',
-  vol: 'Сколько штук в день реально продаётся — среднее за 7 дней по истории сделок. Чем больше объём, тем быстрее уйдёт твоя партия и тем надёжнее цена.',
+  vol: 'Сколько штук в день реально продаётся — среднее за 7 дней по истории сделок. Чем больше объём, тем быстрее уйдёт твоя партия и тем надёжнее цена.\n\nВ Рунофикации берётся МЕНЬШЕЕ из двух: сколько уйдёт готовой вещи и сколько исходника вообще торгуется в городе закупки. Купить больше, чем продают, нельзя — если упирается именно в закупку, под числом это подписано.',
   real: 'Сколько серебра эта позиция принесёт ЛИЧНО ТЕБЕ за день. В отличие от «Пула», который делится на всех продавцов, тут учтено, сколько штук ты способен профинансировать своим бюджетом и сколько успеет поглотить рынок за выбранный срок — берётся то, что упрётся раньше. Возраст цены снижает оценку плавно: сутки — вдвое. Это и есть ключ сортировки «Золотой середины».',
   pool: 'Пул профита в день = профит/шт × объём/день. Сколько серебра в сутки «раздаёт» рынок по этой позиции всем продавцам. Реально забрать себе ~25% без демпинга.',
   stale: 'Возраст самой старой цены, участвующей в расчёте строки (материалы, продажа, ЧР). Чем свежее, тем надёжнее. Данные обновляются, когда игроки со сборщиком Albion Data Project открывают рынки в игре.',
@@ -1506,10 +1573,13 @@ function render(){
         <td>${QUAL_RU[r.q]}</td>
         <td>${fmt(r.buy)}<br><span class="fresh">${r.buyCity}</span></td>
         <td>${fmt(r.stoneCost)}<br><span class="fresh">${fmt(r.stoneN)} × ${stoneKind(r.stoneRes)} (${r.stoneCity})</span></td>
-        <td>${fmt(r.sell)}</td>
+        <td>${fmt(r.sell)}<br><span class="fresh">${r.channel==='ЧР'
+            ? 'ЧР · Карлеон'
+            : r.channel+' · ордером'+(r.cityBid?` (мгновенно ${fmt(r.cityBid)})`:'')}</span></td>
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
-        <td>${fmt(r.vol)}</td><td>${fmt(r.pool)}</td>
+        <td title="Сбыт ${fmt(r.sellVol)}/д${r.buyVol!=null?`, закупка исходника в ${r.buyCity} ${fmt(r.buyVol)}/д — берём меньшее`:', объём закупки исходника неизвестен'}">${fmt(r.vol)}${
+            r.buyVol!=null && r.buyVol<r.sellVol ? '<br><span class="fresh">упор в закупку</span>' : ''}</td><td>${fmt(r.pool)}</td>
         <td><b>${r.real?fmt(r.real):'—'}</b></td>
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
     } else if(S.tab==='cityflip'){
@@ -2349,7 +2419,7 @@ const TAB_CONTROLS={
   ref:     ['wrapCity','wrapFocus','wrapSafe','wrapFee','refModeWrap'],
   flip:    ['wrapCity','wrapSafe','wrapCat'],
   cityflip:['wrapRoute','wrapSafe','wrapCat'],
-  ench:    ['wrapCity','wrapSafe','wrapCat'],
+  ench:    ['wrapCity','wrapSafe','wrapCat','wrapLocal'],
   cons:    ['wrapCity','wrapFocus','wrapFee','wrapSafeCraft','wrapLocal'],
   item:    [],
   roads:   [],
