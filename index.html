@@ -1858,13 +1858,15 @@ function detailEnchHTML(r, idx){
          onchange="setOverride('${r.stoneRes}','${r.stoneCity}',this.value)" title="Цена одного камня. Пусто или 0 — вернуть рыночную."></td>`
     + `<td>${fmt(r.stoneCost)}</td></tr></table>`;
   m += `<br>Себестоимость штуки: <b>${fmt(r.cost)}</b>`;
-  m += `<br><b>Продаём ${tgt?tgt.en:r.targetId} .${it.ench+1} (${QUAL_RU[r.q]})</b> —${r.channel==='ЧР'?'чёрный рынок в Карлеоне, мгновенно по бай-ордеру':r.channel+', своим ордером'}`
+  m += `<br><b>Продаём ${tgt?tgt.en:r.targetId} .${it.ench+1} (${QUAL_RU[r.q]})</b> — ${r.channel==='ЧР'?'чёрный рынок в Карлеоне, мгновенно по бай-ордеру':r.channel+', своим ордером'}`
     + ` <input type="number" style="width:110px" value="${Math.round(r.sell)}" onclick="event.stopPropagation()"
          onchange="setSellOverride('${r.targetId}',this.value)" title="За сколько реально продашь. Пусто или 0 — вернуть цену с рынка.">`
     + `${r.sellOvr?' <span style="color:var(--accent)">✎</span>':''}`
     + ` → на руки <b>${fmt(Math.round(r.rev))}</b> <span class="fresh">(${r.channel==='ЧР'?'налог':'налог + сбор 2,5%'})</span>`;
-  if(norm) m += `<br><span class="fresh">Обычная цена за месяц: <b style="color:var(--text)">${fmt(norm.price)}</b> (${norm.src}${norm.days?', '+norm.days+' дн':''})`
+  if(norm) m += `<br><span class="fresh">Обычная цена за месяц: <b style="color:var(--text)">${fmt(norm.price)}</b> (${norm.src}${norm.days?', '+norm.days+(norm.src==='ЧР'?' дн':' замеров'):''})`
     + `${r.sell>norm.price*1.25?` · сейчас просят на ${Math.round((r.sell/norm.price-1)*100)}% выше нормы`:''}</span>`;
+  // «замеров» — потому что городская норма считается по всем семи рынкам сразу: тридцать дней
+  // торговли в семи городах дают около двухсот суточных точек, а не двести дней
   m += `<br>Профит: <b class="${r.net>=0?'pos':'neg'}">${fmt(Math.round(r.net))}</b> с штуки, маржа ${r.margin.toFixed(1)}%`;
   m += `<br><span class="fresh">Объём: сбыт ${fmt(r.sellVol)}/д${r.buyVol!=null?`, закупка в ${r.buyCity} ${fmt(r.buyVol)}/д`:''} → в расчёт ${fmt(r.vol)}/д</span>`;
   m += `<br><br><b>🧮 Калькулятор партии:</b> берём
