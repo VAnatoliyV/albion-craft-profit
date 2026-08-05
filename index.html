@@ -2601,12 +2601,13 @@ window.goHome=()=>{
   const hs=$('homeStatus');
   try{
     if(hs) hs.textContent='Загружаю базу предметов…';
-    const r = await fetchTO('items.json?v=3', 30000);
+    const r = await fetchTO('items.json?v=4', 30000);
     if(!r.ok) throw new Error('HTTP '+r.status);
     DATA = await r.json();
-    // вес предметов лежит отдельным файлом: он из дампа игры, а не с рынка, и меняется раз в патч
-    try{ DATA.weights = await (await fetchTO('weights.json?v=1', 20000)).json(); }
-    catch(e){ DATA.weights = {}; }
+    // вес предметов лежит внутри items.json (DATA.weights): он из дампа игры, а не с рынка,
+    // и меняется раз в патч. Отдельным файлом его держать нельзя — сборка сайта копирует
+    // в public только index.html, items.json и снимок цен, всё прочее просто не доедет.
+    DATA.weights = DATA.weights || {};
   }catch(e){
     if(hs) hs.innerHTML='<span style="color:var(--red)">Не удалось загрузить базу предметов (items.json). Обнови страницу.</span>';
     return;
