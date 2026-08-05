@@ -443,12 +443,12 @@ const CAT_ARMOR = ['plate_helmet','plate_armor','plate_shoes','leather_helmet','
   'cloth_helmet','cloth_armor','cloth_shoes','royal'];
 const GROUPS = [
   ['all',   'Всё',        null],
-  ['gear',  '⚔ Вещи',     [...CAT_WEAPON, ...CAT_ARMOR]],
+  ['gear',  '⚔️ Вещи',     [...CAT_WEAPON, ...CAT_ARMOR]],
   ['weapon','🗡 Оружие',   CAT_WEAPON],
   ['armor', '🛡 Броня',    CAT_ARMOR],
   ['cape',  '🧣 Плащи',    ['cape','cape_faction']],
   ['bag',   '🎒 Сумки',    ['bag','satchel']],
-  ['gath',  '⛏ Сбор',     ['gatherer','tool','bait']],
+  ['gath',  '⛏️ Сбор',     ['gatherer','tool','bait']],
 ];
 const GROUP_CATS = Object.fromEntries(GROUPS.map(([k,,c])=>[k, c&&new Set(c)]));
 const BONUS_CITY_OF = {}; // cat -> city
