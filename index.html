@@ -493,6 +493,7 @@ const S = {
   cityHist:{},         // itemId -> {city: {q: vol/день}}  (объёмы рынков городов, догружается)
   cityBase:{},         // itemId -> {q: {base, days}}      (обычная цена по городам за месяц)
   loaded:false, rows:[], flipRows:[], cityFlipRows:[], sortKey:'real', sortDir:-1, open:{}, lastOrder:null, grp:'all',
+  itemQ:'', itemSel:null, itemFrom:null, itemTier:'', itemEnch:'',   // поиск цены предмета
   roads:{loaded:false, loading:false, kills:[], fetched:0, err:null, at:null},
 };
 // ручные правки цен ресурсов/артефактов: "MATID|Город" -> цена
@@ -1476,6 +1477,8 @@ function render(){
     const q=$('itemQ');
     if(q){ q.oninput=()=>{ S.itemQ=q.value; const p=q.selectionStart; render(); const q2=$('itemQ'); if(q2){ q2.focus(); q2.setSelectionRange(p,p); } }; }
     const back=$('itemBack'); if(back) back.onclick=()=>{ S.itemSel=null; render(); };
+    const ts=$('itemTierSel'); if(ts) ts.onchange=()=>{ S.itemTier=ts.value; render(); };
+    const es=$('itemEnchSel'); if(es) es.onchange=()=>{ S.itemEnch=es.value; render(); };
     wrap.querySelectorAll('tr.row[data-open]').forEach(tr=>tr.onclick=()=>{ S.itemSel=tr.dataset.open; render(); });
     return;
   }
@@ -2353,7 +2356,12 @@ function itemIndex(){
   if(S._idx) return S._idx;
   const list = DATA.items.map(it=>({id:it.id, en:it.en, ru:it.ru, tier:it.tier, ench:it.ench, cat:it.cat, kind:'item'}));
   for(const c of (DATA.cons||[])) list.push({id:c.id, en:c.en, ru:c.ru, tier:c.tier, ench:c.ench, cat:c.cat, kind:'item'});
+  // Плащи и базовые вещи попадают в матчасть как входной материал (фракционные плащи,
+  // королевские сеты). В поиске они дублировались: одна строка «предмет», вторая «ресурс».
+  // Оставляем предмет — у него карточка богаче, там ещё и чёрный рынок.
+  const asItem = new Set(list.map(x=>x.id));
   for(const [mid,nm] of Object.entries(DATA.matNames||{})){
+    if(asItem.has(mid)) continue;
     const m = /^T(\d)/.exec(mid);
     list.push({id:mid, en:nm.en||mid, ru:nm.ru||'', tier:m?+m[1]:0, ench:(/@(\d)/.exec(mid)?.[1]|0), cat:'resource', kind:'mat'});
   }
@@ -2381,7 +2389,7 @@ function itemCardHTML(id){
       <img src="https://render.albiononline.com/v1/item/${enc(id)}.png?size=76" style="width:64px;height:64px" onerror="this.style.display='none'">
       <div><div style="font-size:17px;font-weight:700">${nm.en}</div>
         <div class="fresh">${nm.ru||''} ${nm.tier?'· T'+nm.tier+(nm.ench?'.'+nm.ench:''):''} · ${isMat?'ресурс/материал':(CAT_RU[nm.cat]||nm.cat)} · <code>${id}</code></div></div>
-      <button id="itemBack" style="margin-left:auto">← к поиску</button></div>`;
+      <span style="margin-left:auto;display:flex;gap:8px">${backBtnHTML()}<button id="itemBack">← к поиску</button></span></div>`;
 
   // сводка «лучшее сейчас» (обычное качество)
   const byCity = isMat ? (S.matPrices[id]||{}) : (S.cityPrices[id]||{});
@@ -2441,11 +2449,19 @@ function itemCardHTML(id){
 function itemTabHTML(){
   if(S.itemSel) return itemCardHTML(S.itemSel);
   const q = (S.itemQ||'').trim().toLowerCase();
-  let out = `<div class="panel"><b>🔍 Поиск цены предмета или ресурса</b>
-    <div style="margin-top:10px"><input type="text" id="itemQ" value="${(S.itemQ||'').replace(/"/g,'&quot;')}"
-      placeholder="Название на английском или русском: bow, посох, metal bar…" style="width:100%;max-width:460px;font-size:14px;padding:9px 12px"></div>`;
+  const tSel = S.itemTier||'', eSel = S.itemEnch||'';
+  const opts = (vals, cur, any) => `<option value="">${any}</option>`
+    + vals.map(v=>`<option value="${v}"${String(cur)===String(v)?' selected':''}>${v}</option>`).join('');
+  let out = `<div class="panel"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <b>🔍 Поиск цены предмета или ресурса</b>${backBtnHTML()}</div>
+    <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <input type="text" id="itemQ" value="${(S.itemQ||'').replace(/"/g,'&quot;')}"
+        placeholder="Название на английском или русском: bow, посох, metal bar…" style="flex:1 1 320px;max-width:460px;font-size:14px;padding:9px 12px">
+      <label class="ctl">Тир <select id="itemTierSel">${opts([1,2,3,4,5,6,7,8], tSel, 'любой')}</select></label>
+      <label class="ctl">Зачар. <select id="itemEnchSel">${opts([0,1,2,3,4], eSel, 'любое')}</select></label>
+    </div>`;
   if(q.length<2){
-    out += '<div class="fresh" style="margin-top:10px">Введи хотя бы две буквы — хватит и трёх первых от каждого слова: «мас пла» найдёт «Плащ (мастер)», «und cap» — «Undead Cape». Ищет по названию на двух языках и по коду предмета.</div></div>';
+    out += '<div class="fresh" style="margin-top:10px">Введи хотя бы две буквы — хватит и трёх первых от каждого слова: «мас пла» найдёт «Плащ (мастер)», «und cap» — «Undead Cape». Ищет по названию на двух языках и по коду предмета. Тир и зачарование сужают выдачу: «плащ» + тир 6 + зачар. 2 даст ровно то, что нужно.</div></div>';
     return out;
   }
   // Ищем по кускам: каждое слово запроса должно найтись где-то в названии.
@@ -2461,9 +2477,13 @@ function itemTabHTML(){
     if(starts(en) || starts(ru)) return 1;
     return 2;
   };
-  const hits = itemIndex().map(x=>{ const s=scoreOf(x); return s==null?null:{...x, _s:s}; }).filter(Boolean)
+  const hits = itemIndex()
+    .filter(x=> (tSel===''||x.tier===+tSel) && (eSel===''||(x.ench||0)===+eSel))
+    .map(x=>{ const s=scoreOf(x); return s==null?null:{...x, _s:s}; }).filter(Boolean)
     .sort((a,b)=>(a._s-b._s)||(a.tier-b.tier)||(a.ench-b.ench)||a.en.localeCompare(b.en));
-  out += `<div class="fresh" style="margin:10px 0">Найдено: ${hits.length}${hits.length>60?' — показаны первые 60, уточни запрос':''}</div>`;
+  const narrow = (tSel!==''?' · тир '+tSel:'')+(eSel!==''?' · зачар. '+eSel:'');
+  out += `<div class="fresh" style="margin:10px 0">Найдено: ${hits.length}${narrow}${hits.length>60?' — показаны первые 60, уточни запрос':''}`
+    + `${hits.length===0&&narrow?' · <a href="#" onclick="clearItemFilters();return false" style="color:var(--accent)">сбросить тир и зачарование</a>':''}</div>`;
   out += '<table><tbody>';
   for(const h of hits.slice(0,60)){
     out += `<tr class="row" data-open="${h.id}"><td class="item">
@@ -2473,7 +2493,15 @@ function itemTabHTML(){
   out += '</tbody></table></div>';
   return out;
 }
-window.openItem = (id)=>{ S.itemSel=id; setTab('item'); };
+// Запоминаем, откуда пришли: иначе из карточки цены обратно в Крафт можно было выйти
+// только через «Разделы» и заново выбрать раздел, потеряв все настройки и раскрытые строки.
+window.openItem = (id)=>{ if(S.tab!=='item') S.itemFrom=S.tab; S.itemSel=id; setTab('item'); };
+window.backFromItem = ()=>{ const t=S.itemFrom; S.itemFrom=null; S.itemSel=null; setTab(t||'craft'); };
+window.clearItemFilters = ()=>{ S.itemTier=''; S.itemEnch=''; render(); };
+// Кнопка «назад в тот раздел, откуда пришёл». Пусто, если зашли в цены прямо из меню.
+function backBtnHTML(){
+  return S.itemFrom ? `<button onclick="backFromItem()" title="Вернуться в раздел, из которого ты открыл эту карточку">← ${TAB_NAMES[S.itemFrom]||'назад'}</button>` : '';
+}
 
 // ─── События ───
 ['citySel','focusChk','premChk','feeInp','qualSel'].forEach(id=>$(id).onchange=()=>{ compute(); render(); });
@@ -2583,6 +2611,7 @@ window.setSellOverride=(iid,val)=>{
 saveOverrides(); // показать чип, если правки сохранились с прошлого раза
 // стартовый экран ↔ приложение
 window.enterApp=(tab)=>{
+  S.itemFrom=null;          // зашли в раздел из меню — возвращаться некуда
   $('home').style.display='none';
   $('appHeader').style.display='';
   $('appMain').style.display='';
