@@ -864,24 +864,26 @@ function bestBuy(mid, cities){
   }
   return ovr || mkt;
 }
-function artBest(artId){
-  // Артефакт: минимальная цена по всем городам (лёгкий, легко перевезти).
-  // Своя цена сильнее рынка: если ты вписал её руками, значит знаешь, почём он тебе
-  // достаётся, — иначе правка молча тонула под более дешёвым ордером в другом городе.
-  let ovrBest=null;
-  for(const c of CITIES){
-    const v = matPrice(artId, c);
-    if(v && v.ovr && (!ovrBest || v.price<ovrBest.price)) ovrBest={price:v.price, city:c, ts:v.ts, age:0};
-  }
-  if(ovrBest) return ovrBest;
-  let best=null;
-  for(const c of CITIES){
+// Артефакт для крафта в городе `city`. Считаем по цене ТОГО города, где крафтишь, — как
+// и все остальные материалы. Раньше бралась минимальная цена по всем городам, и выходила
+// нестыковка: материалы «в Мартлоке», а артефакт «мин. цена: Bridgewatch», хотя за ним
+// ещё надо съездить. Если где-то дешевле — это подсказка рядом, а не молчаливое допущение.
+// Своя цена сильнее рынка: вписал руками — значит знаешь, почём он тебе достаётся.
+function artBest(artId, city){
+  const pool = [...new Set([city, ...craftCities()].filter(Boolean))];
+  const priced = [];
+  for(const c of pool){
     const v = matPrice(artId, c);
     if(!v) continue;
     if(!v.ovr && v.age>CFG.staleHours*3) continue;
-    if(!best || v.price<best.price) best={price:v.price, city:c, ts:v.ts, age:v.age};
+    priced.push({price:v.price, city:c, ts:v.ts, age:v.ovr?0:v.age, ovr:!!v.ovr});
   }
-  return best;
+  if(!priced.length) return null;
+  const here = city ? priced.find(p=>p.city===city) : null;
+  const cheapest = priced.reduce((a,b)=>b.price<a.price?b:a);
+  const pick = here || cheapest;                       // нет в городе крафта — берём где есть
+  const alt = (cheapest.city!==pick.city && cheapest.price < pick.price*0.95) ? cheapest : null;
+  return {...pick, away: !here, alt};
 }
 function craftCostIn(item, city, focus){
   // noRet — компоненты, на которые возврат ресурсов не действует (maxreturnamount=0).
@@ -896,10 +898,10 @@ function craftCostIn(item, city, focus){
     if(p.self) selfMats++;
   }
   if(missing) return null;
-  // артефакт: без возврата ресурсов (maxreturnamount=0), цена — мин. по городам
+  // артефакт: без возврата ресурсов (maxreturnamount=0), цена — города крафта
   let artCost=0, artInfo=null;
   if(item.art){
-    const a = artBest(item.art.id);
+    const a = artBest(item.art.id, city);
     if(!a) return null;
     artCost = a.price*item.art.n; artInfo=a;
     worst=Math.max(worst,a.age||0);
@@ -1817,7 +1819,12 @@ function detailHTML(r,idx){
   if(it.art && r.artInfo){
     const an=(DATA.matNames||{})[it.art.id]||{};
     const aOvr=S.overrides[it.art.id+'|'+r.artInfo.city]!=null;
-    m+=`<tr><td class="item">${icon(it.art.id)} ${an.en||'Артефакт'}${an.ru?' <span class="fresh">'+an.ru+'</span>':''}${aOvr?' <span style="color:var(--accent)">✎</span>':''} <span class="fresh">(артефакт, мин. цена: ${r.artInfo.city})</span></td><td>${it.art.n}</td>
+    const a=r.artInfo;
+    const где = a.away
+      ? `<span class="fresh" title="В ${r.city} этот артефакт сейчас не продаётся, поэтому цена взята из ближайшего города, где он есть. За ним придётся съездить.">артефакт · в ${r.city} нет, цена из ${a.city}</span>`
+      : `<span class="fresh">артефакт · цена в ${r.city}</span>`
+        + (a.alt ? ` <span class="fresh" style="color:var(--accent)" title="Артефакт лёгкий, съездить за ним дешевле, чем кажется. Но в себестоимости выше стоит цена ${r.city} — то, во что он обойдётся, если никуда не ехать.">дешевле в ${a.alt.city}: ${fmt(Math.round(a.alt.price))} (−${Math.round((1-a.alt.price/a.price)*100)}%)</span>` : '');
+    m+=`<tr><td class="item">${icon(it.art.id)} ${an.en||'Артефакт'}${an.ru?' <span class="fresh">'+an.ru+'</span>':''}${aOvr?' <span style="color:var(--accent)">✎</span>':''} ${где}</td><td>${it.art.n}</td>
       <td><input type="number" style="width:90px" value="${Math.round(r.artInfo.price)}" placeholder="—"
         onchange="setOverride('${it.art.id}','${r.artInfo.city}',this.value)"
         title="Своя цена артефакта в ${r.artInfo.city}. Пустое поле или 0 — вернуть цену из API."></td>
@@ -1920,7 +1927,8 @@ function calcUpd(idx){
   }
   if(it.art && r.artInfo){
     const cost=N*it.art.n*r.artInfo.price; matTotal+=cost;
-    html+=`<tr><td class="item">${icon(it.art.id)} Артефакт (${r.artInfo.city})</td><td>${fmt(N*it.art.n)}</td><td>${fmt(cost)}</td></tr>`;
+    const an=(DATA.matNames||{})[it.art.id]||{};
+    html+=`<tr><td class="item">${icon(it.art.id)} ${an.en||'Артефакт'}${an.ru?' <span class="fresh">'+an.ru+'</span>':''} <span class="fresh">(${r.artInfo.city}${r.artInfo.away?', в '+r.city+' нет':''})</span></td><td>${fmt(N*it.art.n)}</td><td>${fmt(cost)}</td></tr>`;
   }
   html+='</table>';
   const feeN = r.fee*N;
