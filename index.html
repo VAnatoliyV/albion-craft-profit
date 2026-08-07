@@ -329,6 +329,7 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
     </label>
     <label class="ctl">Маржа ≥ <input type="number" id="minMargin" value="0" style="width:60px">%</label>
     <label class="ctl">Объём ≥ <input type="number" id="minVol" value="0" style="width:60px">/д</label>
+    <label class="ctl" title="Оставить только позиции, которые были в плюсе хотя бы столько дней из тех, по которым есть история торгов за последние три недели.&#10;&#10;80% — значит «зарабатывало почти всегда». Строки, по которым истории нет вовсе, фильтр не выбрасывает: неизвестно ≠ плохо.">В плюсе ≥ <input type="number" id="minTrend" value="0" min="0" max="100" style="width:56px">% дней</label>
   </div>
   <div id="tableWrap"></div>
 </main>
@@ -385,6 +386,43 @@ function realCell(r){
   const trips = (kg>0 && qty>0) ? Math.ceil(qty*kg/carryKg()) : 0;
   const tip = trips>1 ? ` title="${fmt(Math.round(qty))} шт × ${kg} кг = ${fmt(Math.round(qty*kg))} кг, а увозишь ${fmt(carryKg())} кг за раз"` : '';
   return `<td><b>${r.real?fmt(r.real):'—'}</b>${trips>1?`<br><span class="fresh"${tip}>рейсов: ${fmt(trips)}</span>`:''}</td>`;
+}
+// График маржи по дням в раскрытой строке. Тут ровная полка мгновенно отличается
+// от одинокого шипа — то, что колонкой из двух чисел не передать.
+function trendChartHTML(tr){
+  if(!tr || !tr.perDay) return '';
+  const N = tr.perDay.length;
+  const vals = tr.perDay.filter(v=>v!=null);
+  const lim = Math.max(20, Math.min(300, Math.max(...vals.map(Math.abs))));
+  const W = 12, H = 54, zero = H/2;
+  let bars = '';
+  for(let i=0;i<N;i++){
+    const v = tr.perDay[i], x = i*W + 1;
+    if(v==null){ bars += `<rect x="${x}" y="${zero-1}" width="${W-2}" height="2" fill="#3a3f4b"><title>${N-1-i===0?'сегодня':(N-1-i)+' дн назад'}: торгов не было</title></rect>`; continue; }
+    const h = Math.max(1.5, Math.min(zero-2, Math.abs(v)/lim*(zero-2)));
+    const y = v>=0 ? zero-h : zero;
+    bars += `<rect x="${x}" y="${y}" width="${W-2}" height="${h}" fill="${v>=0?'#3fb950':'#f85149'}" opacity="0.85"><title>${N-1-i===0?'сегодня':(N-1-i)+' дн назад'}: ${v>=0?'+':''}${v.toFixed(0)}%</title></rect>`;
+  }
+  return `<br><b>Маржа по дням</b> <span class="fresh">(три недели, наведи на столбик)</span>
+    <div style="margin-top:4px"><svg width="100%" height="${H}" viewBox="0 0 ${N*W} ${H}" preserveAspectRatio="none" style="max-width:${N*W*2}px;background:#161a22;border-radius:6px">
+      <line x1="0" y1="${zero}" x2="${N*W}" y2="${zero}" stroke="#4a505c" stroke-width="0.5"/>${bars}
+    </svg></div>
+    <span class="fresh">Слева — три недели назад, справа — вчера. Шкала до ${Math.round(lim)}%. В плюсе ${tr.plus} дн из ${tr.days}, обычная маржа ${tr.med>=0?'+':''}${tr.med.toFixed(0)}%.</span>`;
+}
+// Ячейка «Стабильность»: сколько дней из последних трёх недель позиция была в плюсе
+// и какая маржа была обычной. Короткая история — серым: «3 из 4 дней» ничего не значит.
+function trendCell(r){
+  const tr = r.tr;
+  if(!tr) return `<td class="fresh" title="За три недели по этой позиции слишком мало торгов, чтобы судить о стабильности. Не значит «плохо» — значит «не знаем».">—</td>`;
+  const pct = Math.round(tr.plus/tr.days*100);
+  const thin = tr.days < 7;
+  const cls = thin ? 'fresh' : pct>=80 ? 'pos' : pct>=50 ? '' : 'neg';
+  const sign = tr.med>=0 ? '+' : '';
+  const tip = `За последние 3 недели данные о торгах есть за ${tr.days} дн. В ${tr.plus} из них сделка была бы в плюсе, обычная маржа ${sign}${tr.med.toFixed(0)}%.`
+    + (thin ? '\n\nДней мало — цифра справочная.' : '')
+    + (tr.known < 0.9 ? `\n\nПо части материалов (${Math.round((1-tr.known)*100)}% себестоимости) истории нет, они взяты по сегодняшней цене.` : '')
+    + '\n\nСчитается так: берётся сегодняшняя сделка и в неё подставляются цены того дня. Это про устойчивость картины, а не про точный заработок в тот день.';
+  return `<td class="${cls}" title="${tip}"><b>${tr.plus}/${tr.days}</b> дн<br><span class="fresh">${sign}${tr.med.toFixed(0)}%</span></td>`;
 }
 // Зеркальная ловушка: одна вещь, выставленная по ошибке за копейки, делает строку сказочной.
 // Удалять такие нельзя — настоящая находка выглядит так же, — но в топ они попадать не должны.
@@ -537,8 +575,29 @@ function fetchTO(url, ms, noCache){
   if(noCache) opt.cache = 'reload'; // «Обновить» обязан сходить в сеть, а не в кэш
   return fetch(url, opt).finally(()=>clearTimeout(t));
 }
+// У Albion Data Project лимит на IP: 180 запросов в минуту и 300 за пять минут.
+// Раньше мы просто держали паузу между запросами «на глазок»: либо упирались в 429
+// и теряли время на повторных волнах, либо ползли медленнее, чем разрешено.
+// Считаем сами: пока в окне есть место — идём на полной скорости, кончилось — ждём
+// ровно до освобождения ближайшего слота.
+const RL = {m:[], f:[], last:0};
+async function rateGate(){
+  for(;;){
+    const now = Date.now();
+    // мгновенный поток тоже придерживаем: очередь из 165 запросов за десять секунд
+    // формально в лимит укладывается, но выглядит как удар по чужому серверу
+    if(now - RL.last < 220){ await sleep(220-(now-RL.last)); continue; }
+    while(RL.m.length && now-RL.m[0] > 60000)  RL.m.shift();
+    while(RL.f.length && now-RL.f[0] > 300000) RL.f.shift();
+    if(RL.m.length < 165 && RL.f.length < 285){ RL.last=now; RL.m.push(now); RL.f.push(now); return; }
+    const w1 = RL.m.length>=165 ?  60000-(now-RL.m[0])+100 : 0;
+    const w2 = RL.f.length>=285 ? 300000-(now-RL.f[0])+100 : 0;
+    await sleep(Math.max(250, w1, w2));
+  }
+}
 async function fetchJSON(url){
   const c = cache_get(url); if(c) return c;
+  await rateGate();
   let lastErr;
   for(let k=0;k<API_ROUTES.length;k++){
     const idx=(apiRoute+k)%API_ROUTES.length;
@@ -673,6 +732,9 @@ function applyServerData(d){
     const o={}; for(const [ql,v] of Object.entries(byQ)) o[ql]={base:v[0], days:v[1]};
     S.cityBase[id]=o;
   }
+  // посуточный ход цен за три недели: проценты от последнего дня с торгами.
+  // Отсюда растёт «стабильность» — сколько дней из скольких позиция была в плюсе.
+  S.trend = (d.td && d.mh) ? {n:d.td, m:d.mh||{}, b:d.bh||{}, c:d.ih||{}} : null;
 }
 async function loadServerData(force){
   try{
@@ -720,7 +782,14 @@ async function loadAll(force){
   S.loaded=false; S.matPrices={}; S.cityPrices={}; S.bm={};
   const pg=$('prog'); // элемент удалён — обращения защищены проверками
   const itemIds = [...DATA.items.map(i=>i.id), ...(DATA.ench3Ids||[])];
-  const matIds = [...Object.keys(DATA.resval), ...(DATA.rawIds||[]), ...(DATA.extraMatIds||[]), ...(DATA.stoneIds||[])];
+  // зелья и еда живут отдельным списком: их цены на рынках городов надо спрашивать
+  // тоже, иначе у рецепта нет канала продажи и строка не появляется вовсе
+  const consIds = (DATA.cons||[]).map(c=>c.id);
+  const priceIds = [...new Set([...itemIds, ...consIds])];
+  // травы, яйца, молоко и спирт: без них «Зелья и еда» в режиме прямого опроса API
+  // выходили пустыми — цены на ингредиенты просто никто не запрашивал
+  const consMats = [...new Set((DATA.cons||[]).flatMap(c=>Object.keys(c.mats||{})))];
+  const matIds = [...new Set([...Object.keys(DATA.resval), ...(DATA.rawIds||[]), ...(DATA.extraMatIds||[]), ...(DATA.stoneIds||[]), ...consMats])];
   const tasks=[];
   // объёмы продаж готовых ресурсов на рынках городов (для вкладки «Переработка»)
   const refIds = (DATA.refining||[]).map(r=>r.id);
@@ -752,12 +821,27 @@ async function loadAll(force){
     });
   }
   // 2) цены предметов на рынках городов, все качества (канал продажи + покупка для флипа)
-  for(const ch of chunks(itemIds, PB)){
+  for(const ch of chunks(priceIds, PB)){
     tasks.push(async ()=>{
       const d = await fetchJSON(`${API}/prices/${enc(ch.join(','))}.json?locations=${enc(CITIES.join(','))}`);
       for(const e of d){ if(!e.sell_price_min) continue;
         const q = e.quality||1;
         (((S.cityPrices[e.item_id] ||= {})[e.city]) ||= {})[q] = {sell:e.sell_price_min, ts:e.sell_price_min_date}; }
+    });
+  }
+  // 2б) объёмы продаж зелий и еды по городам: без них «золотая середина» слепа к потребляемым
+  for(const ch of chunks(consIds, HB)){
+    tasks.push(async ()=>{
+      const d = await fetchJSON(`${API}/history/${enc(ch.join(','))}.json?locations=${enc(CITIES.join(','))}&time-scale=24`);
+      const cutoff = Date.now() - CFG.histDays*864e5;
+      for(const e of d){
+        let vol=0;
+        for(const p of (e.data||[])){
+          if(new Date(p.timestamp+'Z').getTime() < cutoff) continue;
+          vol += p.item_count;
+        }
+        (((S.cityHist ||= {})[e.item_id] ||= {})[e.location] ||= {})[e.quality||1] = vol/CFG.histDays;
+      }
     });
   }
   // 3) история ЧР: средняя сделок и объём по каждому качеству (1–5)
@@ -838,7 +922,14 @@ function buildSelfCosts(focus){
       const bonus = DATA.refBonus[rmat.chain]===city;
       const ret = refReturnRate(bonus, focus);
       const fee = rmat.iv*CFG.nutritionFactor*fee100/100;
-      S.selfCost[rmat.id+'|'+city] = {cost:(raws+catCost)*(1-ret)+fee, cash:(raws+catCost)+fee, ret, bonus, fee, stale:worst};
+      // из чего сложилась переработка — для «стабильности» по дням (см. trendStats)
+      const parts = [];
+      for(const [rid,c] of Object.entries(rmat.raws)){
+        const p=matPrice(rid, city); if(!p) continue;
+        parts.push([rid, p.price*c*(1-ret), 'mat']);
+      }
+      if(rmat.cat && catCost>0) parts.push([rmat.cat.id, catCost*(1-ret), 'mat']);
+      S.selfCost[rmat.id+'|'+city] = {cost:(raws+catCost)*(1-ret)+fee, cash:(raws+catCost)+fee, ret, bonus, fee, stale:worst, parts};
     }
   }
 }
@@ -909,9 +1000,58 @@ function craftCostIn(item, city, focus){
   const bonus = BONUS_CITY_OF[item.cat]===city;
   const ret = returnRate(bonus,focus);
   const fee = item.iv*CFG.nutritionFactor*(+$('feeInp').value||0)/100;
+  // Из чего сложилась себестоимость — по материалам, уже с учётом возврата ресурсов.
+  // Нужно для «стабильности»: чтобы протащить строку по дням, надо знать, чья цена
+  // сколько весит. Возврат зашит в вес, поэтому доли складываются точно, без поправок.
+  const parts = [];
+  for(const [m,c] of Object.entries(item.mats)){
+    const p = effMatPrice(m, city); if(!p) continue;
+    const w = p.price*c*((noRet && noRet.has(m)) ? 1 : (1-ret));
+    if(w>0) parts.push([m, w, 'mat']);
+  }
+  if(item.art && artCost>0) parts.push([item.art.id, artCost, 'mat']);
   return {cost: raw*(1-ret)+rawNoRet+artCost+fee, cash: raw+rawNoRet+artCost+fee,
-    bonus, ret, fee, raw, rawNoRet, artCost, artInfo, stale:worst, selfMats};
+    bonus, ret, fee, raw, rawNoRet, artCost, artInfo, stale:worst, selfMats, parts};
 }
+// ─── Стабильность: сколько дней из последних трёх недель позиция была в плюсе ───
+// Считаем не «какая была маржа тогда» (историю ордеров никто не хранит), а как бы
+// выглядела СЕГОДНЯШНЯЯ сделка, если подставить цены того дня. Ряды в снимке лежат
+// в процентах от последнего дня, поэтому сегодняшняя цена просто умножается на долю.
+// Материал без ряда держим по сегодняшней цене — это занижает разброс, зато не врёт
+// в другую сторону; сколько таких, видно по полю known.
+function trendSeriesOf(kind, id){
+  const t = S.trend; if(!t || !id) return null;
+  return (kind==='bm' ? t.b : kind==='city' ? t.c : t.m)[id] || null;
+}
+function trendStats(parts, fixedCost, revToday, revSeries){
+  const N = S.trend && S.trend.n; if(!N || !revSeries || !revToday) return null;
+  const rows = [];
+  let total = 0, withSeries = 0;
+  for(const [id, silver, kind] of (parts||[])){
+    if(!(silver>0)) continue;
+    const s = trendSeriesOf(kind, id);
+    rows.push([silver, s]); total += silver; if(s) withSeries += silver;
+  }
+  const margins = [], perDay = new Array(N).fill(null);
+  let plus = 0;
+  for(let i=0;i<N;i++){
+    const rf = revSeries[i]; if(!rf) continue;          // в этот день предмет не торговали
+    let c = fixedCost||0;
+    for(const [silver, s] of rows) c += (s && s[i]) ? silver*s[i]/100 : silver;
+    if(c<=0) continue;
+    const net = revToday*rf/100 - c;
+    const mg = net/c*100;
+    margins.push(mg); perDay[i] = mg;
+    if(net>0) plus++;
+  }
+  if(margins.length < 3) return null;                    // на двух точках выводов не делаем
+  const sorted = [...margins].sort((a,b)=>a-b);
+  return {days:margins.length, plus, med:sorted[Math.floor(sorted.length/2)],
+          known: total>0 ? withSeries/total : 0, margins, perDay};
+}
+// доля дней в плюсе, 0–100; строки без истории не отбрасываем, а помечаем null
+const trendPct = tr => tr ? Math.round(tr.plus/tr.days*100) : null;
+
 // ─── «Золотая середина»: сколько реально заработать с позиции ───
 // Раньше рейтинг был профит × объём × 0.25. Но одинаковый множитель у всех строк
 // НЕ меняет порядок — он лишь переводит пул в серебро. Настоящее ограничение другое:
@@ -1047,7 +1187,10 @@ function compute(){
       const spike = bq1 && bq1.spike ? bq1.spike : 0;
       const swing = bq1 ? (bq1.spread||0) : 0;
       if(spike > CFG.spikeCut || swing > CFG.swingCut) warn = true;
-      rows.push({it, city, cost:cc.cost, bonus:cc.bonus, rev, channel, net, margin,
+      // стабильность: тянем ту же сделку по дням. Материалы — по своим рядам,
+      // плата за станцию не зависит от цен и в ряды не входит.
+      const tr = trendStats(cc.parts, cc.fee, rev, trendSeriesOf(channel==='ЧР'?'bm':'city', it.id));
+      rows.push({tr, it, city, cost:cc.cost, bonus:cc.bonus, rev, channel, net, margin,
         vol, pool: vol*Math.max(net,0), cash:cc.cash, ...goldOf(net, cc.cost, vol, stale, cc.cash), stale, warn,
         bmPrice, bmSrc, cityPrice:bestCityPrice||null, fee:cc.fee, ret:cc.ret, raw:cc.raw, rawNoRet:cc.rawNoRet||0,
         bmNow: bq1?bq1.now:null, bmBase: bq1?bq1.base:null, spike, swing,
@@ -1084,7 +1227,9 @@ function compute(){
       const margin = net/buy.sell*100;
       const stale = hoursAgo(buy.ts);
       const warn = margin>300 || (margin>100 && bq.vol<10);
-      flip.push({it, q, buy:buy.sell, buyCity:buy.city, bmPrice:bq.price, bmSrc:bq.src, net, margin, vol:bq.vol,
+      // покупаем на городском рынке, продаём на ЧР — оба ряда у нас есть
+      const tr = trendStats([[it.id, buy.sell, 'city']], 0, bq.price*(1-tax), trendSeriesOf('bm', it.id));
+      flip.push({tr, it, q, buy:buy.sell, buyCity:buy.city, bmPrice:bq.price, bmSrc:bq.src, net, margin, vol:bq.vol,
         pool:bq.vol*Math.max(net,0), ...goldOf(net, buy.sell, bq.vol, stale), stale, warn});
     }
   }
@@ -1147,7 +1292,8 @@ function compute(){
         const vol = (S.matHist||{})[rmat.id]?.[city] ?? null;
         const stale = Math.max(sc.stale, mp.age||0);
         const warn = margin>300 || (margin>100 && vol!=null && vol<10);
-        refRows.push({rmat, city, cost:sc.cost, sell, net, margin, vol,
+        const tr = trendStats(sc.parts, sc.fee, sell*(1-tax-CFG.setupFee), trendSeriesOf('mat', rmat.id));
+        refRows.push({tr, rmat, city, cost:sc.cost, sell, net, margin, vol,
           pool: vol!=null?vol*Math.max(net,0):null,
           cash:sc.cash, ...goldOf(net, sc.cost, vol, stale, sc.cash),
           bonus:sc.bonus, ret:sc.ret, fee:sc.fee, stale, warn});
@@ -1162,10 +1308,12 @@ function compute(){
       for(const rc of refineCities){
         // сырьё: каждый компонент в самом дешёвом городе
         let raws=0, ok=true, worst=0; const buyCities=new Set();
+        const rparts=[];
         for(const [rid,c] of Object.entries(rmat.raws)){
           const bp = bestBuy(rid, rcities);
           if(!bp){ ok=false; break; }
           raws+=bp.price*c; worst=Math.max(worst,bp.age); buyCities.add(bp.city);
+          rparts.push([rid, bp.price*c, 'mat']);
         }
         if(!ok) continue;
         // катализатор: мин(рынок по всем городам, самопереработка в городе rc)
@@ -1192,8 +1340,10 @@ function compute(){
         if(!sp) continue;
         const net = sp.price*(1-tax-CFG.setupFee) - cost;
         if(!best || net>best.net){
+          const parts = rparts.map(([id,s])=>[id, s*(1-ret), 'mat']);
+          if(rmat.cat && catCost>0) parts.push([rmat.cat.id, catCost*(1-ret), 'mat']);
           best={rmat, city:rc, cost, sell:sp.price, sellCity:sp.city,
-            buyCities:[...buyCities], net, bonus, ret, fee,
+            buyCities:[...buyCities], net, bonus, ret, fee, parts,
             stale:Math.max(worst, sp.age||0)};
         }
       }
@@ -1201,7 +1351,8 @@ function compute(){
       const margin = best.net/best.cost*100;
       const vol = (S.matHist||{})[rmat.id]?.[best.sellCity] ?? null;
       const warn = margin>300 || (margin>100 && vol!=null && vol<10);
-      refRows.push({...best, margin, vol,
+      const tr = trendStats(best.parts, best.fee, best.sell*(1-tax-CFG.setupFee), trendSeriesOf('mat', rmat.id));
+      refRows.push({...best, tr, margin, vol,
         pool: vol!=null?vol*Math.max(best.net,0):null,
         ...goldOf(best.net, best.cost, vol, best.stale), warn});
     }
@@ -1283,7 +1434,10 @@ function compute(){
         const vol = buyVol!=null ? Math.min(buyVol, sellVol) : sellVol;
         const stale = Math.max(hoursAgo(buy.ts), stone.age||0);
         const warn = tooCheap(it.id, q, buy.sell) || margin>300 || (margin>100 && vol<10);
-        enchRows.push({it, q, targetId, buy:buyPrice, buyOvr:buyOvr!=null, sellOvr:sellOvr!=null,
+        // покупка исходника — по городскому ряду, камень — по своему, продажа — по каналу
+        const tr = trendStats([[it.id, buyPrice, 'city'], [up.res, stoneCost, 'mat']], 0, rev,
+                              trendSeriesOf(channel==='ЧР'?'bm':'city', targetId));
+        enchRows.push({tr, it, q, targetId, buy:buyPrice, buyOvr:buyOvr!=null, sellOvr:sellOvr!=null,
           buyCity:buy.city, channel, cityBid, buyVol, sellVol, rev,
           stoneRes:up.res, stoneN:up.n, stonePrice:stone.price, stoneCity:stone.city, stoneCost,
           cost, sell, net, margin, vol,
@@ -1353,7 +1507,14 @@ function compute(){
       const vol = S.cityHist?.[c.id]?.[sellCity]?.[1] ?? null;
       const stale = Math.max(worst, hoursAgo(sellTs));
       const warn = margin>300 || (margin>100 && (vol||0)<10);
-      consRows.push({it:c, city, bonus, cost, costBatch, cash, cashBatch, raw, rawNoRet, ret, fee, rev,
+      // всё считается на партию, поэтому и доли берём на партию, а сравниваем с ценой штуки
+      const cparts = [];
+      for(const [m,n] of Object.entries(c.mats)){
+        const pMat = matPrice(m, city); if(!pMat) continue;
+        cparts.push([m, pMat.price*n*(noRet.has(m)?1:(1-ret))/c.batch, 'mat']);
+      }
+      const tr = trendStats(cparts, fee/c.batch, rev, trendSeriesOf('city', c.id));
+      consRows.push({tr, it:c, city, bonus, cost, costBatch, cash, cashBatch, raw, rawNoRet, ret, fee, rev,
         channel:sellCity, sellPrice, net, margin, vol,
         pool: vol!=null?vol*Math.max(net,0):null,
         ...goldOf(net, cost, vol, stale, cash), stale, warn});
@@ -1393,15 +1554,15 @@ async function loadCityVolumes(){
 // ─── Рендер ───
 const COLS_CONS = [
   ['item','Предмет'],['city','Город крафта'],['cost','Себестоимость/шт'],['channel','Продажа'],
-  ['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['real','Мне за день'],['stale','Данные'],
+  ['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['real','Мне за день'],['trend','Стабильность'],['stale','Данные'],
 ];
 const COLS_CRAFT = [
   ['item','Предмет'],['city','Город'],['cost','Себестоимость'],['rev','Выручка (нетто)'],
-  ['channel','Канал'],['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['real','Мне за день'],['stale','Данные'],
+  ['channel','Канал'],['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['real','Мне за день'],['trend','Стабильность'],['stale','Данные'],
 ];
 const COLS_FLIP = [
   ['item','Предмет'],['q','Качество'],['buy','Купить'],['bmPrice','Продать (ЧР)'],
-  ['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['real','Мне за день'],['stale','Данные'],
+  ['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['real','Мне за день'],['trend','Стабильность'],['stale','Данные'],
 ];
 const COLS_CITYFLIP = [
   ['item','Предмет'],['q','Качество'],['buy','Купить'],['sell','Продать'],
@@ -1409,11 +1570,11 @@ const COLS_CITYFLIP = [
 ];
 const COLS_REF = [
   ['item','Ресурс'],['city','Город'],['cost','Себестоимость'],['sell','Цена продажи'],
-  ['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д (город)'],['pool','Пул/день'],['real','Мне за день'],['stale','Данные'],
+  ['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д (город)'],['pool','Пул/день'],['real','Мне за день'],['trend','Стабильность'],['stale','Данные'],
 ];
 const COLS_ENCH = [
   ['item','Предмет'],['q','Качество'],['buy','Купить шмотку'],['stoneCost','Камни'],
-  ['sell','Продать'],['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['real','Мне за день'],['stale','Данные'],
+  ['sell','Продать'],['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['real','Мне за день'],['trend','Стабильность'],['stale','Данные'],
 ];
 const STONE_RU = {RUNE:'руны', SOUL:'души', RELIC:'реликты'};
 const stoneKind = id => STONE_RU[id.split('_')[1]]||id;
@@ -1430,6 +1591,7 @@ const COL_TIPS = {
   vol: 'Сколько штук в день реально продаётся — среднее за 7 дней по истории сделок. Чем больше объём, тем быстрее уйдёт твоя партия и тем надёжнее цена.\n\nВ Рунофикации берётся МЕНЬШЕЕ из двух: сколько уйдёт готовой вещи и сколько исходника вообще торгуется в городе закупки. Купить больше, чем продают, нельзя — если упирается именно в закупку, под числом это подписано.',
   real: 'Сколько серебра эта позиция принесёт ЛИЧНО ТЕБЕ за день. В отличие от «Пула», который делится на всех продавцов, тут учтено, сколько штук ты способен профинансировать своим бюджетом и сколько успеет поглотить рынок за выбранный срок — берётся то, что упрётся раньше. Возраст цены снижает оценку плавно: сутки — вдвое. Это и есть ключ сортировки «Золотой середины».',
   pool: 'Пул профита в день = профит/шт × объём/день. Сколько серебра в сутки «раздаёт» рынок по этой позиции всем продавцам. Реально забрать себе ~25% без демпинга.',
+  trend: 'Сколько дней из последних трёх недель эта позиция была бы в плюсе, и какая маржа была обычной.\n\nСчитается так: берётся сегодняшняя сделка — твой город, твой фокус, твоя плата за станок — и в неё подставляются цены каждого дня из истории. Отдельно по материалам, отдельно по цене продажи.\n\n«18/20 дн +22%» — картина устойчивая, на такое можно планировать партию. «2/19 дн» при жирной марже сегодня — почти наверняка всплеск, который сдуется, пока крафтишь.\n\nСерым — когда дней с торгами меньше семи: выборка слишком мала. Прочерк — истории нет вовсе.\n\nВажно: история Albion — это средняя цена состоявшихся сделок за сутки, а сегодняшняя себестоимость считается по минимальному ордеру на продажу. Величины разные, поэтому колонка говорит про устойчивость, а не про точный заработок в тот день.',
   stale: 'Возраст самой старой цены, участвующей в расчёте строки (материалы, продажа, ЧР). Чем свежее, тем надёжнее. Данные обновляются, когда игроки со сборщиком Albion Data Project открывают рынки в игре.',
   q: 'Качество предмета (Обычное → Шедевр). На чёрном рынке у каждого качества свои ордера, цены и объёмы — поэтому каждое качество считается отдельной строкой.',
   buy: 'Цена покупки — лучший селл-ордер: во флиппинге ЧР это рынок Карлеона, во флиппинге городов — самый дешёвый город (указан под ценой).',
@@ -1502,6 +1664,7 @@ function render(){
   const q = $('searchInp').value.toLowerCase();
   const cat=$('catSel').value, tier=$('tierSel').value, ench=$('enchSel').value;
   let minM=+$('minMargin').value||0, minV=+$('minVol').value||0;
+  const minT=+($('minTrend')?.value)||0;
   if(S.gold){ minM=Math.max(minM,10); minV=Math.max(minV,50); }
   const craft = S.tab==='craft';
   const source = craft?S.rows : S.tab==='flip'?S.flipRows : S.tab==='cityflip'?S.cityFlipRows : S.tab==='ench'?(S.enchRows||[]) : S.tab==='cons'?(S.consRows||[]) : (S.refRows||[]);
@@ -1515,6 +1678,10 @@ function render(){
     if(ench!=='' && String(it.ench)!==ench) return false;
     if(r.margin < minM) return false;
     if((r.vol||0) < minV && (minV>0)) return false;
+    // Стабильность. Строку без истории не выбрасываем ни фильтром, ни «Золотой серединой»:
+    // «мы не знаем» — это не «плохо», а вот молча прятать половину таблицы нечестно.
+    if(minT>0 && r.tr && trendPct(r.tr) < minT) return false;
+    if(S.gold && r.tr && r.tr.days>=7 && trendPct(r.tr) < 60) return false;
     const maxAge = +$('ageSel').value || CFG.staleHours;
     if(S.gold && r.stale>maxAge) return false;
     if(S.gold && r.warn) return false; // сомнительные не попадают в «золотую середину»
@@ -1533,6 +1700,7 @@ function render(){
   const cmp=(a,b)=>{
     let va=a[key], vb=b[key];
     if(key==='item'){ va=(a.it||a.rmat).en; vb=(b.it||b.rmat).en; }
+    if(key==='trend'){ va=trendPct(a.tr) ?? -1; vb=trendPct(b.tr) ?? -1; }
     if(typeof va==='string' || typeof vb==='string'){
       return dir<0 ? String(vb??'').localeCompare(String(va??'')) : String(va??'').localeCompare(String(vb??''));
     }
@@ -1597,8 +1765,9 @@ function render(){
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
         <td>${r.vol?fmt(r.vol):'—'}</td><td>${r.pool?fmt(r.pool):'—'}</td>
         ${realCell(r)}
+        ${trendCell(r)}
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
-      html+=`<tr class="det" style="display:none"><td colspan="11" id="det${i}"></td></tr>`;
+      html+=`<tr class="det" style="display:none"><td colspan="12" id="det${i}"></td></tr>`;
     } else if(S.tab==='cons'){
       const bonusBadge = r.bonus?'<span class="badge b-bonus">бонус</span>':'';
       html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${it.en}</b>${topBadge+limBadge+openBadge+warnBadge+staleBadge}
@@ -1609,8 +1778,9 @@ function render(){
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
         <td>${r.vol!=null?fmt(r.vol):'—'}</td><td>${r.pool!=null?fmt(r.pool):'—'}</td>
         ${realCell(r)}
+        ${trendCell(r)}
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
-      html+=`<tr class="det" style="display:none"><td colspan="10" id="cdet${i}"></td></tr>`;
+      html+=`<tr class="det" style="display:none"><td colspan="11" id="cdet${i}"></td></tr>`;
     } else if(S.tab==='flip'){
       html+=`<tr class="row">${nameCellQ(it, r.q, topBadge+limBadge+warnBadge+staleBadge)}
         <td>${QUAL_RU[r.q]}</td>
@@ -1619,6 +1789,7 @@ function render(){
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
         <td>${fmt(r.vol)}</td><td>${fmt(r.pool)}</td>
         ${realCell(r)}
+        ${trendCell(r)}
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
     } else if(S.tab==='ench'){
       html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(it.id,r.q)}<div class="iname"><b>${it.en}${topBadge+limBadge+openBadge+warnBadge+staleBadge}</b>
@@ -1634,8 +1805,9 @@ function render(){
         <td title="Сбыт ${fmt(r.sellVol)}/д${r.buyVol!=null?`, закупка исходника в ${r.buyCity} ${fmt(r.buyVol)}/д — берём меньшее`:', объём закупки исходника неизвестен'}">${fmt(r.vol)}${
             r.buyVol!=null && r.buyVol<r.sellVol ? '<br><span class="fresh">упор в закупку</span>' : ''}</td><td>${fmt(r.pool)}</td>
         ${realCell(r)}
+        ${trendCell(r)}
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
-      html+=`<tr class="det" style="display:none"><td colspan="11" id="edet${i}"></td></tr>`;
+      html+=`<tr class="det" style="display:none"><td colspan="12" id="edet${i}"></td></tr>`;
     } else if(S.tab==='cityflip'){
       html+=`<tr class="row">${nameCellQ(it, r.q, topBadge+limBadge+warnBadge+staleBadge)}
         <td>${QUAL_RU[r.q]}</td>
@@ -1664,8 +1836,9 @@ function render(){
         <td>${r.vol!=null?fmt(r.vol):'—'}</td>
         <td>${r.pool!=null?fmt(r.pool):'—'}</td>
         ${realCell(r)}
+        ${trendCell(r)}
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
-      html+=`<tr class="det" style="display:none"><td colspan="10" id="rdet${i}"></td></tr>`;
+      html+=`<tr class="det" style="display:none"><td colspan="11" id="rdet${i}"></td></tr>`;
     }
   });
   html+='</tbody></table>';
@@ -1728,7 +1901,7 @@ function restoreDetState(td, st){
 // под нужное количество — чтобы не путать рецепт партии с реальной закупкой
 function detailConsHTML(r,idx){
   const it=r.it;
-  return `<div style="margin-bottom:8px">🧮 <b>Хочу</b>
+  return trendChartHTML(r.tr) + `<div style="margin-top:10px;margin-bottom:8px">🧮 <b>Хочу</b>
       <input type="number" value="${it.batch*10}" min="${it.batch}" step="${it.batch}" style="width:100px"
         id="calcConsN${idx}" onclick="event.stopPropagation()" oninput="calcConsUpd(${idx})"> шт.
       &nbsp; 🛒 <b>Закупка</b>
@@ -1856,6 +2029,7 @@ function detailHTML(r,idx){
        + `<td><span class="fresh">${d.price?fmt(d.price):'—'}</span></td><td>${fmt(d.vol)}</td></tr>`; }
     m+='</table>';
   }
+  m+=trendChartHTML(r.tr);
   m+=`<br><b>🧮 Калькулятор партии:</b> крафтим
       <input type="number" value="100" min="1" step="10" style="width:90px" id="calcN${idx}" oninput="calcUpd(${idx})"> шт.
       <div id="calcOut${idx}" style="margin-top:6px"></div>`;
@@ -1888,6 +2062,7 @@ function detailEnchHTML(r, idx){
   // торговли в семи городах дают около двухсот суточных точек, а не двести дней
   m += `<br>Профит: <b class="${r.net>=0?'pos':'neg'}">${fmt(Math.round(r.net))}</b> с штуки, маржа ${r.margin.toFixed(1)}%`;
   m += `<br><span class="fresh">Объём: сбыт ${fmt(r.sellVol)}/д${r.buyVol!=null?`, закупка в ${r.buyCity} ${fmt(r.buyVol)}/д`:''} → в расчёт ${fmt(r.vol)}/д</span>`;
+  m += trendChartHTML(r.tr);
   m += `<br><br><b>🧮 Калькулятор партии:</b> берём
       <input type="number" value="20" min="1" step="5" style="width:80px" id="ecalcN${idx}" onclick="event.stopPropagation()" oninput="calcEnchUpd(${idx})"> шт.
       <div id="ecalcOut${idx}" style="margin-top:6px"></div>`;
@@ -2043,6 +2218,7 @@ function detailRefHTML(r, idx){
   m+=`<br><b>🧮 Калькулятор: перерабатываем</b>
       <input type="number" value="100" min="1" step="50" style="width:90px" id="rcalcN${idx}" oninput="calcRefUpd(${idx})"> шт.
       <div id="rcalcOut${idx}" style="margin-top:6px"></div>`;
+  m += trendChartHTML(r.tr);
   return m;
 }
 function calcRefUpd(idx){
@@ -2515,7 +2691,7 @@ function backBtnHTML(){
 ['citySel','focusChk','premChk','feeInp','qualSel'].forEach(id=>$(id).onchange=()=>{ compute(); render(); });
 ['budgetInp','horizonInp'].forEach(id=>$(id).oninput=()=>{ S.limit=0; compute(); render(); });
 $('carryInp').oninput=()=>render();   // вес на расчёт не влияет, только на подпись «рейсов»
-['searchInp','minMargin','minVol'].forEach(id=>$(id).oninput=()=>{ S.limit=0; render(); });
+['searchInp','minMargin','minVol','minTrend'].forEach(id=>$(id).oninput=()=>{ S.limit=0; render(); });
 ['catSel','tierSel','enchSel','ageSel'].forEach(id=>$(id).onchange=()=>{ S.limit=0; render(); });
 // Автообновление. Сам снимок весит ~2 МБ, поэтому не тянем его по таймеру:
 // сначала спрашиваем крошечный data-stats.json (200 байт) — не поменялся ли builtAt,

@@ -10,6 +10,12 @@ const HIST_DAYS = 7;
 // API и так отдаёт 30 суточных точек — раньше мы выбрасывали всё старше недели.
 // Теперь считаем по ним «обычную цену» предмета: медиану, которую всплеск не сдвигает.
 const BASE_DAYS = 30;
+// Окно «стабильности»: за сколько последних суток мы храним ход цены, чтобы сайт мог
+// сказать «прибыльно 18 дней из 21», а не только «прибыльно прямо сейчас».
+const TREND_DAYS = 21;
+// Меньше этого числа дней с торгами ряд не сохраняем: на трёх точках «стабильность»
+// — это не вывод, а совпадение, и место в снимке она занимает зря.
+const TREND_MIN_DAYS = 5;
 const PRICE_BATCH = 80;
 const HIST_BATCH = 25;
 const DELAY_MS = 120;
@@ -24,6 +30,34 @@ const sleep = ms => new Promise(r=>setTimeout(r,ms));
 const chunks = (a,n) => { const o=[]; for(let i=0;i<a.length;i+=n) o.push(a.slice(i,i+n)); return o; };
 const minutes = iso => Math.round(new Date(iso+'Z').getTime()/6e4); // epoch-минуты
 const nowMin = () => Math.round(Date.now()/6e4);
+const dayIdx = iso => Math.floor(new Date(iso+'Z').getTime()/864e5);  // номер суток от эпохи
+const todayIdx = () => Math.floor(Date.now()/864e5);
+
+// Копилка «предмет → сутки → цены». Цены по городам за один день потом сворачиваем
+// в медиану: один город с задранным ордером не должен решать за всё королевство.
+function pushDay(map, id, day, price){
+  if(!(price>0)) return;
+  const byDay = map.get(id) || map.set(id, new Map()).get(id);
+  (byDay.get(day) || byDay.set(day, []).get(day)).push(price);
+}
+// Ряд за TREND_DAYS суток в ПРОЦЕНТАХ от самого свежего дня с данными.
+// Проценты, а не цены: числа втрое короче (снимок и так 4.5 МБ), а стабильность
+// считается по ходу цены, не по её величине. 0 — в этот день торгов не было.
+function trendSeries(byDay){
+  if(!byDay) return null;
+  const last = todayIdx();
+  const vals = new Array(TREND_DAYS).fill(0);
+  let base = 0, days = 0;
+  for(let i=0;i<TREND_DAYS;i++){
+    const arr = byDay.get(last - (TREND_DAYS-1-i));
+    if(!arr || !arr.length) continue;
+    arr.sort((a,b)=>a-b);
+    vals[i] = arr[Math.floor(arr.length/2)];
+    base = vals[i]; days++;                       // база — последний известный день
+  }
+  if(days < TREND_MIN_DAYS || !base) return null;
+  return vals.map(v => v>0 ? Math.round(v/base*100) : 0);
+}
 
 let okCount=0, failCount=0, waitedMs=0;
 
@@ -144,6 +178,8 @@ async function main(){
   // 3) история чёрного рынка: средняя сделок и объём/день по качествам
   console.log(`black market history: ${itemIds.length} ids`);
   const cutoff = Date.now() - HIST_DAYS*864e5;
+  // посуточный ход цены ЧР — из тех же ответов, лишних запросов не делаем
+  const bmDays = new Map(), bmAnyDays = new Map();
   await runPool(chunks(itemIds, HIST_BATCH).map(ch => async ()=>{
     const d = await getJSON(`${API}/history/${encodeURIComponent(ch.join(','))}.json?locations=${encodeURIComponent('Black Market')}&time-scale=24`);
     for(const e of d||[]){
@@ -151,6 +187,7 @@ async function main(){
       let sum=0, cnt=0, vol=0, last=null;
       for(const p of e.data||[]){
         const t = new Date(p.timestamp+'Z').getTime();
+        pushDay(q===1?bmDays:bmAnyDays, e.item_id, dayIdx(p.timestamp), p.avg_price);
         if(t < cutoff) continue;
         vol += p.item_count; sum += p.avg_price*p.item_count; cnt += p.item_count;
         if(!last || p.timestamp>last) last=p.timestamp;
@@ -225,6 +262,7 @@ async function main(){
   //    Бресильене висела по 799 991 при рынке 50 000 и давала «мне за день 57 млн» из воздуха).
   console.log(`city market volumes: ${itemIds.length}+${consIds.length} ids`);
   out.ch = {}; out.cb = {};
+  const cityDays = new Map();          // посуточный ход городской цены, обычное качество
   await runPool(chunks([...itemIds, ...consIds], HIST_BATCH).map(ch => async ()=>{
     const d = await getJSON(`${API}/history/${encodeURIComponent(ch.join(','))}.json?locations=${encodeURIComponent(CITIES.join(','))}&time-scale=24`);
     const baseCut = Date.now() - BASE_DAYS*864e5;
@@ -236,6 +274,7 @@ async function main(){
       for(const p of e.data||[]){
         const t = new Date(p.timestamp+'Z').getTime();
         if(t >= baseCut && p.avg_price>0) (acc[e.item_id+'|'+q] ||= []).push(p.avg_price);
+        if(q===1) pushDay(cityDays, e.item_id, dayIdx(p.timestamp), p.avg_price);
         if(t < cutoff) continue;
         vol += p.item_count;
       }
@@ -250,6 +289,32 @@ async function main(){
       ((out.cb[id] ||= {}))[q] = [Math.round(arr[Math.floor(arr.length/2)]), arr.length];
     }
   }), 'city-volumes')
+
+  // 6) посуточная история материалов: единственный новый блок запросов. Без него
+  //    «стабильность» считалась бы по выручке при замороженной себестоимости —
+  //    а дорожают обычно именно ресурсы, и как раз это съедает маржу.
+  //    Пачки вдвое крупнее, чем у предметов: у материалов одно качество, ответ втрое
+  //    легче, а каждый лишний запрос — это секунда общего времени сбора.
+  console.log(`material history: ${matAll.length} ids`);
+  const matDays = new Map();
+  await runPool(chunks(matAll, HIST_BATCH*2).map(ch => async ()=>{
+    const d = await getJSON(`${API}/history/${encodeURIComponent(ch.join(','))}.json?locations=${encodeURIComponent(CITIES.join(','))}&time-scale=24`);
+    for(const e of d||[]){
+      if((e.quality||1)!==1) continue;
+      for(const p of e.data||[]) pushDay(matDays, e.item_id, dayIdx(p.timestamp), p.avg_price);
+    }
+  }), 'mat-history')
+
+  // ряды в снимок: проценты от последнего известного дня, окно TREND_DAYS
+  out.td = TREND_DAYS;
+  out.mh = {}; out.bh = {}; out.ih = {};
+  for(const [id, byDay] of matDays){ const s = trendSeries(byDay); if(s) out.mh[id] = s; }
+  for(const id of new Set([...bmDays.keys(), ...bmAnyDays.keys()])){
+    const s = trendSeries(bmDays.get(id)) || trendSeries(bmAnyDays.get(id));
+    if(s) out.bh[id] = s;
+  }
+  for(const [id, byDay] of cityDays){ const s = trendSeries(byDay); if(s) out.ih[id] = s; }
+  console.log(`тренды: материалы ${Object.keys(out.mh).length}, ЧР ${Object.keys(out.bh).length}, города ${Object.keys(out.ih).length}`);
 
   out.t = Math.round(Date.now()/1000);
   const json = JSON.stringify(out);
