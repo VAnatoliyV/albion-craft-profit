@@ -80,6 +80,14 @@ td.item img{width:42px;height:42px;flex:none;filter:drop-shadow(0 2px 4px rgba(0
 /* Заголовок «Журналы» в разборе строки. Картинка тут лежит не в ячейке таблицы,
    поэтому размер ей никто не задавал: она приезжала в натуральные 64 px и текст
    болтался по нижнему краю. */
+.lngbox{display:inline-flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden}
+.lng{background:none;border:none;color:var(--muted);font:inherit;font-size:11.5px;font-weight:600;padding:3px 8px;cursor:pointer}
+.lng.on{background:var(--accent);color:#111}
+/* Кнопка «скопировать название»: нужна ровно там, где предмет надо ПОКУПАТЬ. */
+.cp{background:none;border:1px solid var(--border2);border-radius:5px;color:var(--muted);
+    font-size:11px;line-height:1;padding:2px 5px;margin-left:6px;cursor:pointer;vertical-align:middle}
+.cp:hover{color:var(--accent);border-color:var(--accent)}
+.cp.cpok{color:var(--green);border-color:var(--green)}
 .jhead{display:flex;align-items:center;gap:9px;margin:12px 0 5px}
 .jhead img{width:30px;height:30px;flex:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))}
 .jhead b{font-size:13px}
@@ -286,6 +294,9 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
         <option value="12">12 ч</option><option value="24" selected>24 ч</option>
       </select>
     </label>
+    <label class="ctl" title="На каком языке показывать названия предметов и, главное, что кладётся в буфер по кнопке ⧉.&#10;&#10;Поиск на рынке в игре ищет по названию ТВОЕГО клиента. Клиент английский — значит и копировать надо английское название: «Runite Steel Bar», а не «Брусок рунита». Поэтому по умолчанию английский.&#10;&#10;Второе название остаётся подписью снизу, так что ничего не теряется.">Названия
+      <span class="lngbox"><button class="lng on" data-l="en" onclick="setLang('en')">EN</button><button class="lng" data-l="ru" onclick="setLang('ru')">RU</button></span>
+    </label>
     <button class="gold" id="goldBtn" title="Что это такое?&#10;&#10;Один клик — и таблица ранжируется по тому, сколько серебра позиция реально принесёт ЛИЧНО ТЕБЕ за день.&#10;&#10;Количество = min(бюджет ÷ себестоимость; 10% дневного объёма × дней). То есть берётся то, что упрётся раньше: твой кошелёк или ёмкость рынка. Если бюджет не задан, капитал считается безграничным и всё сводится к обороту.&#10;&#10;Важное следствие: при небольшом капитале наверх сами собой выходят позиции с высокой маржой (отдача на вложенное), а при большом — массовые с оборотом. Бейдж в строке говорит, чем именно она ограничена.&#10;&#10;Возраст цены учитывается плавно: сутки — вес 0.5, двое суток — 0.25.&#10;&#10;Отсекаются: маржа ниже 10%, объём ниже 50 шт/день, устаревшие данные и строки с флагом «⚠ проверить». Топ-10 помечается бейджем ТОП.">⭐ Золотая середина</button>
     <label class="ctl" id="wrapBudget" title="Сколько серебра ты реально готов вложить в ОДНУ позицию.&#10;&#10;Пока поле пустое, сайт считает капитал безграничным и ранжирует по ёмкости рынка — как раньше.&#10;&#10;Как только введёшь сумму, в расчёт входит ограничение: нельзя изготовить больше, чем позволяет твоё серебро. При небольшом капитале рейтинг сам собой съезжает к марже (отдаче на вложенное), при большом — возвращается к обороту.">Бюджет
       <input type="number" id="budgetInp" placeholder="без лимита" min="0" step="100000" style="width:120px">
@@ -415,6 +426,38 @@ function trendChartHTML(tr){
     </svg></div>
     <span class="fresh">Слева — три недели назад, справа — вчера. Шкала до ${Math.round(lim)}%. В плюсе ${tr.plus} дн из ${tr.days}, обычная маржа ${tr.med>=0?'+':''}${tr.med.toFixed(0)}%.</span>`;
 }
+// ─── Язык названий и копирование в буфер ───
+// Поиск на рынке в игре ищет по названию клиента. Клиент английский — значит и
+// копировать надо английское имя. Поэтому en по умолчанию; выбор запоминается.
+let LANG = (()=>{ try{ return localStorage.getItem('acp_lang')==='ru' ? 'ru' : 'en'; }catch(e){ return 'en'; } })();
+const nmA = o => !o ? '' : (LANG==='ru' ? (o.ru||o.en||'') : (o.en||o.ru||''));   // главное имя
+const nmB = o => !o ? '' : (LANG==='ru' ? (o.en||'')       : (o.ru||''));         // подпись снизу
+window.setLang = v => {
+  LANG = (v==='ru' ? 'ru' : 'en');
+  try{ localStorage.setItem('acp_lang', LANG); }catch(e){}
+  document.querySelectorAll('button.lng').forEach(b=>b.classList.toggle('on', b.dataset.l===LANG));
+  S.limit = 0; render();
+};
+function nameOfId(id){
+  const m = (DATA.matNames||{})[id]; if(m) return nmA(m);
+  const it = (typeof itemById==='function') ? itemById(id) : null; if(it) return nmA(it);
+  return id;
+}
+// navigator.clipboard есть не всегда (локальный файл с диска, старый браузер) —
+// поэтому запасной путь через невидимое поле, он работает везде.
+function copyText(t, el){
+  const ok = ()=>{ if(!el) return; const o=el.textContent; el.textContent='✓'; el.classList.add('cpok');
+    setTimeout(()=>{ el.textContent=o; el.classList.remove('cpok'); }, 900); };
+  const fb = ()=>{ const ta=document.createElement('textarea'); ta.value=t; ta.setAttribute('readonly','');
+    ta.style.cssText='position:fixed;top:0;left:0;opacity:0'; document.body.appendChild(ta);
+    ta.select(); try{ document.execCommand('copy'); ok(); }catch(e){} document.body.removeChild(ta); };
+  try{ if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).then(ok, fb); else fb(); }
+  catch(e){ fb(); }
+}
+window.copyName = (id, ev)=>{ ev.stopPropagation(); copyText(nameOfId(id), ev.currentTarget); };
+// кнопка ставится только там, где предмет надо ПОКУПАТЬ
+const cpBtn = id => `<button class="cp" onclick="copyName('${id}',event)" title="Скопировать название — вставь в поиск на рынке в игре">⧉</button>`;
+
 // Ячейка «Стабильность»: сколько дней из последних трёх недель позиция была в плюсе
 // и какая маржа была обычной. Короткая история — серым: «3 из 4 дней» ничего не значит.
 function trendCell(r){
@@ -1616,12 +1659,12 @@ const WARN_TIP = 'Подозрительные цифры: аномальная 
 const QUAL_RU = {1:'Обычное',2:'Хорошее',3:'Выдающееся',4:'Отличное',5:'Шедевр'};
 function icon(id,q){ return `<img loading="lazy" src="https://render.albiononline.com/v1/item/${enc(id)}.png?size=64${q?`&quality=${q}`:''}" alt="">`; }
 function nameCell(it, extra, qualText){
-  return `<td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${it.en}</b>${extra||''}`+`
-    <span>${it.ru||''} · T${it.tier}${it.ench?'.'+it.ench:''} · ${CAT_RU[it.cat]||it.cat}${qualText?' · '+qualText:''}</span></div></td>`;
+  return `<td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${nmA(it)}</b>${extra||''}`+`
+    <span>${nmB(it)} · T${it.tier}${it.ench?'.'+it.ench:''} · ${CAT_RU[it.cat]||it.cat}${qualText?' · '+qualText:''}</span></div></td>`;
 }
 function nameCellQ(it, q, extra){
-  return `<td class="item">${icon(it.id,q)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${it.en}</b>${extra||''}`+`
-    <span>${it.ru||''} · T${it.tier}${it.ench?'.'+it.ench:''} · ${CAT_RU[it.cat]||it.cat} · ${QUAL_RU[q]}</span></div></td>`;
+  return `<td class="item">${icon(it.id,q)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${nmA(it)}</b>${extra||''}`+`
+    <span>${nmB(it)} · T${it.tier}${it.ench?'.'+it.ench:''} · ${CAT_RU[it.cat]||it.cat} · ${QUAL_RU[q]}</span></div></td>`;
 }
 // ключ строки, переживающий пересчёт и пересортировку: вкладка + предмет + город
 function rowKey(r){
@@ -1706,7 +1749,7 @@ function render(){
   const key = S.gold?'real':S.sortKey, dir=S.gold?-1:S.sortDir; // dir=-1 → по убыванию
   const cmp=(a,b)=>{
     let va=a[key], vb=b[key];
-    if(key==='item'){ va=(a.it||a.rmat).en; vb=(b.it||b.rmat).en; }
+    if(key==='item'){ va=nmA(a.it||a.rmat); vb=nmA(b.it||b.rmat); }
     if(key==='trend'){ va=trendPct(a.tr) ?? -1; vb=trendPct(b.tr) ?? -1; }
     if(typeof va==='string' || typeof vb==='string'){
       return dir<0 ? String(vb??'').localeCompare(String(va??'')) : String(va??'').localeCompare(String(vb??''));
@@ -1777,8 +1820,8 @@ function render(){
       html+=`<tr class="det" style="display:none"><td colspan="12" id="det${i}"></td></tr>`;
     } else if(S.tab==='cons'){
       const bonusBadge = r.bonus?'<span class="badge b-bonus">бонус</span>':'';
-      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${it.en}</b>${topBadge+limBadge+openBadge+warnBadge+staleBadge}
-        <span>${it.ru||''} · T${it.tier}${it.ench?'.'+it.ench:''} · ${it.cat==='potion'?'Зелье':'Еда'} · партия ${it.batch} шт</span></div></td>
+      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${nmA(it)}</b>${topBadge+limBadge+openBadge+warnBadge+staleBadge}
+        <span>${nmB(it)} · T${it.tier}${it.ench?'.'+it.ench:''} · ${it.cat==='potion'?'Зелье':'Еда'} · партия ${it.batch} шт</span></div></td>
         <td>${r.city}${bonusBadge}</td><td>${fmt(r.cost)}</td>
         <td><span class="badge b-ch">${r.channel}</span></td>
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
@@ -1799,8 +1842,8 @@ function render(){
         ${trendCell(r)}
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
     } else if(S.tab==='ench'){
-      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(it.id,r.q)}<div class="iname"><b>${it.en}${topBadge+limBadge+openBadge+warnBadge+staleBadge}</b>
-          <span>${it.ru||''} · T${it.tier}${it.ench?'.'+it.ench:''} <b style="color:var(--accent)">→ .${it.ench+1}</b> · ${CAT_RU[it.cat]||it.cat} · ${QUAL_RU[r.q]}</span></div></td>
+      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(it.id,r.q)}<div class="iname"><b>${nmA(it)}${topBadge+limBadge+openBadge+warnBadge+staleBadge}</b>
+          <span>${nmB(it)} · T${it.tier}${it.ench?'.'+it.ench:''} <b style="color:var(--accent)">→ .${it.ench+1}</b> · ${CAT_RU[it.cat]||it.cat} · ${QUAL_RU[r.q]}</span></div></td>
         <td>${QUAL_RU[r.q]}</td>
         <td>${fmt(r.buy)}<br><span class="fresh">${r.buyCity}</span></td>
         <td>${fmt(r.stoneCost)}<br><span class="fresh">${fmt(r.stoneN)} × ${stoneKind(r.stoneRes)} (${r.stoneCity})</span></td>
@@ -1834,8 +1877,8 @@ function render(){
       const route = r.sellCity
         ? `<span class="fresh">🛒 купить сырьё: <b style="color:var(--text)">${r.buyCities.join(', ')}</b><br>⚒ переработать: <b style="color:var(--text)">${r.city}</b> ${bonusBadge}<br>💰 продать: <b style="color:var(--text)">${r.sellCity}</b></span>`
         : `<b>${r.city}</b> ${bonusBadge}<br><span class="fresh">купить сырьё, переработать и продать — всё в этом городе</span>`;
-      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(rm.id)}<div class="iname"><b>${rm.en}${topBadge+limBadge+openBadge+warnBadge+staleBadge}</b>
-          <span>${rm.ru||''} · T${rm.tier}${rm.ench?'.'+rm.ench:''} · ${CHAIN_RU[rm.chain]}</span></div></td>
+      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(rm.id)}<div class="iname"><b>${nmA(rm)}${topBadge+limBadge+openBadge+warnBadge+staleBadge}</b>
+          <span>${nmB(rm)} · T${rm.tier}${rm.ench?'.'+rm.ench:''} · ${CHAIN_RU[rm.chain]}</span></div></td>
         <td>${route}</td>
         <td>${fmt(r.cost)}</td><td>${fmt(r.sell)}</td>
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
@@ -1952,8 +1995,8 @@ function calcConsUpd(idx){
     }
     const nm=(DATA.matNames||{})[mid]||{};
     const mark=noRet.has(mid)?' <i style="color:var(--muted)">без возврата</i>':'';
-    m+=`<tr><td class="item">${icon(mid)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${mid}')">${nm.en||mid}</b>`+
-       `<span>${nm.ru||''}${mark}${p&&p.ovr?' <span style="color:var(--accent)">✎ моя цена</span>':''}</span></div></td>`+
+    m+=`<tr><td class="item">${icon(mid)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${mid}')">${nmA(nm)||mid}</b>${cpBtn(mid)}`+
+       `<span>${nmB(nm)}${mark}${p&&p.ovr?' <span style="color:var(--accent)">✎ моя цена</span>':''}</span></div></td>`+
       `<td>${cnt}</td>`+
       `<td><input type="number" style="width:90px" value="${p?Math.round(p.price):''}" placeholder="—"
          onclick="event.stopPropagation()" onchange="setOverride('${mid}','${r.city}',this.value)"
@@ -1990,7 +2033,7 @@ function detailHTML(r,idx){
     const selfMark = pe&&pe.self ? ` <span style="color:var(--green)" title="Дешевле переработать самому из сырья: ${fmt(pe.price)} против ${p?fmt(p.price):'—'} на рынке. Уже учтено в себестоимости.">⚒ сам ${fmt(pe.price)}</span>` : '';
     const noRetMark = noRetSet&&noRetSet.has(mid) ? ' <i style="color:var(--muted)">без возврата</i>' : '';
     const mn=(DATA.matNames||{})[mid];
-    m+=`<tr><td class="item">${icon(mid)} ${mn?mn.en:mid}${mn&&mn.ru?' <span class="fresh">'+mn.ru+'</span>':''}${noRetMark}${p&&p.ovr?' <span style="color:var(--accent)">✎</span>':''}${selfMark}</td><td>${c}</td>
+    m+=`<tr><td class="item">${icon(mid)} ${nmA(mn)||mid}${cpBtn(mid)}${nmB(mn)?' <span class="fresh">'+nmB(mn)+'</span>':''}${noRetMark}${p&&p.ovr?' <span style="color:var(--accent)">✎</span>':''}${selfMark}</td><td>${c}</td>
       <td><input type="number" style="width:90px" value="${p?Math.round(p.price):''}" placeholder="—"
         onchange="setOverride('${mid}','${r.city}',this.value)"
         title="Введи свою цену, если на рынке она другая. Пустое поле или 0 — вернуть цену из API."></td>
@@ -2004,7 +2047,7 @@ function detailHTML(r,idx){
       ? `<span class="fresh" title="В ${r.city} этот артефакт сейчас не продаётся, поэтому цена взята из ближайшего города, где он есть. За ним придётся съездить.">артефакт · в ${r.city} нет, цена из ${a.city}</span>`
       : `<span class="fresh">артефакт · цена в ${r.city}</span>`
         + (a.alt ? ` <span class="fresh" style="color:var(--accent)" title="Артефакт лёгкий, съездить за ним дешевле, чем кажется. Но в себестоимости выше стоит цена ${r.city} — то, во что он обойдётся, если никуда не ехать.">дешевле в ${a.alt.city}: ${fmt(Math.round(a.alt.price))} (−${Math.round((1-a.alt.price/a.price)*100)}%)</span>` : '');
-    m+=`<tr><td class="item">${icon(it.art.id)} ${an.en||'Артефакт'}${an.ru?' <span class="fresh">'+an.ru+'</span>':''}${aOvr?' <span style="color:var(--accent)">✎</span>':''} ${где}</td><td>${it.art.n}</td>
+    m+=`<tr><td class="item">${icon(it.art.id)} ${nmA(an)||'Артефакт'}${cpBtn(it.art.id)}${nmB(an)?' <span class="fresh">'+nmB(an)+'</span>':''}${aOvr?' <span style="color:var(--accent)">✎</span>':''} ${где}</td><td>${it.art.n}</td>
       <td><input type="number" style="width:90px" value="${Math.round(r.artInfo.price)}" placeholder="—"
         onchange="setOverride('${it.art.id}','${r.artInfo.city}',this.value)"
         title="Своя цена артефакта в ${r.artInfo.city}. Пустое поле или 0 — вернуть цену из API."></td>
@@ -2053,9 +2096,9 @@ function detailEnchHTML(r, idx){
   const it=r.it, tgt=itemById(r.targetId);
   const norm = normPrice(r.targetId, r.q);
   const kg = itemKg(it);
-  let m = `<b>Покупаем ${it.en} (${QUAL_RU[r.q]}) в ${r.buyCity}, цену можно править ✎:</b>`
+  let m = `<b>Покупаем ${nmA(it)} (${QUAL_RU[r.q]}) в ${r.buyCity}, цену можно править ✎:</b>`
     + `<table><tr><th class="item">Что</th><th>Кол-во</th><th>Цена (ред.)</th><th>Сумма</th></tr>`
-    + `<tr><td class="item">${icon(it.id, r.q)} ${it.en}${r.buyOvr?' <span style="color:var(--accent)">✎</span>':''}</td><td>1</td>`
+    + `<tr><td class="item">${icon(it.id, r.q)} ${nmA(it)}${cpBtn(it.id)}${r.buyOvr?' <span style="color:var(--accent)">✎</span>':''}</td><td>1</td>`
     + `<td><input type="number" style="width:100px" value="${Math.round(r.buy)}" onclick="event.stopPropagation()"
          onchange="setBuyOverride('${it.id}',${r.q},this.value)" title="За сколько реально купишь эту вещь. Пусто или 0 — вернуть рыночную цену."></td>`
     + `<td>${fmt(r.buy)}</td></tr>`
@@ -2064,7 +2107,7 @@ function detailEnchHTML(r, idx){
          onchange="setOverride('${r.stoneRes}','${r.stoneCity}',this.value)" title="Цена одного камня. Пусто или 0 — вернуть рыночную."></td>`
     + `<td>${fmt(r.stoneCost)}</td></tr></table>`;
   m += `<br>Себестоимость штуки: <b>${fmt(r.cost)}</b>`;
-  m += `<br><b>Продаём ${tgt?tgt.en:r.targetId} .${it.ench+1} (${QUAL_RU[r.q]})</b> — ${r.channel==='ЧР'?'чёрный рынок в Карлеоне, мгновенно по бай-ордеру':r.channel+', своим ордером'}`
+  m += `<br><b>Продаём ${tgt?nmA(tgt):r.targetId} .${it.ench+1} (${QUAL_RU[r.q]})</b> — ${r.channel==='ЧР'?'чёрный рынок в Карлеоне, мгновенно по бай-ордеру':r.channel+', своим ордером'}`
     + ` <input type="number" style="width:110px" value="${Math.round(r.sell)}" onclick="event.stopPropagation()"
          onchange="setSellOverride('${r.targetId}',this.value)" title="За сколько реально продашь. Пусто или 0 — вернуть цену с рынка.">`
     + `${r.sellOvr?' <span style="color:var(--accent)">✎</span>':''}`
@@ -2089,7 +2132,7 @@ function calcEnchUpd(idx){
   const revAll = r.rev*N, profit = revAll-invest;
   const kg = itemKg(r.it), trips = kg? Math.ceil(N*kg/carryKg()) : 0;
   let h = `<table><tr><th class="item">Что</th><th>Всего</th><th>Стоимость</th></tr>`
-    + `<tr><td class="item">${icon(r.it.id, r.q)} ${r.it.en}</td><td>${fmt(N)}</td><td>${fmt(Math.round(buyAll))}</td></tr>`
+    + `<tr><td class="item">${icon(r.it.id, r.q)} ${nmA(r.it)}${cpBtn(r.it.id)}</td><td>${fmt(N)}</td><td>${fmt(Math.round(buyAll))}</td></tr>`
     + `<tr><td class="item">${icon(r.stoneRes)} ${stoneKind(r.stoneRes)}</td><td>${fmt(r.stoneN*N)}</td><td>${fmt(Math.round(stoneAll))}</td></tr></table>`;
   h += `Вложить: <b>${fmt(Math.round(invest))}</b> · выручка на руки: <b>${fmt(Math.round(revAll))}</b>`
     + ` · <b class="${profit>=0?'pos':'neg'}">итог ${fmt(Math.round(profit))}</b>`;
@@ -2116,12 +2159,12 @@ function calcUpd(idx){
     const cost=p?need*p.price:null;
     if(cost!=null) matTotal+=cost;
     const mn=(DATA.matNames||{})[mid];
-    html+=`<tr><td class="item">${icon(mid)} ${mn?mn.en:mid}${noR?' <i style="color:var(--muted)">без возврата</i>':''}${p&&p.ovr?' <span style="color:var(--accent)">✎</span>':''}</td><td>${fmt(need)}</td><td>${cost!=null?fmt(cost):'—'}</td></tr>`;
+    html+=`<tr><td class="item">${icon(mid)} ${nmA(mn)||mid}${cpBtn(mid)}${noR?' <i style="color:var(--muted)">без возврата</i>':''}${p&&p.ovr?' <span style="color:var(--accent)">✎</span>':''}</td><td>${fmt(need)}</td><td>${cost!=null?fmt(cost):'—'}</td></tr>`;
   }
   if(it.art && r.artInfo){
     const cost=N*it.art.n*r.artInfo.price; matTotal+=cost;
     const an=(DATA.matNames||{})[it.art.id]||{};
-    html+=`<tr><td class="item">${icon(it.art.id)} ${an.en||'Артефакт'}${an.ru?' <span class="fresh">'+an.ru+'</span>':''} <span class="fresh">(${r.artInfo.city}${r.artInfo.away?', в '+r.city+' нет':''})</span></td><td>${fmt(N*it.art.n)}</td><td>${fmt(cost)}</td></tr>`;
+    html+=`<tr><td class="item">${icon(it.art.id)} ${nmA(an)||'Артефакт'}${cpBtn(it.art.id)}${nmB(an)?' <span class="fresh">'+nmB(an)+'</span>':''} <span class="fresh">(${r.artInfo.city}${r.artInfo.away?', в '+r.city+' нет':''})</span></td><td>${fmt(N*it.art.n)}</td><td>${fmt(cost)}</td></tr>`;
   }
   html+='</table>';
   const feeN = r.fee*N;
@@ -2155,8 +2198,9 @@ function calcUpd(idx){
     let best=null;
     for(const [c,v] of Object.entries(S.matPrices[fullId]||{}))
       if(v.price && (!best || v.price>best.price)) best={...v, city:c};
-    const jn = (id)=>{ const n=(DATA.matNames||{})[id]; return n?`${n.en}${n.ru?' <span class="fresh">'+n.ru+'</span>':''}`:id; };
-    const head = `<div class="jhead">${icon(fullId)}<span><b>Журналы</b> — ${jn(fullId)}</span></div>`;
+    const jn = (id)=>{ const n=(DATA.matNames||{})[id]; return n?`${nmA(n)}${nmB(n)?' <span class="fresh">'+nmB(n)+'</span>':''}`:id; };
+    const head = `<div class="jhead">${icon(fullId)}<span><b>Журналы</b> — ${jn(fullId)}${cpBtn(fullId)}<br>`+
+      `<span class="fresh">покупаем пустые: ${jn(emptyId)}${cpBtn(emptyId)}</span></span></div>`;
     const tail = `<span class="fresh">один крафт даёт ${fmt(fame)} славы, журнал вмещает ${fmt(CFG.journalCap[it.tier])} → ${perCraft.toFixed(2)} журнала на штуку</span><br>`;
     if(fLoc && fLoc.price){
       const fullNet=fLoc.price*(1-tax-CFG.setupFee);
@@ -2208,7 +2252,7 @@ function detailRefHTML(r, idx){
     const p=refRawBest(rid,r);
     const nm=DATA.matNames?.[rid]||{};
     const pc=p?p.city:r.city;
-    m+=`<tr><td class="item">${icon(rid)} ${nm.en||rid}${p&&p.ovr?' <span style="color:var(--accent)">✎</span>':''}</td><td>${c}</td>
+    m+=`<tr><td class="item">${icon(rid)} ${nmA(nm)||rid}${cpBtn(rid)}${p&&p.ovr?' <span style="color:var(--accent)">✎</span>':''}</td><td>${c}</td>
       <td><input type="number" style="width:90px" value="${p?Math.round(p.price):''}" placeholder="—"
         onchange="setOverride('${rid}','${pc}',this.value)"
         title="Введи свою цену покупки. Пустое поле или 0 — вернуть цену из API."></td>
@@ -2228,7 +2272,7 @@ function detailRefHTML(r, idx){
     }
     const selfFallback = cp ? null : S.selfCost[rm.cat.id+'|'+r.city]; // если в продаже нет вовсе
     const shown = cp ? cp.price : (selfFallback?selfFallback.cost:null);
-    m+=`<tr><td class="item">${icon(rm.cat.id)} ${nm.en||rm.cat.id}${nm.ru?' <span class="fresh">'+nm.ru+'</span>':''}${cp&&cp.ovr?' <span style="color:var(--accent)">✎</span>':''} <span class="fresh">(катализатор младшего тира)</span></td><td>${rm.cat.n}</td>
+    m+=`<tr><td class="item">${icon(rm.cat.id)} ${nmA(nm)||rm.cat.id}${cpBtn(rm.cat.id)}${nmB(nm)?' <span class="fresh">'+nmB(nm)+'</span>':''}${cp&&cp.ovr?' <span style="color:var(--accent)">✎</span>':''} <span class="fresh">(катализатор младшего тира)</span></td><td>${rm.cat.n}</td>
       <td><input type="number" style="width:90px" value="${shown!=null?Math.round(shown):''}" placeholder="—"
         onchange="setOverride('${rm.cat.id}','${catCity}',this.value)"
         title="Своя цена катализатора в ${catCity}. Пустое поле или 0 — вернуть цену из API."></td>
@@ -2260,12 +2304,12 @@ function calcRefUpd(idx){
     const cost=p?need*p.price:null;
     if(cost!=null) total+=cost;
     const nm=DATA.matNames?.[rid]||{};
-    html+=`<tr><td class="item">${icon(rid)} ${nm.en||rid}</td><td>${fmt(need)}</td><td>${cost!=null?fmt(cost)+(p?' <span class=fresh>('+p.city+')</span>':''):'—'}</td></tr>`;
+    html+=`<tr><td class="item">${icon(rid)} ${nmA(nm)||rid}${cpBtn(rid)}</td><td>${fmt(need)}</td><td>${cost!=null?fmt(cost)+(p?' <span class=fresh>('+p.city+')</span>':''):'—'}</td></tr>`;
   }
   if(rm.cat){
     const need=Math.ceil(rm.cat.n*N*(1-r.ret));
     const nm=DATA.matNames?.[rm.cat.id]||{};
-    html+=`<tr><td class="item">${icon(rm.cat.id)} ${nm.en||rm.cat.id}</td><td>${fmt(need)}</td><td><span class="fresh">рынок или своя переработка — см. выше</span></td></tr>`;
+    html+=`<tr><td class="item">${icon(rm.cat.id)} ${nmA(nm)||rm.cat.id}${cpBtn(rm.cat.id)}</td><td>${fmt(need)}</td><td><span class="fresh">рынок или своя переработка — см. выше</span></td></tr>`;
   }
   html+='</table>';
   const feeN=r.fee*N, revenue=N*r.sell*(1-tax-CFG.setupFee), profit=N*r.net;
@@ -2598,7 +2642,7 @@ function itemCardHTML(id){
   const bm = S.bm[id];
   let out = `<div class="panel"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <img src="https://render.albiononline.com/v1/item/${enc(id)}.png?size=76" style="width:64px;height:64px" onerror="this.style.display='none'">
-      <div><div style="font-size:17px;font-weight:700">${nm.en}</div>
+      <div><div style="font-size:17px;font-weight:700">${nmA(nm)}${cpBtn(id)}</div>
         <div class="fresh">${nm.ru||''} ${nm.tier?'· T'+nm.tier+(nm.ench?'.'+nm.ench:''):''} · ${isMat?'ресурс/материал':(CAT_RU[nm.cat]||nm.cat)} · <code>${id}</code></div></div>
       <span style="margin-left:auto;display:flex;gap:8px">${backBtnHTML()}<button id="itemBack">← к поиску</button></span></div>`;
 
@@ -2691,7 +2735,7 @@ function itemTabHTML(){
   const hits = itemIndex()
     .filter(x=> (tSel===''||x.tier===+tSel) && (eSel===''||(x.ench||0)===+eSel))
     .map(x=>{ const s=scoreOf(x); return s==null?null:{...x, _s:s}; }).filter(Boolean)
-    .sort((a,b)=>(a._s-b._s)||(a.tier-b.tier)||(a.ench-b.ench)||a.en.localeCompare(b.en));
+    .sort((a,b)=>(a._s-b._s)||(a.tier-b.tier)||(a.ench-b.ench)||nmA(a).localeCompare(nmA(b)));
   const narrow = (tSel!==''?' · тир '+tSel:'')+(eSel!==''?' · зачар. '+eSel:'');
   out += `<div class="fresh" style="margin:10px 0">Найдено: ${hits.length}${narrow}${hits.length>60?' — показаны первые 60, уточни запрос':''}`
     + `${hits.length===0&&narrow?' · <a href="#" onclick="clearItemFilters();return false" style="color:var(--accent)">сбросить тир и зачарование</a>':''}</div>`;
@@ -2699,7 +2743,7 @@ function itemTabHTML(){
   for(const h of hits.slice(0,60)){
     out += `<tr class="row" data-open="${h.id}"><td class="item">
       <img loading="lazy" src="https://render.albiononline.com/v1/item/${enc(h.id)}.png?size=48" style="width:38px;height:38px" onerror="this.style.display='none'">
-      <div class="iname"><b>${h.en}</b><span>${h.ru||''} ${h.tier?'· T'+h.tier+(h.ench?'.'+h.ench:''):''} · ${h.kind==='mat'?'ресурс':(CAT_RU[h.cat]||h.cat)}</span></div></td></tr>`;
+      <div class="iname"><b>${nmA(h)}</b><span>${nmB(h)} ${h.tier?'· T'+h.tier+(h.ench?'.'+h.ench:''):''} · ${h.kind==='mat'?'ресурс':(CAT_RU[h.cat]||h.cat)}</span></div></td></tr>`;
   }
   out += '</tbody></table></div>';
   return out;
