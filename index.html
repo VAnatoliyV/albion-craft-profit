@@ -77,6 +77,12 @@ th:hover{color:var(--accent)}
 td.item,th.item{text-align:left}
 td.item{display:flex;align-items:center;gap:9px;min-width:260px}
 td.item img{width:42px;height:42px;flex:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))}
+/* Заголовок «Журналы» в разборе строки. Картинка тут лежит не в ячейке таблицы,
+   поэтому размер ей никто не задавал: она приезжала в натуральные 64 px и текст
+   болтался по нижнему краю. */
+.jhead{display:flex;align-items:center;gap:9px;margin:12px 0 5px}
+.jhead img{width:30px;height:30px;flex:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))}
+.jhead b{font-size:13px}
 .iname{overflow:hidden}
 .iname b{display:block;font-weight:600;font-size:13px;color:var(--text)}
 .iname b.lnk{display:inline;cursor:pointer;border-bottom:1px dotted var(--border2)}
@@ -2033,6 +2039,12 @@ function detailHTML(r,idx){
   m+=trendChartHTML(r.tr);
   m+=`<br><b>🧮 Калькулятор партии:</b> крафтим
       <input type="number" value="100" min="1" step="10" style="width:90px" id="calcN${idx}" oninput="calcUpd(${idx})"> шт.
+      &nbsp; 🛒 <b>Закупка</b>
+      <select id="calcMode${idx}" onclick="event.stopPropagation()" onchange="calcUpd(${idx})">
+        <option value="chain">впритык, с возвратом</option>
+        <option value="full">на всё количество</option>
+      </select>
+      <span class="help" title="«Впритык, с возвратом» — возврат ресурсов падает в сумку после каждого крафта, и его можно скормить в следующий. Тогда закупить надо примерно на четверть меньше. НО: возврат случайный, 24.8% — это среднее за много крафтов, на одной партии может не повезти. Поэтому сюда заложено 5% страховки — раньше её не было, и партия вставала на последней штуке.&#10;&#10;Важно: станок проверяет материалы на ВЕСЬ заказ сразу. Поставить 100 штук одной кнопкой в этом режиме не выйдет — крафтить придётся кусками по 10–20, подбирая возврат из сумки.&#10;&#10;«На всё количество» — полный рецепт на все штуки. Одна кнопка, никакой возни, но денег нужно на четверть больше, а в конце останется гора возвращённых материалов. Профит от выбора не меняется: остатки стоят ровно столько, сколько ты переплатил.">?</span>
       <div id="calcOut${idx}" style="margin-top:6px"></div>`;
   return m;
 }
@@ -2090,12 +2102,17 @@ function calcUpd(idx){
   const N = Math.max(1, +($('calcN'+idx)?.value||100));
   const it=r.it, tax=$('premChk').checked?0.04:0.08;
   const noRetSet = it.noRet ? new Set(it.noRet) : null;
+  // Возврат ресурсов — СЛУЧАЙНЫЙ, 24.8% это среднее за много крафтов. Раньше список
+  // покупок считался ровно по среднему, и партия на 40 штук вставала на 39-й: чуть
+  // не повезло с возвратом — и материалов не хватило. Теперь два честных режима.
+  const mode = $('calcMode'+idx)?.value || 'chain';
+  const BUF = 1.05;                             // страховка на невезение с возвратом
   let html='<table><tr><th class="item">Ресурс</th><th>Купить всего</th><th>Стоимость</th></tr>';
   let matTotal=0;
   for(const [mid,c] of Object.entries(it.mats)){
     const p=matPrice(mid, r.city);
     const noR = noRetSet && noRetSet.has(mid);   // на такие возврат не действует — берём полное количество
-    const need=noR ? c*N : Math.ceil(c*N*(1-r.ret));
+    const need = (noR || mode==='full') ? c*N : Math.ceil(c*N*(1-r.ret)*BUF);
     const cost=p?need*p.price:null;
     if(cost!=null) matTotal+=cost;
     const mn=(DATA.matNames||{})[mid];
@@ -2114,8 +2131,16 @@ function calcUpd(idx){
     const ji=DATA.jinfo[it.tier];
     const fame=craftFame(it);
     const nJ=journalsFor(it, N);
+    // Сдать можно только ПОЛНЫЙ журнал. Раньше считались все nJ (округление вверх),
+    // и последний, заполненный наполовину, шёл в профит как проданный. По факту он
+    // остаётся у тебя в сумке и ждёт следующей партии — в деньги его писать нельзя.
+    const cap = CFG.journalCap[it.tier]||0;
+    const totalFame = N*fame;
+    const jFull = cap ? Math.floor(totalFame/cap) : 0;
+    const jRest = cap ? totalFame - jFull*cap : 0;          // слава в недозаполненном
+    const restPct = cap ? Math.round(jRest/cap*100) : 0;
     const emptyCost=nJ*ji.empty;
-    const perCraft=CFG.journalCap[it.tier] ? fame/CFG.journalCap[it.tier] : 0;
+    const perCraft=cap ? fame/cap : 0;
     const fullId=`T${it.tier}_JOURNAL_${it.j}_FULL`;
     const emptyId=`T${it.tier}_JOURNAL_${it.j}_EMPTY`;
     // Журналы возим не мы: пустые покупаем в городе крафта, полные там же и сдаём.
@@ -2131,22 +2156,23 @@ function calcUpd(idx){
     for(const [c,v] of Object.entries(S.matPrices[fullId]||{}))
       if(v.price && (!best || v.price>best.price)) best={...v, city:c};
     const jn = (id)=>{ const n=(DATA.matNames||{})[id]; return n?`${n.en}${n.ru?' <span class="fresh">'+n.ru+'</span>':''}`:id; };
-    const head = `<div style="margin:8px 0 4px">${icon(fullId)} <b>Журналы</b> — ${jn(fullId)}</div>`;
+    const head = `<div class="jhead">${icon(fullId)}<span><b>Журналы</b> — ${jn(fullId)}</span></div>`;
     const tail = `<span class="fresh">один крафт даёт ${fmt(fame)} славы, журнал вмещает ${fmt(CFG.journalCap[it.tier])} → ${perCraft.toFixed(2)} журнала на штуку</span><br>`;
     if(fLoc && fLoc.price){
       const fullNet=fLoc.price*(1-tax-CFG.setupFee);
-      jNet=nJ*(fullNet-emptyUnit);
+      jNet=jFull*fullNet - nJ*emptyUnit;      // продаём только полные, пустых покупаем все
       const better = best && best.city!==r.city && best.price>fLoc.price
         ? ` <span class="fresh">— в ${best.city} дают ${fmt(best.price)}, но туда надо везти</span>` : '';
       jHtml = head +
-        `Нужно <b>${fmt(nJ)}</b> шт · пустые по <b>${fmt(emptyUnit)}</b> (${emptySrc}) = ${fmt(emptyCostReal)} · `+
-        `полные сдаём в <b>${r.city}</b> по ${fmt(fLoc.price)}${better} → `+
-        `<b class="${jNet>=0?'pos':'neg'}">${jNet>=0?'+':''}${fmt(jNet)}</b> к профиту партии<br>` + tail;
+        `Купить пустых: <b>${fmt(nJ)}</b> шт по <b>${fmt(emptyUnit)}</b> (${emptySrc}) = ${fmt(emptyCostReal)}<br>`+
+        `Заполнится целиком: <b>${fmt(jFull)}</b> шт — сдаём в <b>${r.city}</b> по ${fmt(fLoc.price)}${better} → `+
+        `<b class="${jNet>=0?'pos':'neg'}">${jNet>=0?'+':''}${fmt(jNet)}</b> к профиту партии<br>`+
+        (jRest>0 ? `<span class="fresh">Последний журнал заполнится на ${restPct}% (${fmt(Math.round(jRest))} славы из ${fmt(cap)}). Сдать его нельзя, он остаётся у тебя и дозаполнится следующей партией — в профит не включён.</span><br>` : '') + tail;
     } else if(best){
       // в городе крафта полные не продаются — считаем без них, но показываем куда везти
       jHtml = head +
         `Нужно <b>${fmt(nJ)}</b> шт · пустые по <b>${fmt(emptyUnit)}</b> (${emptySrc}) = ${fmt(emptyCostReal)}<br>`+
-        `<span class="fresh">В ${r.city} полные журналы никто не покупает. Дороже всего берут в ${best.city} — ${fmt(best.price)} за штуку, это ${fmt(nJ*(best.price*(1-tax-CFG.setupFee)-emptyUnit))} за партию, но туда надо везти. В профит не включено.</span><br>` + tail;
+        `<span class="fresh">Заполнится целиком ${fmt(jFull)} шт${jRest>0?`, последний — на ${restPct}%`:''}. В ${r.city} полные журналы никто не покупает. Дороже всего берут в ${best.city} — ${fmt(best.price)} за штуку, это ${fmt(jFull*best.price*(1-tax-CFG.setupFee)-nJ*emptyUnit)} за партию, но туда надо везти. В профит не включено.</span><br>` + tail;
     } else {
       jHtml = head +
         `Нужно <b>${fmt(nJ)}</b> шт · пустые по <b>${fmt(emptyUnit)}</b> (${emptySrc}) = ${fmt(emptyCostReal)}<br>`+
