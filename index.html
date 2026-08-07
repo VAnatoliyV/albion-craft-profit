@@ -464,7 +464,7 @@ const CITY_BONUS = {
   // бонуса ни в одном городе нет: считаем их по базовому возврату, без +15%.
   'Brecilien':     ['cape','bag','satchel'],
 };
-const CAT_RU = {axe:'Топоры',quarterstaff:'Боевые посохи',froststaff:'Посохи мороза',plate_shoes:'Латные сапоги',
+const CAT_RU = {furniture:'Мебель и ремкомплекты',axe:'Топоры',quarterstaff:'Боевые посохи',froststaff:'Посохи мороза',plate_shoes:'Латные сапоги',
   offhand:'Офхенды',plate_armor:'Латная броня',crossbow:'Арбалеты',dagger:'Кинжалы',cursestaff:'Посохи проклятий',
   cloth_shoes:'Тканевые сандалии',bow:'Луки',sword:'Мечи',arcanestaff:'Чародейские посохи',leather_helmet:'Кожаные капюшоны',
   leather_shoes:'Кожаные ботинки',cloth_armor:'Робы',plate_helmet:'Латные шлемы',hammer:'Молоты',spear:'Копья',
@@ -488,6 +488,7 @@ const GROUPS = [
   ['cape',  '🧣 Плащи',    ['cape','cape_faction']],
   ['bag',   '🎒 Сумки',    ['bag','satchel']],
   ['gath',  '⛏️ Сбор',     ['gatherer','tool','bait']],
+  ['home',  '🏠 Дом',      ['furniture']],
 ];
 const GROUP_CATS = Object.fromEntries(GROUPS.map(([k,,c])=>[k, c&&new Set(c)]));
 const BONUS_CITY_OF = {}; // cat -> city
