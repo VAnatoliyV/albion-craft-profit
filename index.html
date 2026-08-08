@@ -538,7 +538,15 @@ const GROUPS = [
   ['bag',   '🎒 Сумки',    ['bag','satchel']],
   ['gath',  '⛏️ Сбор',     ['gatherer','tool','bait']],
   ['home',  '🏠 Дом',      ['furniture']],
+  ['potion','🧪 Зелья',    ['potion']],
+  ['meal',  '🍖 Еда',      ['meal']],
 ];
+// На каждой вкладке свой набор чипов: в «Зельях и еде» железные группы не нужны,
+// а на вкладках со снаряжением нечего делать зельям.
+const TAB_GROUPS = {
+  cons: ['all','potion','meal'],
+  def:  ['all','gear','weapon','armor','cape','bag','gath','home'],
+};
 const GROUP_CATS = Object.fromEntries(GROUPS.map(([k,,c])=>[k, c&&new Set(c)]));
 const BONUS_CITY_OF = {}; // cat -> city
 for (const [c,cats] of Object.entries(CITY_BONUS)) cats.forEach(k=>BONUS_CITY_OF[k]=c);
@@ -2813,7 +2821,9 @@ function setTab(t){
   const vis=TAB_CONTROLS[t]||[];
   for(const id of ALL_WRAPS){ const w=$(id); if(w) w.style.display = vis.includes(id)?'':'none'; }
   const flt=$('filters'); if(flt) flt.style.display = (t==='roads'||t==='item')?'none':'';
-  const gr=$('grpRow'); if(gr) gr.style.display = (TAB_CONTROLS[t]||[]).includes('wrapCat') ? 'flex' : 'none';
+  buildGroups();
+  const gr=$('grpRow');
+  if(gr) gr.style.display = ((TAB_CONTROLS[t]||[]).includes('wrapCat') || TAB_GROUPS[t]) ? 'flex' : 'none';
   if(t==='roads' && !S.roads.loaded && !S.roads.loading) loadRoads(); // ленивая загрузка при входе
   S.limit = 0; // сбросить порцию строк
   if(S.loaded && t!=='roads') compute();
@@ -2828,9 +2838,12 @@ function paintGroups(){
   const row=$('grpRow'); if(!row) return;
   row.querySelectorAll('button.grp').forEach(b=>b.classList.toggle('on', b.dataset.g===S.grp));
 }
-{
-  const row=$('grpRow');
-  for(const [key,label] of GROUPS.map(g=>[g[0],g[1]])){
+function buildGroups(){
+  const row=$('grpRow'); if(!row) return;
+  const allow = TAB_GROUPS[S.tab] || TAB_GROUPS.def;
+  if(!allow.includes(S.grp)) S.grp = 'all';       // ушли с вкладки — сбрасываем фильтр
+  row.innerHTML='';
+  for(const [key,label] of GROUPS.filter(g=>allow.includes(g[0])).map(g=>[g[0],g[1]])){
     const b=document.createElement('button');
     b.className='grp'; b.dataset.g=key; b.textContent=label;
     b.onclick=()=>{ S.grp=key; const cs=$('catSel'); if(cs) cs.value=''; S.limit=0; paintGroups(); render(); };
@@ -2838,6 +2851,7 @@ function paintGroups(){
   }
   paintGroups();
 }
+buildGroups();
 $('catSel').addEventListener('change', ()=>{ if($('catSel').value){ S.grp='all'; paintGroups(); } });
 $('safeChk').onchange=()=>{ compute(); render(); };
 ['flipFrom','flipTo'].forEach(id=>$(id).onchange=()=>{ S.limit=0; compute(); render(); });
