@@ -294,6 +294,9 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
         <option value="12">12 ч</option><option value="24" selected>24 ч</option>
       </select>
     </label>
+    <label class="ctl" id="wrapDaily" title="Дневной бонус производства из окна Activities в игре: раз в сутки две категории получают +10% к возврату ресурсов.&#10;&#10;Автоматически это не подтянуть — такой информации нет ни в одном открытом API, она живёт только в игровом клиенте. Поэтому выбери руками то, что видишь сегодня в игре: сайт прибавит 10 процентных пунктов к возврату СТРОКАМ ЭТИХ КАТЕГОРИЙ и пометит их значком.&#10;&#10;Выбор запоминается до конца суток и сам сбрасывается на следующий день, чтобы вчерашний бонус не занижал сегодняшнюю себестоимость.&#10;&#10;Сверься со станком в игре: там показан итоговый процент возврата — если цифры разойдутся, скажи, поправлю формулу.">Дневной бонус
+      <select id="daily1"></select><select id="daily2" style="margin-left:4px"></select>
+    </label>
     <label class="ctl" title="На каком языке показывать названия предметов и, главное, что кладётся в буфер по кнопке ⧉.&#10;&#10;Поиск на рынке в игре ищет по названию ТВОЕГО клиента. Клиент английский — значит и копировать надо английское название: «Runite Steel Bar», а не «Брусок рунита». Поэтому по умолчанию английский.&#10;&#10;Второе название остаётся подписью снизу, так что ничего не теряется.">Названия
       <span class="lngbox"><button class="lng on" data-l="en" onclick="setLang('en')">EN</button><button class="lng" data-l="ru" onclick="setLang('ru')">RU</button></span>
     </label>
@@ -561,6 +564,7 @@ const CFG = {
   askCap: 1.4,        // селл-ордер дороже нормы во столько раз — фантом, продать по нему нельзя
   askFloor: 0.5,      // дешевле половины нормы — скорее всего одна вещь по ошибке, помечаем
   carryKg: 50,        // грузоподъёмность по умолчанию: пеший персонаж без сумки
+  dailyBonus: 0.10,   // дневной бонус производства: +10 процентных пунктов к возврату
 
   histBatch: 50, priceBatch: 150, concurrency: 4,
   // Журналы наполняются СЛАВОЙ, а не числом крафтов. Ёмкость пустого журнала по тирам
@@ -574,6 +578,16 @@ const CFG = {
   famePerMat:  {4:22.5, 5:90,   6:270,  7:645,  8:1395},
 };
 const rr = b => b/(1+b); // возврат из суммы бонусов
+// Дневной бонус производства (окно Activities): раз в сутки две категории получают
+// +10% к возврату ресурсов. В API этого нет нигде — только руками. Храним вместе с
+// датой: назавтра выбор протухает сам, иначе вчерашний бонус тихо занижал бы цену.
+const DAILY_KEY='acp_daily';
+const dayStamp = () => new Date().toISOString().slice(0,10);
+let DAILY = (()=>{ try{ const v=JSON.parse(localStorage.getItem(DAILY_KEY)||'null');
+  return (v && v.d===dayStamp()) ? (v.c||[]) : []; }catch(e){ return []; } })();
+function saveDaily(){ try{ localStorage.setItem(DAILY_KEY, JSON.stringify({d:dayStamp(), c:DAILY})); }catch(e){} }
+// +0.10 к итоговому возврату, если категория строки отмечена как сегодняшний бонус
+const dailyFor = key => (key && DAILY.includes(key)) ? CFG.dailyBonus : 0;
 // бонусные города потребляемых: алхимия — Бресилиен, кухня — Карлеон
 const CONS_BONUS_CITY = {potion:'Brecilien', meal:'Caerleon'};
 
@@ -945,13 +959,13 @@ async function loadAll(force){
 }
 
 // ─── Расчёт ───
-function returnRate(bonus, focus){
+function returnRate(bonus, focus, daily){
   let b = CFG.cityBase + (bonus?CFG.specialty:0) + (focus?CFG.focus:0);
-  return rr(b);
+  return Math.min(0.95, rr(b) + (daily||0));
 }
-function refReturnRate(bonus, focus){
+function refReturnRate(bonus, focus, daily){
   let b = CFG.cityBase + (bonus?CFG.refSpecialty:0) + (focus?CFG.focus:0);
-  return rr(b);
+  return Math.min(0.95, rr(b) + (daily||0));
 }
 // себестоимость самостоятельной переработки материала в городе (снизу вверх по тирам)
 function buildSelfCosts(focus){
@@ -978,7 +992,8 @@ function buildSelfCosts(focus){
         catCost = eff*rmat.cat.n;
       }
       const bonus = DATA.refBonus[rmat.chain]===city;
-      const ret = refReturnRate(bonus, focus);
+      const dly = dailyFor('chain:'+rmat.chain);
+      const ret = refReturnRate(bonus, focus, dly);
       const fee = rmat.iv*CFG.nutritionFactor*fee100/100;
       // из чего сложилась переработка — для «стабильности» по дням (см. trendStats)
       const parts = [];
@@ -1056,7 +1071,8 @@ function craftCostIn(item, city, focus){
     worst=Math.max(worst,a.age||0);
   }
   const bonus = BONUS_CITY_OF[item.cat]===city;
-  const ret = returnRate(bonus,focus);
+  const dly = dailyFor(item.cat);
+  const ret = returnRate(bonus, focus, dly);
   const fee = item.iv*CFG.nutritionFactor*(+$('feeInp').value||0)/100;
   // Из чего сложилась себестоимость — по материалам, уже с учётом возврата ресурсов.
   // Нужно для «стабильности»: чтобы протащить строку по дням, надо знать, чья цена
@@ -1069,7 +1085,7 @@ function craftCostIn(item, city, focus){
   }
   if(item.art && artCost>0) parts.push([item.art.id, artCost, 'mat']);
   return {cost: raw*(1-ret)+rawNoRet+artCost+fee, cash: raw+rawNoRet+artCost+fee,
-    bonus, ret, fee, raw, rawNoRet, artCost, artInfo, stale:worst, selfMats, parts};
+    bonus, ret, fee, raw, rawNoRet, artCost, artInfo, stale:worst, selfMats, parts, daily:dly>0};
 }
 // ─── Стабильность: сколько дней из последних трёх недель позиция была в плюсе ───
 // Считаем не «какая была маржа тогда» (историю ордеров никто не хранит), а как бы
@@ -1248,7 +1264,7 @@ function compute(){
       // стабильность: тянем ту же сделку по дням. Материалы — по своим рядам,
       // плата за станцию не зависит от цен и в ряды не входит.
       const tr = trendStats(cc.parts, cc.fee, rev, trendSeriesOf(channel==='ЧР'?'bm':'city', it.id));
-      rows.push({tr, it, city, cost:cc.cost, bonus:cc.bonus, rev, channel, net, margin,
+      rows.push({tr, it, city, cost:cc.cost, bonus:cc.bonus, daily:!!cc.daily, rev, channel, net, margin,
         vol, pool: vol*Math.max(net,0), cash:cc.cash, ...goldOf(net, cc.cost, vol, stale, cc.cash), stale, warn,
         bmPrice, bmSrc, cityPrice:bestCityPrice||null, fee:cc.fee, ret:cc.ret, raw:cc.raw, rawNoRet:cc.rawNoRet||0,
         bmNow: bq1?bq1.now:null, bmBase: bq1?bq1.base:null, spike, swing,
@@ -1351,7 +1367,7 @@ function compute(){
         const stale = Math.max(sc.stale, mp.age||0);
         const warn = margin>300 || (margin>100 && vol!=null && vol<10);
         const tr = trendStats(sc.parts, sc.fee, sell*(1-tax-CFG.setupFee), trendSeriesOf('mat', rmat.id));
-        refRows.push({tr, rmat, city, cost:sc.cost, sell, net, margin, vol,
+        refRows.push({tr, rmat, city, daily:dailyFor('chain:'+rmat.chain)>0, cost:sc.cost, sell, net, margin, vol,
           pool: vol!=null?vol*Math.max(net,0):null,
           cash:sc.cash, ...goldOf(net, sc.cost, vol, stale, sc.cash),
           bonus:sc.bonus, ret:sc.ret, fee:sc.fee, stale, warn});
@@ -1385,7 +1401,8 @@ function compute(){
           catCost=eff*rmat.cat.n;
         }
         const bonus = DATA.refBonus[rmat.chain]===rc;
-        const ret = refReturnRate(bonus, focus);
+        const dly = dailyFor('chain:'+rmat.chain);
+        const ret = refReturnRate(bonus, focus, dly);
         const fee = rmat.iv*CFG.nutritionFactor*fee100/100;
         const cost = (raws+catCost)*(1-ret)+fee;
         // продажа: где дороже
@@ -1539,7 +1556,8 @@ function compute(){
       }
       if(missing) continue;
       const bonus = city===home;
-      const ret = returnRate(bonus, focus);
+      const dly = dailyFor(c.cat);
+      const ret = returnRate(bonus, focus, dly);
       const fee = c.iv*CFG.nutritionFactor*(+$('feeInp').value||0)/100; // за партию
       const costBatch = raw*(1-ret) + rawNoRet + fee; // возврат только на обычное сырьё
       const cost = costBatch/c.batch; // за одну штуку
@@ -1572,7 +1590,7 @@ function compute(){
         cparts.push([m, pMat.price*n*(noRet.has(m)?1:(1-ret))/c.batch, 'mat']);
       }
       const tr = trendStats(cparts, fee/c.batch, rev, trendSeriesOf('city', c.id));
-      consRows.push({tr, it:c, city, bonus, cost, costBatch, cash, cashBatch, raw, rawNoRet, ret, fee, rev,
+      consRows.push({tr, it:c, city, bonus, daily:dly>0, cost, costBatch, cash, cashBatch, raw, rawNoRet, ret, fee, rev,
         channel:sellCity, sellPrice, net, margin, vol,
         pool: vol!=null?vol*Math.max(net,0):null,
         ...goldOf(net, cost, vol, stale, cash), stale, warn});
@@ -1813,7 +1831,8 @@ function render(){
       ? `<span class="badge b-lim2" title="Эта строка сейчас не проходит фильтры — например, после твоей правки цены профит ушёл в минус. Она осталась в таблице только потому, что ты держишь её раскрытой: чтобы можно было увидеть результат и откатить цену. Закроешь панель — строка встанет на своё место.">👁 держим открытой</span>`
       : '';
     if(craft){
-      const bonusBadge = r.bonus?'<span class="badge b-bonus">бонус</span>':'';
+      const bonusBadge = (r.bonus?'<span class="badge b-bonus">бонус</span>':'')
+        + (r.daily?'<span class="badge b-bonus" title="Сегодняшний дневной бонус производства: +10 процентных пунктов к возврату ресурсов на эту категорию. Отмечено тобой в шапке.">+10% день</span>':'');
       const chLabel = r.channel==='ЧР' ? `ЧР · ${qualMode==='q1'?'обыч. кач.':'все кач.'}` : r.channel+' · обыч. кач.';
       const qualText = qualMode==='q1' ? 'Обычное' : 'Все качества (взвеш.)';
       html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}">${nameCell(it, topBadge+limBadge+openBadge+spikeBadge+warnBadge+staleBadge, qualText)}
@@ -1827,7 +1846,8 @@ function render(){
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
       html+=`<tr class="det" style="display:none"><td colspan="12" id="det${i}"></td></tr>`;
     } else if(S.tab==='cons'){
-      const bonusBadge = r.bonus?'<span class="badge b-bonus">бонус</span>':'';
+      const bonusBadge = (r.bonus?'<span class="badge b-bonus">бонус</span>':'')
+        + (r.daily?'<span class="badge b-bonus" title="Сегодняшний дневной бонус производства: +10 процентных пунктов к возврату ресурсов на эту категорию.">+10% день</span>':'');
       html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${nmA(it)}</b>${topBadge+limBadge+openBadge+warnBadge+staleBadge}
         <span>${nmB(it)} · T${it.tier}${it.ench?'.'+it.ench:''} · ${it.cat==='potion'?'Зелье':'Еда'} · партия ${it.batch} шт</span></div></td>
         <td>${r.city}${bonusBadge}</td><td>${fmt(r.cost)}</td>
@@ -2838,6 +2858,23 @@ function paintGroups(){
   const row=$('grpRow'); if(!row) return;
   row.querySelectorAll('button.grp').forEach(b=>b.classList.toggle('on', b.dataset.g===S.grp));
 }
+// Списки «дневного бонуса»: категории предметов плюс цепочки переработки.
+function fillDaily(){
+  const opts = [['','— нет —']];
+  const cats = [...new Set(DATA.items.map(i=>i.cat))].sort((a,b)=>(CAT_RU[a]||a).localeCompare(CAT_RU[b]||b));
+  for(const c of cats) opts.push([c, CAT_RU[c]||c]);
+  opts.push(['potion','Зелья'],['meal','Еда']);
+  for(const [k,label] of Object.entries(CHAIN_RU||{})) opts.push(['chain:'+k, 'Переработка: '+label]);
+  for(const [i,id] of [[0,'daily1'],[1,'daily2']]){
+    const sel=$(id); if(!sel) continue;
+    sel.innerHTML = opts.map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
+    sel.value = DAILY[i] || '';
+    sel.onchange = ()=>{
+      DAILY = [$('daily1').value, $('daily2').value].filter(Boolean);
+      saveDaily(); S.limit=0; compute(); render();
+    };
+  }
+}
 function buildGroups(){
   const row=$('grpRow'); if(!row) return;
   const allow = TAB_GROUPS[S.tab] || TAB_GROUPS.def;
@@ -2925,6 +2962,7 @@ window.goHome=()=>{
   { const cs=$('catSel');
     [...new Set(DATA.items.map(i=>i.cat))].sort((a,b)=>(CAT_RU[a]||a).localeCompare(CAT_RU[b]||b))
       .forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=CAT_RU[c]||c; cs.appendChild(o); }); }
+  fillDaily();   // списки дневного бонуса зависят от базы предметов — строим после её загрузки
   if(hs) hs.textContent='Цены загружаются в фоне — выбирай раздел…';
   await loadAll(false);
   if(hs && !hs.textContent.includes('готовы')) hs.textContent='Цены загружены ✓';
