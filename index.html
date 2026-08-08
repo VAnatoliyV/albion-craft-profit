@@ -439,6 +439,8 @@ window.setLang = v => {
   LANG = (v==='ru' ? 'ru' : 'en');
   try{ localStorage.setItem('acp_lang', LANG); }catch(e){}
   document.querySelectorAll('button.lng').forEach(b=>b.classList.toggle('on', b.dataset.l===LANG));
+  if(typeof fillDaily==='function') fillDaily();   // «Дневной бонус» — теми же словами, что в игре
+  if(typeof fillCats==='function')  fillCats();
   S.limit = 0; render();
 };
 function nameOfId(id){
@@ -516,7 +518,7 @@ const CITY_BONUS = {
   // бонуса ни в одном городе нет: считаем их по базовому возврату, без +15%.
   'Brecilien':     ['cape','bag','satchel'],
 };
-const CAT_RU = {furniture:'Мебель и ремкомплекты',axe:'Топоры',quarterstaff:'Боевые посохи',froststaff:'Посохи мороза',plate_shoes:'Латные сапоги',
+const CAT_RU = {potion:'Зелья',meal:'Еда',furniture:'Мебель и ремкомплекты',axe:'Топоры',quarterstaff:'Боевые посохи',froststaff:'Посохи мороза',plate_shoes:'Латные сапоги',
   offhand:'Офхенды',plate_armor:'Латная броня',crossbow:'Арбалеты',dagger:'Кинжалы',cursestaff:'Посохи проклятий',
   cloth_shoes:'Тканевые сандалии',bow:'Луки',sword:'Мечи',arcanestaff:'Чародейские посохи',leather_helmet:'Кожаные капюшоны',
   leather_shoes:'Кожаные ботинки',cloth_armor:'Робы',plate_helmet:'Латные шлемы',hammer:'Молоты',spear:'Копья',
@@ -1652,6 +1654,26 @@ const COLS_ENCH = [
   ['item','Предмет'],['q','Качество'],['buy','Купить шмотку'],['stoneCost','Камни'],
   ['sell','Продать'],['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['real','Мне за день'],['trend','Стабильность'],['stale','Данные'],
 ];
+// Английские названия категорий подобраны под формулировки самой игры: в окне
+// Activities дневной бонус пишут как «Leather Hood» и «Potion», а не «leather_helmet».
+// При EN список бонусов читается один в один с игрой — за этим всё и затевалось.
+const CAT_EN = {
+  furniture:'Furniture', axe:'Axe', quarterstaff:'Quarterstaff', froststaff:'Frost Staff',
+  plate_shoes:'Plate Boots', offhand:'Off-hand', plate_armor:'Plate Armor', crossbow:'Crossbow',
+  dagger:'Dagger', cursestaff:'Cursed Staff', cloth_shoes:'Cloth Sandals', bow:'Bow', sword:'Sword',
+  arcanestaff:'Arcane Staff', leather_helmet:'Leather Hood', leather_shoes:'Leather Shoes',
+  cloth_armor:'Cloth Robe', plate_helmet:'Plate Helmet', hammer:'Hammer', spear:'Spear',
+  holystaff:'Holy Staff', mace:'Mace', firestaff:'Fire Staff', naturestaff:'Nature Staff',
+  leather_armor:'Leather Jacket', cloth_helmet:'Cloth Cowl', knuckles:'War Gloves',
+  shapeshifterstaff:'Shapeshifter Staff', cape:'Cape', cape_faction:'Faction Cape', bag:'Bag',
+  satchel:'Satchel', gatherer:'Gathering Gear', tool:'Tool', bait:'Bait', royal:'Royal Gear',
+  potion:'Potion', meal:'Meal',
+};
+const CHAIN_EN = {ore:'Ore → Metal Bars', hide:'Hide → Leather', fiber:'Fiber → Cloth',
+                  wood:'Wood → Planks', rock:'Stone → Blocks'};
+// одно место, где решается, каким языком назвать категорию
+const catName   = c => (LANG==='ru' ? (CAT_RU[c]||c) : (CAT_EN[c]||CAT_RU[c]||c));
+const chainName = c => (LANG==='ru' ? (CHAIN_RU[c]||c) : (CHAIN_EN[c]||CHAIN_RU[c]||c));
 const STONE_RU = {RUNE:'руны', SOUL:'души', RELIC:'реликты'};
 const stoneKind = id => STONE_RU[id.split('_')[1]]||id;
 const CHAIN_RU = {ore:'Руда → Бруски', hide:'Шкуры → Кожа', fiber:'Волокно → Ткань', wood:'Дерево → Доски', rock:'Камень → Блоки'};
@@ -1686,11 +1708,11 @@ const QUAL_RU = {1:'Обычное',2:'Хорошее',3:'Выдающееся',
 function icon(id,q){ return `<img loading="lazy" src="https://render.albiononline.com/v1/item/${enc(id)}.png?size=64${q?`&quality=${q}`:''}" alt="">`; }
 function nameCell(it, extra, qualText){
   return `<td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${nmA(it)}</b>${extra||''}`+`
-    <span>${nmB(it)} · T${it.tier}${it.ench?'.'+it.ench:''} · ${CAT_RU[it.cat]||it.cat}${qualText?' · '+qualText:''}</span></div></td>`;
+    <span>${nmB(it)} · T${it.tier}${it.ench?'.'+it.ench:''} · ${catName(it.cat)}${qualText?' · '+qualText:''}</span></div></td>`;
 }
 function nameCellQ(it, q, extra){
   return `<td class="item">${icon(it.id,q)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${nmA(it)}</b>${extra||''}`+`
-    <span>${nmB(it)} · T${it.tier}${it.ench?'.'+it.ench:''} · ${CAT_RU[it.cat]||it.cat} · ${QUAL_RU[q]}</span></div></td>`;
+    <span>${nmB(it)} · T${it.tier}${it.ench?'.'+it.ench:''} · ${catName(it.cat)} · ${QUAL_RU[q]}</span></div></td>`;
 }
 // ключ строки, переживающий пересчёт и пересортировку: вкладка + предмет + город
 function rowKey(r){
@@ -1871,7 +1893,7 @@ function render(){
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
     } else if(S.tab==='ench'){
       html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(it.id,r.q)}<div class="iname"><b>${nmA(it)}${topBadge+limBadge+openBadge+warnBadge+staleBadge}</b>
-          <span>${nmB(it)} · T${it.tier}${it.ench?'.'+it.ench:''} <b style="color:var(--accent)">→ .${it.ench+1}</b> · ${CAT_RU[it.cat]||it.cat} · ${QUAL_RU[r.q]}</span></div></td>
+          <span>${nmB(it)} · T${it.tier}${it.ench?'.'+it.ench:''} <b style="color:var(--accent)">→ .${it.ench+1}</b> · ${catName(it.cat)} · ${QUAL_RU[r.q]}</span></div></td>
         <td>${QUAL_RU[r.q]}</td>
         <td>${fmt(r.buy)}<br><span class="fresh">${r.buyCity}</span></td>
         <td>${fmt(r.stoneCost)}<br><span class="fresh">${fmt(r.stoneN)} × ${stoneKind(r.stoneRes)} (${r.stoneCity})</span></td>
@@ -1906,7 +1928,7 @@ function render(){
         ? `<span class="fresh">🛒 купить сырьё: <b style="color:var(--text)">${r.buyCities.join(', ')}</b><br>⚒ переработать: <b style="color:var(--text)">${r.city}</b> ${bonusBadge}<br>💰 продать: <b style="color:var(--text)">${r.sellCity}</b></span>`
         : `<b>${r.city}</b> ${bonusBadge}<br><span class="fresh">купить сырьё, переработать и продать — всё в этом городе</span>`;
       html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(rm.id)}<div class="iname"><b>${nmA(rm)}${topBadge+limBadge+openBadge+warnBadge+staleBadge}</b>
-          <span>${nmB(rm)} · T${rm.tier}${rm.ench?'.'+rm.ench:''} · ${CHAIN_RU[rm.chain]}</span></div></td>
+          <span>${nmB(rm)} · T${rm.tier}${rm.ench?'.'+rm.ench:''} · ${chainName(rm.chain)}</span></div></td>
         <td>${route}</td>
         <td>${fmt(r.cost)}</td><td>${fmt(r.sell)}</td>
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
@@ -2671,7 +2693,7 @@ function itemCardHTML(id){
   let out = `<div class="panel"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <img src="https://render.albiononline.com/v1/item/${enc(id)}.png?size=76" style="width:64px;height:64px" onerror="this.style.display='none'">
       <div><div style="font-size:17px;font-weight:700">${nmA(nm)}${cpBtn(id)}</div>
-        <div class="fresh">${nm.ru||''} ${nm.tier?'· T'+nm.tier+(nm.ench?'.'+nm.ench:''):''} · ${isMat?'ресурс/материал':(CAT_RU[nm.cat]||nm.cat)} · <code>${id}</code></div></div>
+        <div class="fresh">${nm.ru||''} ${nm.tier?'· T'+nm.tier+(nm.ench?'.'+nm.ench:''):''} · ${isMat?'ресурс/материал':catName(nm.cat)} · <code>${id}</code></div></div>
       <span style="margin-left:auto;display:flex;gap:8px">${backBtnHTML()}<button id="itemBack">← к поиску</button></span></div>`;
 
   // сводка «лучшее сейчас» (обычное качество)
@@ -2771,7 +2793,7 @@ function itemTabHTML(){
   for(const h of hits.slice(0,60)){
     out += `<tr class="row" data-open="${h.id}"><td class="item">
       <img loading="lazy" src="https://render.albiononline.com/v1/item/${enc(h.id)}.png?size=48" style="width:38px;height:38px" onerror="this.style.display='none'">
-      <div class="iname"><b>${nmA(h)}</b><span>${nmB(h)} ${h.tier?'· T'+h.tier+(h.ench?'.'+h.ench:''):''} · ${h.kind==='mat'?'ресурс':(CAT_RU[h.cat]||h.cat)}</span></div></td></tr>`;
+      <div class="iname"><b>${nmA(h)}</b><span>${nmB(h)} ${h.tier?'· T'+h.tier+(h.ench?'.'+h.ench:''):''} · ${h.kind==='mat'?'ресурс':catName(h.cat)}</span></div></td></tr>`;
   }
   out += '</tbody></table></div>';
   return out;
@@ -2858,13 +2880,22 @@ function paintGroups(){
   const row=$('grpRow'); if(!row) return;
   row.querySelectorAll('button.grp').forEach(b=>b.classList.toggle('on', b.dataset.g===S.grp));
 }
+// Список категорий в фильтре — на выбранном языке, выбор при переключении не теряется.
+function fillCats(){
+  const cs=$('catSel'); if(!cs || !DATA) return;
+  const keep=cs.value;
+  cs.innerHTML='<option value="">Все</option>';
+  [...new Set(DATA.items.map(i=>i.cat))].sort((a,b)=>catName(a).localeCompare(catName(b)))
+    .forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=catName(c); cs.appendChild(o); });
+  cs.value=keep;
+}
 // Списки «дневного бонуса»: категории предметов плюс цепочки переработки.
 function fillDaily(){
   const opts = [['','— нет —']];
-  const cats = [...new Set(DATA.items.map(i=>i.cat))].sort((a,b)=>(CAT_RU[a]||a).localeCompare(CAT_RU[b]||b));
-  for(const c of cats) opts.push([c, CAT_RU[c]||c]);
-  opts.push(['potion','Зелья'],['meal','Еда']);
-  for(const [k,label] of Object.entries(CHAIN_RU||{})) opts.push(['chain:'+k, 'Переработка: '+label]);
+  const cats = [...new Set(DATA.items.map(i=>i.cat))].sort((a,b)=>catName(a).localeCompare(catName(b)));
+  for(const c of cats) opts.push([c, catName(c)]);
+  opts.push(['potion', catName('potion')], ['meal', catName('meal')]);
+  for(const k of Object.keys(CHAIN_RU||{})) opts.push(['chain:'+k, (LANG==='ru'?'Переработка: ':'Refining: ')+chainName(k)]);
   for(const [i,id] of [[0,'daily1'],[1,'daily2']]){
     const sel=$(id); if(!sel) continue;
     sel.innerHTML = opts.map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
@@ -2958,10 +2989,7 @@ window.goHome=()=>{
     if(hs) hs.innerHTML='<span style="color:var(--red)">Не удалось загрузить базу предметов (items.json). Обнови страницу.</span>';
     return;
   }
-  // категории в фильтр
-  { const cs=$('catSel');
-    [...new Set(DATA.items.map(i=>i.cat))].sort((a,b)=>(CAT_RU[a]||a).localeCompare(CAT_RU[b]||b))
-      .forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=CAT_RU[c]||c; cs.appendChild(o); }); }
+  fillCats();   // категории в фильтр — на выбранном языке
   fillDaily();   // списки дневного бонуса зависят от базы предметов — строим после её загрузки
   if(hs) hs.textContent='Цены загружаются в фоне — выбирай раздел…';
   await loadAll(false);
