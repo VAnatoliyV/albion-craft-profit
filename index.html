@@ -394,6 +394,17 @@ function normPrice(id, q){
   all.sort((a,b)=>a-b);
   return {price: all[Math.floor(all.length/2)], days:0, src:'ордера'};
 }
+// Цена продажи в городе: НИКОГДА не выше «обычной за месяц» — ровно та же защита,
+// что давно стоит на чёрном рынке. Живой пример: Major Gigantify Potion, Лимхёрст.
+// В снимке минимальный ордер был 13 175 (данным два часа), месячная норма 12 324,
+// а в игре к тому моменту кто-то выложил 209 штук по 11 779 — и реальная цена продажи
+// стала 11 776. Сайт считал профит 1 829 вместо 604. Ордер, который висит один и дорого,
+// перебивают стопкой дешёвых ровно тогда, когда ты приедешь продавать.
+function cityAsk(id, q, ask){
+  const nm = normPrice(id, q);
+  if(!CFG.useBase || !nm || !(ask > nm.price)) return {price:ask, spike:0, norm:nm?nm.price:0};
+  return {price:nm.price, spike:Math.round((ask/nm.price-1)*100), norm:nm.price};
+}
 function askCapFor(id, q){ const n=normPrice(id,q); return n ? n.price*CFG.askCap : Infinity; }
 // Вес вещи в килограммах: из дампа Albion, ключ без зачарования — оно на вес не влияет.
 function itemKg(it){ const id=(it&&it.id)||''; return (DATA&&DATA.weights) ? (DATA.weights[id.split('@')[0]]||0) : 0; }
@@ -1243,7 +1254,8 @@ function compute(){
         if(v.sell>capAsk) continue;                 // фантомный прайс, продать по нему нельзя
         if(v.sell>bestCityPrice){ bestCityPrice=v.sell; bestCity=c; }
       }
-      const revCity = bestCity ? bestCityPrice*(1-tax-CFG.setupFee) : null;
+      const cityFair = bestCity ? cityAsk(it.id, 1, bestCityPrice) : null;
+      const revCity = cityFair ? cityFair.price*(1-tax-CFG.setupFee) : null;
       let rev, channel;
       if(revBM!=null && (revCity==null || revBM>=revCity)){ rev=revBM; channel='ЧР'; }
       else if(revCity!=null){ rev=revCity; channel=bestCity; }
@@ -1270,6 +1282,7 @@ function compute(){
         vol, pool: vol*Math.max(net,0), cash:cc.cash, ...goldOf(net, cc.cost, vol, stale, cc.cash), stale, warn,
         bmPrice, bmSrc, cityPrice:bestCityPrice||null, fee:cc.fee, ret:cc.ret, raw:cc.raw, rawNoRet:cc.rawNoRet||0,
         bmNow: bq1?bq1.now:null, bmBase: bq1?bq1.base:null, spike, swing,
+        cityAskNow: bestCityPrice||null, cityNorm: cityFair?cityFair.norm:0, citySpike: cityFair?cityFair.spike:0,
         artCost:cc.artCost||0, artInfo:cc.artInfo||null});
     }
   }
@@ -1496,10 +1509,11 @@ function compute(){
           if(v.sell>capAsk) continue;               // фантомный прайс
           if(!cityBest || v.sell>cityBest.sell) cityBest={...v, city:c};
         }
-        const revCity = cityBest ? cityBest.sell*(1-tax-CFG.setupFee) : null;
+        const cityFairE = cityBest ? cityAsk(targetId, q, cityBest.sell) : null;
+        const revCity = cityFairE ? cityFairE.price*(1-tax-CFG.setupFee) : null;
         let rev, channel, sell, cityBid=null;
         if(revBM!=null && (revCity==null || revBM>=revCity)){ rev=revBM; channel='ЧР'; sell=tq.price; }
-        else if(revCity!=null){ rev=revCity; channel=cityBest.city; sell=cityBest.sell; cityBid=cityBest.buy||0; }
+        else if(revCity!=null){ rev=revCity; channel=cityBest.city; sell=cityFairE.price; cityBid=cityBest.buy||0; }
         else continue;
         if(sellOvr!=null){ sell=sellOvr; rev=sellOvr*(channel==='ЧР' ? (1-tax) : (1-tax-CFG.setupFee)); }
         const net = rev - cost, margin = net/cost*100;
@@ -1579,7 +1593,9 @@ function compute(){
       }
       if(!sellCity) continue;
       if(sellOvr!=null) sellPrice = sellOvr;
-      const rev = sellPrice*(1-tax-CFG.setupFee);
+      // своя цена всегда сильнее нормы: раз ввёл число руками — считаем по нему
+      const fair = sellOvr!=null ? {price:sellPrice, spike:0, norm:0} : cityAsk(c.id, 1, sellPrice);
+      const rev = fair.price*(1-tax-CFG.setupFee);
       const net = rev-cost;
       const margin = net/cost*100;
       const vol = S.cityHist?.[c.id]?.[sellCity]?.[1] ?? null;
@@ -1593,7 +1609,8 @@ function compute(){
       }
       const tr = trendStats(cparts, fee/c.batch, rev, trendSeriesOf('city', c.id));
       consRows.push({tr, it:c, city, bonus, daily:dly>0, cost, costBatch, cash, cashBatch, raw, rawNoRet, ret, fee, rev,
-        channel:sellCity, sellPrice, net, margin, vol,
+        channel:sellCity, sellPrice:fair.price, askNow:sellPrice, cityNorm:fair.norm, citySpike:fair.spike,
+        sellBid:(S.cityPrices[c.id]?.[sellCity]?.[1]?.buy)||0, sellAge:hoursAgo(sellTs), net, margin, vol,
         pool: vol!=null?vol*Math.max(net,0):null,
         ...goldOf(net, cost, vol, stale, cash), stale, warn});
     }
@@ -1845,6 +1862,9 @@ function render(){
       : `<span class="badge b-lim2" title="Ограничение — рынок: серебра хватает с запасом, но больше этого объёма в день без демпинга не продать. Тут выигрывает оборот.">📦 упёрлось в рынок</span>`) : '';
     const warnBadge = r.warn?`<span class="badge b-warn" title="${WARN_TIP}">⚠ проверить</span>`:'';
     // цена сейчас выше своей месячной нормы — это всплеск, крафтить под него нельзя
+    // городской ордер задран над месячной нормой — считаем по норме, но предупреждаем
+    const citySpikeBadge = (r.citySpike>CFG.spikeCut)
+      ? `<span class="badge b-warn" title="В ${r.channel} сейчас просят ${fmt(r.cityAskNow||r.askNow)} — на ${r.citySpike}% выше обычной цены за месяц (${fmt(r.cityNorm)}). В расчёт взята обычная: одинокий дорогой ордер перебивают стопкой дешёвых ровно тогда, когда приезжаешь продавать.">🔥 ордер выше нормы</span>` : '';
     const spikeBadge = r.spike>CFG.spikeCut
       ? `<span class="badge b-warn" title="Сейчас на чёрном рынке за это дают ${fmt(r.bmNow)} — на ${r.spike}% выше обычной цены ${fmt(r.bmBase)}, по которой предмет торгуется месяц.&#10;&#10;Всплески живут день-два. Пока ты скрафтишь партию, цена вернётся к обычной — именно так и вышло с шипованными перчатками: месяц стояли 32 000, за два дня взлетели до 70 500 и сдулись обратно.&#10;&#10;Профит здесь посчитан по ОБЫЧНОЙ цене, а не по всплеску. Крафтить под это не надо. А вот сдать то, что уже лежит в сундуке, — самое время.">📈 всплеск +${r.spike}%</span>`
       : (r.swing>CFG.swingCut ? `<span class="badge b-warn" title="Цена этого предмета за месяц гуляет на ${r.swing}% — предсказать, сколько дадут через два дня, нельзя. В «Золотую середину» такие не попадают.">🎲 цена скачет</span>` : '');
@@ -1857,7 +1877,7 @@ function render(){
         + (r.daily?'<span class="badge b-bonus" title="Сегодняшний дневной бонус производства: +10 процентных пунктов к возврату ресурсов на эту категорию. Отмечено тобой в шапке.">+10% день</span>':'');
       const chLabel = r.channel==='ЧР' ? `ЧР · ${qualMode==='q1'?'обыч. кач.':'все кач.'}` : r.channel+' · обыч. кач.';
       const qualText = qualMode==='q1' ? 'Обычное' : 'Все качества (взвеш.)';
-      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}">${nameCell(it, topBadge+limBadge+openBadge+spikeBadge+warnBadge+staleBadge, qualText)}
+      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}">${nameCell(it, topBadge+limBadge+openBadge+spikeBadge+citySpikeBadge+warnBadge+staleBadge, qualText)}
         <td>${r.city}${bonusBadge}</td><td>${fmt(r.cost)}</td><td>${fmt(r.rev)}</td>
         <td><span class="badge b-ch">${chLabel}</span></td>
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
@@ -1870,7 +1890,7 @@ function render(){
     } else if(S.tab==='cons'){
       const bonusBadge = (r.bonus?'<span class="badge b-bonus">бонус</span>':'')
         + (r.daily?'<span class="badge b-bonus" title="Сегодняшний дневной бонус производства: +10 процентных пунктов к возврату ресурсов на эту категорию.">+10% день</span>':'');
-      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${nmA(it)}</b>${topBadge+limBadge+openBadge+warnBadge+staleBadge}
+      html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${nmA(it)}</b>${topBadge+limBadge+openBadge+citySpikeBadge+warnBadge+staleBadge}
         <span>${nmB(it)} · T${it.tier}${it.ench?'.'+it.ench:''} · ${it.cat==='potion'?'Зелье':'Еда'} · партия ${it.batch} шт</span></div></td>
         <td>${r.city}${bonusBadge}</td><td>${fmt(r.cost)}</td>
         <td><span class="badge b-ch">${r.channel}</span></td>
@@ -2019,6 +2039,7 @@ function calcConsUpd(idx){
   const want=+($('calcConsN'+idx)?.value||0);
   if(!want){ el.innerHTML=''; return; }
   const batches=Math.ceil(want/it.batch), made=batches*it.batch;
+  const tax=$('premChk').checked?0.04:0.08;   // для строки «мгновенно дадут столько-то»
   const noRet=new Set(it.noRet||[]);
   const mode=$('calcConsMode'+idx)?.value||'full';
   const chain=mode==='chain';
@@ -2065,6 +2086,12 @@ function calcConsUpd(idx){
         onclick="event.stopPropagation()" onchange="setSellOverride('${it.id}',this.value)"
         title="По какой цене реально продашь. Пусто или 0 — вернуть цену из API.">${S.overrides['SELL|'+it.id]!=null?' <span style="color:var(--accent)">✎</span>':''}
       → нетто <b>${fmt(r.rev)}</b>/шт<br>`+
+     `<span class="fresh">`+
+     (r.citySpike>0
+       ? `Сейчас в ${r.channel} просят <b style="color:var(--text)">${fmt(r.askNow)}</b> — на ${r.citySpike}% выше обычной цены за месяц (${fmt(r.cityNorm)}). Считаем по обычной: одинокий дорогой ордер перебивают стопкой дешёвых ровно тогда, когда приезжаешь продавать.`
+       : `Цена снята ${r.sellAge<1?Math.max(1,Math.round(r.sellAge*60))+' мин':Math.round(r.sellAge)+' ч'} назад${r.cityNorm?`, обычная за месяц ${fmt(r.cityNorm)}`:''}.`)+
+     (r.sellBid?` Мгновенно (бай-ордер) дадут <b style="color:var(--text)">${fmt(r.sellBid)}</b> — это ${fmt(Math.round(r.sellBid*(1-tax)-r.cost))}/шт после налога.`:'')+
+     `</span><br>`+
      `<b>Наличных на закупку: ${fmt(sum + r.fee*batches)}</b>
       <span class="help" title="Столько серебра нужно иметь на руках прямо сейчас: сырьё оплачивается полной ценой, станок тоже. Возврат ресурсов придёт материалами в инвентарь уже после крафта — это не серебро, но его можно продать или пустить в следующую партию. Поэтому «вложение» ниже меньше.">?</span>`+
      ` → останется материалами ~${fmt(leftVal)}<br>`+
