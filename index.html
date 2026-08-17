@@ -274,7 +274,12 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
       <span class="help" title="Своя пара городов вместо автоподбора.&#10;&#10;По умолчанию сайт для каждого предмета сам берёт самый дешёвый город и самый дорогой — маршрут получается разный от строки к строке, и повезти всё одной ходкой нельзя.&#10;&#10;Задай «откуда» и «куда» — и останутся только те предметы, которые выгодно тащить именно по этому маршруту. Это уже готовый список закупки на одну поездку.&#10;&#10;Можно указать только одно поле: например «откуда: Бресильен, куда: любой» — что выгодно вывозить из Бресильена куда угодно.&#10;&#10;Явно выбранный город работает даже при включённых «безопасных маршрутах»: раз ты его назвал, значит дорогу туда планируешь сам.">?</span>
     </label>
     <label class="ctl toggle" id="wrapFocus"><input type="checkbox" id="focusChk"> Фокус</label>
-    <label class="ctl toggle" id="wrapLocal"><input type="checkbox" id="localChk"> 📍 Продать на месте<span class="help" title="Продажа только в том же городе, где скрафтил. В Рунофикации — шмотка, камни и продажа всё в одном городе. Никакой перевозки вообще — ни между городами, ни на чёрный рынок.&#10;&#10;Сайт по умолчанию ищет лучшую цену среди всех городов и молча предполагает, что ты туда повезёшь. Этот режим отвечает на другой вопрос: сколько выйдет, если никуда не ехать.&#10;&#10;Исключение — крафт в Карлеоне: там чёрный рынок под боком, поэтому продажа на ЧР считается продажей на месте.&#10;&#10;В режиме «все города» перебираются все доступные города и остаётся лучший вариант по каждому предмету.">?</span></label>
+    <label class="ctl" id="wrapLocal" title="Куда возить.&#10;&#10;«Лучший маршрут» — сайт ищет лучшую цену среди всех городов и молча предполагает, что ты туда повезёшь. Вес и ходки видно в колонке «Мне за день», риск ганка в расчёт не входит.&#10;&#10;«На месте» — покупка, крафт и продажа в одном городе. В Рунофикации — шмотка, камни и продажа тоже в одном. Никакой перевозки вообще. Отвечает на вопрос «сколько выйдет, если никуда не ехать».&#10;&#10;Исключение — Карлеон: там чёрный рынок под боком, поэтому продажа на ЧР считается продажей на месте.&#10;&#10;В режиме «все города» перебираются все доступные и остаётся лучший вариант по каждому предмету.">Режим
+      <select id="modeSel">
+        <option value="route">Лучший маршрут</option>
+        <option value="local">📍 На месте</option>
+      </select>
+    </label>
     <label class="ctl toggle" id="wrapSafeCraft"><input type="checkbox" id="safeCraftChk"> 🛡 Безопасный крафт<span class="help" title="Убирает из расчёта опасную логистику.&#10;&#10;Крафт и продажа только там, куда можно дойти безопасно: 5 королевских городов и Бресильен. Карлеон исключается целиком — он на чёрном острове, туда и оттуда везут через красные и чёрные зоны. Вместе с ним отключается чёрный рынок: он как раз в Карлеоне.&#10;&#10;Цена безопасности: бонус +15% даётся только в «своём» городе категории. У кастетов, посохов оборотня и всей еды он в Карлеоне — в этом режиме ты их крафтишь без бонуса, с базовым возвратом. Зелья, плащи и сумки не страдают: их бонус в Бресильене, а туда дорога безопасная.">?</span></label>
     <label class="ctl toggle" id="wrapSafe"><input type="checkbox" id="safeChk"> Безопасные маршруты<span class="help" title="Убирает Карлеон из перевозок: дорога туда идёт через красные и чёрные зоны. Бресильен остаётся — до него есть безопасный путь.&#10;&#10;Действует на «Лучший маршрут» в Переработке, на Флиппинг между городами и на Рунофикацию — там вместе с Карлеоном отключается и чёрный рынок: он стоит именно там, и везти туда вещь пришлось бы через красные зоны.&#10;&#10;Не влияет на: локальные циклы (там нет перевозок) и на продажу на ЧР во Флиппинге — этот раздел про чёрный рынок и есть, доставку туда ты планируешь сам. Для полного исключения Карлеона из крафта есть отдельный переключатель «Безопасный крафт».">?</span></label>
     <label class="ctl toggle" id="wrapSelfRef"><input type="checkbox" id="selfRefChk"> Сырьё сам<span class="help" title="Для каждого материала сайт сравнивает два пути: купить готовый ресурс (бруски, кожу…) на рынке или купить сырьё (руду, шкуры…) и переработать самому в городе крафта — с учётом возврата и платы за станок. В себестоимость идёт то, что дешевле. В карточке предмета видно, где выгоднее переработать самому (метка ⚒).">?</span></label>
@@ -343,8 +348,8 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
     </label>
     <label class="ctl" id="refModeWrap" style="display:none">Режим переработки<span class="help" title="Локальный цикл — купил сырьё, переработал и продал в одном и том же городе: ноль перевозок и риска.&#10;&#10;Лучший маршрут — сайт подбирает максимальный профит: сырьё покупается там, где дешевле, переработка идёт в выбранном городе (или бонусном, если выбраны «Все города»), а готовый ресурс продаётся там, где дороже. Перевозка между городами — на тебе: вес, ходки и риск ганка в расчёт не входят.">?</span>
       <select id="refModeSel">
-        <option value="local">Локальный цикл</option>
         <option value="route">Лучший маршрут</option>
+        <option value="local" selected>📍 На месте (локальный цикл)</option>
       </select>
     </label>
     <label class="ctl">Маржа ≥ <input type="number" id="minMargin" value="0" style="width:60px">%</label>
@@ -497,7 +502,7 @@ function routeCities(){ return safeRoutes() ? SAFE_CITIES : CITIES; }
 // «Безопасный крафт»: и варим, и продаём только в королевской пятёрке, ЧР выключен
 function safeCraft(){ return !!$('safeCraftChk')?.checked; }
 function craftCities(){ return safeCraft() ? SAFE_CITIES : CITIES; }
-function localOnly(){ return !!$('localChk')?.checked; }
+function localOnly(){ return ($('modeSel')?.value)==='local'; }
 // когда перебрано несколько городов, в таблице оставляем лучший вариант на предмет
 function bestPerItem(rows){
   const best=new Map();
@@ -2104,35 +2109,20 @@ function calcConsUpd(idx){
 }
 function detailHTML(r,idx){
   const it=r.it;
-  let m='<b>Материалы (цены в '+r.city+', можно править ✎):</b><table><tr><th class="item">Ресурс</th><th>Кол-во</th><th>Цена (ред.)</th><th>Сумма</th></tr>';
-  const noRetSet = it.noRet ? new Set(it.noRet) : null;
-  for(const [mid,c] of Object.entries(it.mats)){
-    const p=matPrice(mid, r.city);
-    const pe=effMatPrice(mid, r.city);
-    const selfMark = pe&&pe.self ? ` <span style="color:var(--green)" title="Дешевле переработать самому из сырья: ${fmt(pe.price)} против ${p?fmt(p.price):'—'} на рынке. Уже учтено в себестоимости.">⚒ сам ${fmt(pe.price)}</span>` : '';
-    const noRetMark = noRetSet&&noRetSet.has(mid) ? ' <i style="color:var(--muted)">без возврата</i>' : '';
-    const mn=(DATA.matNames||{})[mid];
-    m+=`<tr><td class="item">${icon(mid)} ${nmA(mn)||mid}${cpBtn(mid)}${nmB(mn)?' <span class="fresh">'+nmB(mn)+'</span>':''}${noRetMark}${p&&p.ovr?' <span style="color:var(--accent)">✎</span>':''}${selfMark}</td><td>${c}</td>
-      <td><input type="number" style="width:90px" value="${p?Math.round(p.price):''}" placeholder="—"
-        onchange="setOverride('${mid}','${r.city}',this.value)"
-        title="Введи свою цену, если на рынке она другая. Пустое поле или 0 — вернуть цену из API."></td>
-      <td>${pe?fmt(pe.price*c):'—'}</td></tr>`;
-  }
-  if(it.art && r.artInfo){
-    const an=(DATA.matNames||{})[it.art.id]||{};
-    const aOvr=S.overrides[it.art.id+'|'+r.artInfo.city]!=null;
-    const a=r.artInfo;
-    const где = a.away
-      ? `<span class="fresh" title="В ${r.city} этот артефакт сейчас не продаётся, поэтому цена взята из ближайшего города, где он есть. За ним придётся съездить.">артефакт · в ${r.city} нет, цена из ${a.city}</span>`
-      : `<span class="fresh">артефакт · цена в ${r.city}</span>`
-        + (a.alt ? ` <span class="fresh" style="color:var(--accent)" title="Артефакт лёгкий, съездить за ним дешевле, чем кажется. Но в себестоимости выше стоит цена ${r.city} — то, во что он обойдётся, если никуда не ехать.">дешевле в ${a.alt.city}: ${fmt(Math.round(a.alt.price))} (−${Math.round((1-a.alt.price/a.price)*100)}%)</span>` : '');
-    m+=`<tr><td class="item">${icon(it.art.id)} ${nmA(an)||'Артефакт'}${cpBtn(it.art.id)}${nmB(an)?' <span class="fresh">'+nmB(an)+'</span>':''}${aOvr?' <span style="color:var(--accent)">✎</span>':''} ${где}</td><td>${it.art.n}</td>
-      <td><input type="number" style="width:90px" value="${Math.round(r.artInfo.price)}" placeholder="—"
-        onchange="setOverride('${it.art.id}','${r.artInfo.city}',this.value)"
-        title="Своя цена артефакта в ${r.artInfo.city}. Пустое поле или 0 — вернуть цену из API."></td>
-      <td>${fmt(r.artCost)} <i style="color:var(--muted)">без возврата</i></td></tr>`;
-  }
-  m+='</table>';
+  // Раньше здесь было две таблицы: сверху материалы на одну штуку, снизу — отдельный
+  // калькулятор с колонкой «купить всего». Один и тот же список ресурсов дважды, и чтобы
+  // сверить «сколько брать» с «почём», приходилось скакать вверх-вниз. Теперь как в Зельях:
+  // одна таблица, где и цена правится, и количество на партию сразу видно.
+  let m = trendChartHTML(r.tr);
+  m += `<br><b>🧮 Расчёт партии:</b> крафтим
+      <input type="number" value="100" min="1" step="10" style="width:90px" id="calcN${idx}" onclick="event.stopPropagation()" oninput="calcUpd(${idx})"> шт.
+      &nbsp; 🛒 <b>Закупка</b>
+      <select id="calcMode${idx}" onclick="event.stopPropagation()" onchange="calcUpd(${idx})">
+        <option value="chain">впритык, с возвратом</option>
+        <option value="full">на всё количество</option>
+      </select>
+      <span class="help" title="«Впритык, с возвратом» — возврат ресурсов падает в сумку после каждого крафта, и его можно скормить в следующий. Тогда закупить надо примерно на четверть меньше. НО: возврат случайный, 24.8% — это среднее за много крафтов, на одной партии может не повезти. Поэтому сюда заложено 5% страховки — раньше её не было, и партия вставала на последней штуке.&#10;&#10;Важно: станок проверяет материалы на ВЕСЬ заказ сразу. Поставить 100 штук одной кнопкой в этом режиме не выйдет — крафтить придётся кусками по 10–20, подбирая возврат из сумки.&#10;&#10;«На всё количество» — полный рецепт на все штуки. Одна кнопка, никакой возни, но денег нужно на четверть больше, а в конце останется гора возвращённых материалов. Профит от выбора не меняется: остатки стоят ровно столько, сколько ты переплатил.">?</span>
+      <div id="calcOut${idx}" style="margin-top:6px"></div>`;
   const sOvr = S.overrides['SELL|'+it.id]!=null;
   m+=(r.raw ? `Сырьё: <b>${fmt(r.raw)}</b> · Возврат: <b>${(r.ret*100).toFixed(1)}%</b> → эффективно ${fmt(r.raw*(1-r.ret))} · ` : '')+
      (r.rawNoRet ? `Компоненты: <b>${fmt(r.rawNoRet)}</b> <i style="color:var(--muted)">без возврата</i> · ` : '')+
@@ -2158,16 +2148,6 @@ function detailHTML(r,idx){
        + `<td><span class="fresh">${d.price?fmt(d.price):'—'}</span></td><td>${fmt(d.vol)}</td></tr>`; }
     m+='</table>';
   }
-  m+=trendChartHTML(r.tr);
-  m+=`<br><b>🧮 Калькулятор партии:</b> крафтим
-      <input type="number" value="100" min="1" step="10" style="width:90px" id="calcN${idx}" oninput="calcUpd(${idx})"> шт.
-      &nbsp; 🛒 <b>Закупка</b>
-      <select id="calcMode${idx}" onclick="event.stopPropagation()" onchange="calcUpd(${idx})">
-        <option value="chain">впритык, с возвратом</option>
-        <option value="full">на всё количество</option>
-      </select>
-      <span class="help" title="«Впритык, с возвратом» — возврат ресурсов падает в сумку после каждого крафта, и его можно скормить в следующий. Тогда закупить надо примерно на четверть меньше. НО: возврат случайный, 24.8% — это среднее за много крафтов, на одной партии может не повезти. Поэтому сюда заложено 5% страховки — раньше её не было, и партия вставала на последней штуке.&#10;&#10;Важно: станок проверяет материалы на ВЕСЬ заказ сразу. Поставить 100 штук одной кнопкой в этом режиме не выйдет — крафтить придётся кусками по 10–20, подбирая возврат из сумки.&#10;&#10;«На всё количество» — полный рецепт на все штуки. Одна кнопка, никакой возни, но денег нужно на четверть больше, а в конце останется гора возвращённых материалов. Профит от выбора не меняется: остатки стоят ровно столько, сколько ты переплатил.">?</span>
-      <div id="calcOut${idx}" style="margin-top:6px"></div>`;
   return m;
 }
 // ─── Рунофикация: разбор строки и калькулятор партии ───
@@ -2229,22 +2209,44 @@ function calcUpd(idx){
   // не повезло с возвратом — и материалов не хватило. Теперь два честных режима.
   const mode = $('calcMode'+idx)?.value || 'chain';
   const BUF = 1.05;                             // страховка на невезение с возвратом
-  let html='<table><tr><th class="item">Ресурс</th><th>Купить всего</th><th>Стоимость</th></tr>';
+  // Одна таблица на всё: и цена правится тут же, и сколько нужно на партию видно рядом.
+  let html=`<div style="margin:2px 0 4px"><b>Материалы на ${fmt(N)} шт</b>, цены в ${r.city}, `+
+    `закупка ${mode==='full'?'на всё количество':'впритык'}:</div>`+
+    '<table><tr><th class="item">Ресурс</th><th>На 1 шт</th><th>Цена (ред.)</th><th>Купить всего</th><th>Сумма</th></tr>';
   let matTotal=0;
   for(const [mid,c] of Object.entries(it.mats)){
     const p=matPrice(mid, r.city);
+    const pe=effMatPrice(mid, r.city);
     const noR = noRetSet && noRetSet.has(mid);   // на такие возврат не действует — берём полное количество
     const need = (noR || mode==='full') ? c*N : Math.ceil(c*N*(1-r.ret)*BUF);
-    const cost=p?need*p.price:null;
+    const unit = pe?pe.price:(p?p.price:null);
+    const cost = unit!=null ? need*unit : null;
     if(cost!=null) matTotal+=cost;
     const mn=(DATA.matNames||{})[mid];
-    html+=`<tr><td class="item">${icon(mid)} ${nmA(mn)||mid}${cpBtn(mid)}${noR?' <i style="color:var(--muted)">без возврата</i>':''}${p&&p.ovr?' <span style="color:var(--accent)">✎</span>':''}</td><td>${fmt(need)}</td><td>${cost!=null?fmt(cost):'—'}</td></tr>`;
+    const selfMark = pe&&pe.self ? ` <span style="color:var(--green)" title="Дешевле переработать самому из сырья: ${fmt(pe.price)} против ${p?fmt(p.price):'—'} на рынке. Уже учтено в себестоимости.">⚒ сам ${fmt(pe.price)}</span>` : '';
+    html+=`<tr><td class="item">${icon(mid)} ${nmA(mn)||mid}${cpBtn(mid)}${nmB(mn)?' <span class="fresh">'+nmB(mn)+'</span>':''}`+
+      `${noR?' <i style="color:var(--muted)">без возврата</i>':''}${p&&p.ovr?' <span style="color:var(--accent)">✎</span>':''}${selfMark}</td>`+
+      `<td>${c}</td>`+
+      `<td><input type="number" style="width:90px" value="${p?Math.round(p.price):''}" placeholder="—"
+         onclick="event.stopPropagation()" onchange="setOverride('${mid}','${r.city}',this.value)"
+         title="Введи свою цену, если на рынке она другая. Пустое поле или 0 — вернуть цену из API."></td>`+
+      `<td><b>${fmt(need)}</b></td><td>${cost!=null?fmt(cost):'—'}</td></tr>`;
   }
   if(it.art && r.artInfo){
-    const cost=N*it.art.n*r.artInfo.price; matTotal+=cost;
+    const a=r.artInfo, cost=N*it.art.n*a.price; matTotal+=cost;
     const an=(DATA.matNames||{})[it.art.id]||{};
-    html+=`<tr><td class="item">${icon(it.art.id)} ${nmA(an)||'Артефакт'}${cpBtn(it.art.id)}${nmB(an)?' <span class="fresh">'+nmB(an)+'</span>':''} <span class="fresh">(${r.artInfo.city}${r.artInfo.away?', в '+r.city+' нет':''})</span></td><td>${fmt(N*it.art.n)}</td><td>${fmt(cost)}</td></tr>`;
+    const где = a.away
+      ? `<span class="fresh" title="В ${r.city} этот артефакт сейчас не продаётся, цена взята из ближайшего города, где он есть. За ним придётся съездить.">в ${r.city} нет, цена из ${a.city}</span>`
+      : `<span class="fresh">цена в ${r.city}</span>`
+        + (a.alt ? ` <span class="fresh" style="color:var(--accent)" title="Артефакт лёгкий, съездить за ним дешевле, чем кажется. Но в себестоимости стоит цена ${r.city} — то, во что он обойдётся, если никуда не ехать.">дешевле в ${a.alt.city}: ${fmt(Math.round(a.alt.price))} (−${Math.round((1-a.alt.price/a.price)*100)}%)</span>` : '');
+    html+=`<tr><td class="item">${icon(it.art.id)} ${nmA(an)||'Артефакт'}${cpBtn(it.art.id)}${nmB(an)?' <span class="fresh">'+nmB(an)+'</span>':''} <i style="color:var(--muted)">без возврата</i> ${где}</td>`+
+      `<td>${it.art.n}</td>`+
+      `<td><input type="number" style="width:90px" value="${Math.round(a.price)}" placeholder="—"
+         onclick="event.stopPropagation()" onchange="setOverride('${it.art.id}','${a.city}',this.value)"
+         title="Своя цена артефакта в ${a.city}. Пустое поле или 0 — вернуть цену из API."></td>`+
+      `<td><b>${fmt(N*it.art.n)}</b></td><td>${fmt(cost)}</td></tr>`;
   }
+  html+=`<tr><td class="item"><b>Итого сырья</b></td><td></td><td></td><td></td><td><b>${fmt(Math.round(matTotal))}</b></td></tr>`;
   html+='</table>';
   const feeN = r.fee*N;
   // журналы: 3 крафта = 1 журнал своего тира
@@ -2954,7 +2956,7 @@ $('safeChk').onchange=()=>{ compute(); render(); };
 ['flipFrom','flipTo'].forEach(id=>$(id).onchange=()=>{ S.limit=0; compute(); render(); });
 $('flipSwap').onclick=()=>{ const a=$('flipFrom'), b=$('flipTo'); const t=a.value; a.value=b.value; b.value=t; S.limit=0; compute(); render(); };
 $('safeCraftChk').onchange=()=>{ S.limit=0; compute(); render(); };
-$('localChk').onchange=()=>{ S.limit=0; compute(); render(); };
+$('modeSel').onchange=()=>{ S.limit=0; compute(); render(); };
 $('ovrReset').onclick=()=>{ S.overrides={}; saveOverrides(); compute(); render(); };
 window.setOverride=(mid,city,val)=>{
   const v=parseFloat(val);
