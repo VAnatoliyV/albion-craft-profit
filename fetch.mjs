@@ -40,6 +40,21 @@ function pushDay(map, id, day, price){
   const byDay = map.get(id) || map.set(id, new Map()).get(id);
   (byDay.get(day) || byDay.set(day, []).get(day)).push(price);
 }
+// «Обычная цена за месяц» — медиана суточных медиан за BASE_DAYS. Считается из тех же
+// точек, что и тренд, поэтому не стоит ни одного лишнего запроса к API. Нужна там же,
+// где и для предметов: отличить живую цену от одинокого задранного ордера.
+function baseFrom(byDay){
+  if(!byDay) return null;
+  const last = todayIdx(); const arr = [];
+  for(let i=0;i<BASE_DAYS;i++){
+    const a = byDay.get(last - i); if(!a || !a.length) continue;
+    const srt = [...a].sort((x,y)=>x-y);
+    arr.push(srt[Math.floor(srt.length/2)]);
+  }
+  if(arr.length < 3) return null;                  // на двух точках медиана ничего не стоит
+  arr.sort((a,b)=>a-b);
+  return [Math.round(arr[Math.floor(arr.length/2)]), arr.length];
+}
 // Ряд за TREND_DAYS суток в ПРОЦЕНТАХ от самого свежего дня с данными.
 // Проценты, а не цены: числа втрое короче (снимок и так 4.5 МБ), а стабильность
 // считается по ходу цены, не по её величине. 0 — в этот день торгов не было.
@@ -308,12 +323,17 @@ async function main(){
   // ряды в снимок: проценты от последнего известного дня, окно TREND_DAYS
   out.td = TREND_DAYS;
   out.mh = {}; out.bh = {}; out.ih = {};
-  for(const [id, byDay] of matDays){ const s = trendSeries(byDay); if(s) out.mh[id] = s; }
+  out.mb = {};                                     // материал -> [обычная цена за месяц, дней]
+  for(const [id, byDay] of matDays){
+    const s = trendSeries(byDay); if(s) out.mh[id] = s;
+    const b = baseFrom(byDay);    if(b) out.mb[id] = b;
+  }
   for(const id of new Set([...bmDays.keys(), ...bmAnyDays.keys()])){
     const s = trendSeries(bmDays.get(id)) || trendSeries(bmAnyDays.get(id));
     if(s) out.bh[id] = s;
   }
   for(const [id, byDay] of cityDays){ const s = trendSeries(byDay); if(s) out.ih[id] = s; }
+  console.log(`месячная норма материалов: ${Object.keys(out.mb).length}`);
   console.log(`тренды: материалы ${Object.keys(out.mh).length}, ЧР ${Object.keys(out.bh).length}, города ${Object.keys(out.ih).length}`);
 
   out.t = Math.round(Date.now()/1000);
@@ -326,6 +346,7 @@ async function main(){
     itemsWithBMOrders: Object.keys(out.bo||{}).length,
     resourceVolumes: Object.keys(out.h).length,
     itemsWithCityVolumes: Object.keys(out.ch||{}).length,
+    materialsWithBase: Object.keys(out.mb||{}).length,
     requestsOk: okCount, requestsFailed: failCount,
     rateWaitSec: Math.round(waitedMs/1000),
     sizeKB: Math.round(json.length/1024),

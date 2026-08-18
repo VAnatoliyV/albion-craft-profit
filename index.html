@@ -391,6 +391,8 @@ const SAFE_CITIES = [...ROYAL_CITIES, 'Brecilien'];
 function normPrice(id, q){
   const cb = S.cityBase?.[id]?.[q];
   if(cb && cb.base) return {price:cb.base, days:cb.days||0, src:'города'};
+  const mb = (q==1) && S.matBase?.[id];             // ресурсы: одно качество
+  if(mb && mb.base) return {price:mb.base, days:mb.days||0, src:'города'};
   const bq = S.bm[id]?.qs?.[q];
   if(bq && bq.base) return {price:bq.base, days:bq.days||0, src:'ЧР'};
   const all=[];
@@ -409,6 +411,16 @@ function cityAsk(id, q, ask){
   const nm = normPrice(id, q);
   if(!CFG.useBase || !nm || !(ask > nm.price)) return {price:ask, spike:0, norm:nm?nm.price:0};
   return {price:nm.price, spike:Math.round((ask/nm.price-1)*100), norm:nm.price};
+}
+// Для ресурсов правило мягче, чем для вещей. Рынок сырья самый глубокий в игре: там сотни
+// ордеров, и минимальный ордер обычно настоящий. Поэтому обрезаем цену продажи не по любому
+// превышению нормы, а только когда она задрана выше порога всплеска — иначе обычные колебания
+// рынка занижали бы профит переработки на ровном месте.
+function refAsk(id, ask){
+  const nm = normPrice(id, 1);
+  if(!CFG.useBase || !nm || !(ask > nm.price*(1+CFG.spikeCut/100)))
+    return {price:ask, spike: nm && ask>nm.price ? Math.round((ask/nm.price-1)*100) : 0, norm:nm?nm.price:0, capped:false};
+  return {price:nm.price, spike:Math.round((ask/nm.price-1)*100), norm:nm.price, capped:true};
 }
 function askCapFor(id, q){ const n=normPrice(id,q); return n ? n.price*CFG.askCap : Infinity; }
 // Вес вещи в килограммах: из дампа Albion, ключ без зачарования — оно на вес не влияет.
@@ -620,6 +632,7 @@ const S = {
   bm:{},               // itemId -> {qs:{q:{price,vol}}, vol, last}
   cityHist:{},         // itemId -> {city: {q: vol/день}}  (объёмы рынков городов, догружается)
   cityBase:{},         // itemId -> {q: {base, days}}      (обычная цена по городам за месяц)
+  matBase:{},          // matId  -> {base, days}            (то же для материалов)
   loaded:false, rows:[], flipRows:[], cityFlipRows:[], sortKey:'real', sortDir:-1, open:{}, lastOrder:null, grp:'all',
   itemQ:'', itemSel:null, itemFrom:null, itemTier:'', itemEnch:'',   // поиск цены предмета
   roads:{loaded:false, loading:false, kills:[], fetched:0, err:null, at:null},
@@ -817,6 +830,10 @@ function applyServerData(d){
     }
     S.cityHist[id]=o;
   }
+  // обычная цена материалов за месяц: та же медиана суточных, что и у предметов,
+  // но собирается из истории материалов — на неё опирается «Переработка»
+  S.matBase={};
+  for(const [id,v] of Object.entries(d.mb||{})) S.matBase[id]={base:v[0], days:v[1]};
   S.cityBase={};
   for(const [id,byQ] of Object.entries(d.cb||{})){
     const o={}; for(const [ql,v] of Object.entries(byQ)) o[ql]={base:v[0], days:v[1]};
@@ -1380,7 +1397,8 @@ function compute(){
         const mp = matPrice(rmat.id, city);
         if(!mp) continue;
         if(!mp.ovr && mp.age>CFG.staleHours*3) continue;
-        const sell = mp.price;
+        const ca = refAsk(rmat.id, mp.price);
+        const sell = ca.price;
         const net = sell*(1-tax-CFG.setupFee) - sc.cost;
         const margin = net/sc.cost*100;
         const vol = (S.matHist||{})[rmat.id]?.[city] ?? null;
@@ -1388,6 +1406,7 @@ function compute(){
         const warn = margin>300 || (margin>100 && vol!=null && vol<10);
         const tr = trendStats(sc.parts, sc.fee, sell*(1-tax-CFG.setupFee), trendSeriesOf('mat', rmat.id));
         refRows.push({tr, rmat, city, daily:dailyFor('chain:'+rmat.chain)>0, cost:sc.cost, sell, net, margin, vol,
+          askNow:mp.price, sellSpike:ca.spike, sellNorm:ca.norm, sellCapped:ca.capped,
           pool: vol!=null?vol*Math.max(net,0):null,
           cash:sc.cash, ...goldOf(net, sc.cost, vol, stale, sc.cash),
           bonus:sc.bonus, ret:sc.ret, fee:sc.fee, stale, warn});
@@ -1433,11 +1452,12 @@ function compute(){
           if(!sp || p.price>sp.price) sp={...p, city:scty};
         }
         if(!sp) continue;
-        const net = sp.price*(1-tax-CFG.setupFee) - cost;
+        const ca = refAsk(rmat.id, sp.price);
+        const net = ca.price*(1-tax-CFG.setupFee) - cost;
         if(!best || net>best.net){
           const parts = rparts.map(([id,s])=>[id, s*(1-ret), 'mat']);
           if(rmat.cat && catCost>0) parts.push([rmat.cat.id, catCost*(1-ret), 'mat']);
-          best={rmat, city:rc, cost, sell:sp.price, sellCity:sp.city,
+          best={rmat, city:rc, cost, sell:ca.price, askNow:sp.price, sellSpike:ca.spike, sellNorm:ca.norm, sellCapped:ca.capped, sellCity:sp.city,
             buyCities:[...buyCities], net, bonus, ret, fee, parts,
             stale:Math.max(worst, sp.age||0)};
         }
@@ -2136,7 +2156,11 @@ function detailHTML(r,idx){
      `Реалистичный профит/день: <b>${fmt(r.real)}</b>`+
      (r.bmBase ? `<br><span class="fresh">Обычная цена ЧР за месяц: <b style="color:var(--text)">${fmt(r.bmBase)}</b>`+
         (r.bmNow&&r.bmNow!==r.bmBase ? ` · сейчас дают ${fmt(r.bmNow)}${r.spike>0?` (<b style="color:var(--accent)">+${r.spike}% всплеск</b>, в расчёт не берём)`:''}` : '')+
-        (r.swing?` · за месяц цена гуляет на ${r.swing}%`:'')+'</span>' : '');
+        (r.swing?` · за месяц цена гуляет на ${r.swing}%`:'')+'</span>' : '')+
+     // продаём в городе — норма тоже нужна: именно по ней видно, сколько эта вещь стоит
+     // из месяца в месяц, а не в конкретный час
+     (r.channel!=='ЧР' && r.cityNorm ? `<br><span class="fresh">Обычная цена в ${r.channel} за месяц: <b style="color:var(--text)">${fmt(r.cityNorm)}</b>`+
+        (r.citySpike>0 ? ` · сейчас просят ${fmt(r.cityAskNow||r.askNow)} — на ${r.citySpike}% выше, в расчёт взята обычная` : '')+'</span>' : '');
   const bm = S.bm[it.id];
   if(bm){
     m+='<br><b>ЧР по качествам:</b><table><tr><th>Качество</th><th>Бай-ордер</th><th title="Медиана суточных цен за 30 дней — то, за сколько предмет реально уходит из месяца в месяц. Именно по ней считается профит, если бай-ордер сейчас выше неё.">Обычная за месяц</th><th>Средняя 7д</th><th>Объём/д</th></tr>';
@@ -2328,71 +2352,73 @@ function detailRefHTML(r, idx){
   const verdict = r.net>0
     ? `<span class="pos" style="font-size:14px">✅ ПЕРЕРАБАТЫВАТЬ ВЫГОДНО: +${fmt(r.net)} серебра за штуку (маржа ${r.margin.toFixed(1)}%)</span>`
     : `<span class="neg" style="font-size:14px">❌ СЕЙЧАС НЕВЫГОДНО: ${fmt(r.net)} серебра за штуку — покупать готовый ресурс дешевле</span>`;
-  let m = verdict + '<br><br><b>Что нужно на 1 штуку (цены можно править ✎):</b><table><tr><th class="item">Компонент</th><th>Кол-во</th><th>Цена (ред.)</th><th>Где купить</th></tr>';
-  for(const [rid,c] of Object.entries(rm.raws)){
-    const p=refRawBest(rid,r);
-    const nm=DATA.matNames?.[rid]||{};
-    const pc=p?p.city:r.city;
-    m+=`<tr><td class="item">${icon(rid)} ${nmA(nm)||rid}${cpBtn(rid)}${p&&p.ovr?' <span style="color:var(--accent)">✎</span>':''}</td><td>${c}</td>
-      <td><input type="number" style="width:90px" value="${p?Math.round(p.price):''}" placeholder="—"
-        onchange="setOverride('${rid}','${pc}',this.value)"
-        title="Введи свою цену покупки. Пустое поле или 0 — вернуть цену из API."></td>
-      <td>${p?p.city:'—'}</td></tr>`;
-  }
-  if(rm.cat){
-    const nm=DATA.matNames?.[rm.cat.id]||{};
-    // Катализатор берём там же, где идёт цикл: в локальном режиме — город строки,
-    // в режиме маршрута — самый дешёвый среди городов маршрута. Цена правится и сразу работает.
-    const localMode = ($('refModeSel')?.value||'local')==='local';
-    let cp=null, catCity=r.city;
-    if(localMode){
-      cp = matPrice(rm.cat.id, r.city);
-    } else {
-      const b=bestBuy(rm.cat.id, routeCities());
-      if(b){ cp=b; catCity=b.city; }
-    }
-    const selfFallback = cp ? null : S.selfCost[rm.cat.id+'|'+r.city]; // если в продаже нет вовсе
-    const shown = cp ? cp.price : (selfFallback?selfFallback.cost:null);
-    m+=`<tr><td class="item">${icon(rm.cat.id)} ${nmA(nm)||rm.cat.id}${cpBtn(rm.cat.id)}${nmB(nm)?' <span class="fresh">'+nmB(nm)+'</span>':''}${cp&&cp.ovr?' <span style="color:var(--accent)">✎</span>':''} <span class="fresh">(катализатор младшего тира)</span></td><td>${rm.cat.n}</td>
-      <td><input type="number" style="width:90px" value="${shown!=null?Math.round(shown):''}" placeholder="—"
-        onchange="setOverride('${rm.cat.id}','${catCity}',this.value)"
-        title="Своя цена катализатора в ${catCity}. Пустое поле или 0 — вернуть цену из API."></td>
-      <td>${cp?catCity:(selfFallback?`<span class="fresh" title="Ордеров на него сейчас нет, поэтому в расчёт идёт стоимость самостоятельной переработки в ${r.city}">нет в продаже</span>`:'—')}</td></tr>`;
-  }
-  m+='</table>';
+  // Раньше здесь было две таблицы с одним и тем же списком ресурсов: сверху «на 1 штуку»
+  // с ценами, снизу «купить всего». Как и в крафте, свели в одну: цена правится там же,
+  // где видно количество на партию.
+  let m = verdict + trendChartHTML(r.tr);
+  m += `<br><b>🧮 Расчёт партии:</b> перерабатываем
+      <input type="number" value="100" min="1" step="50" style="width:90px" id="rcalcN${idx}" onclick="event.stopPropagation()" oninput="calcRefUpd(${idx})"> шт.
+      <div id="rcalcOut${idx}" style="margin-top:6px"></div>`;
   const sellCity=r.sellCity||r.city;
   const sellOvr=S.overrides[rm.id+'|'+sellCity]!=null;
   m+=`Возврат ресурсов: <b>${(r.ret*100).toFixed(1)}%</b>${r.bonus?' (бонусный город!)':''} · Станок: <b>${fmt(r.fee)}</b> · `+
      `Итого себестоимость: <b>${fmt(r.cost)}</b> · Продажа в ${sellCity}${sellOvr?' <span style="color:var(--accent)">✎</span>':''}:
-      <input type="number" style="width:100px" value="${Math.round(r.sell)}"
+      <input type="number" style="width:100px" value="${Math.round(r.sell)}" onclick="event.stopPropagation()"
         onchange="setOverride('${rm.id}','${sellCity}',this.value)"
-        title="По какой цене реально продашь. Пустое поле или 0 — вернуть цену из API."><br>`;
-  m+=`<br><b>🧮 Калькулятор: перерабатываем</b>
-      <input type="number" value="100" min="1" step="50" style="width:90px" id="rcalcN${idx}" oninput="calcRefUpd(${idx})"> шт.
-      <div id="rcalcOut${idx}" style="margin-top:6px"></div>`;
-  m += trendChartHTML(r.tr);
+        title="По какой цене реально продашь. Пустое поле или 0 — вернуть цену из API.">`;
+  // Обычная цена за месяц — то, ради чего вся затея: разовый дорогой ордер ничего не значит,
+  // а вот медиана суточных сделок показывает, на чём зарабатываешь из месяца в месяц.
+  const nrm = normPrice(rm.id, 1);
+  if(nrm) m += `<br><span class="fresh">Обычная цена за месяц: <b style="color:var(--text)">${fmt(nrm.price)}</b>`
+    + ` <span class="fresh">(${nrm.src==='ордера' ? 'по текущим ордерам, месячной истории нет' : nrm.days+' замеров'})</span>`
+    + (r.sellCapped
+        ? ` · сейчас в ${sellCity} просят ${fmt(r.askNow)} — на ${r.sellSpike}% выше нормы, это всплеск: в расчёт взята норма`
+        : (r.sellSpike>0 ? ` · сейчас просят на ${r.sellSpike}% выше нормы` : ''))
+    + `</span>`;
   return m;
 }
 function calcRefUpd(idx){
   const r=(window.__refDetRows||{})[idx]; if(!r) return;
   const N=Math.max(1,+($('rcalcN'+idx)?.value||100));
   const rm=r.rmat, tax=$('premChk').checked?0.04:0.08;
-  let html='<table><tr><th class="item">Компонент</th><th>Купить всего (с учётом возврата)</th><th>Стоимость</th></tr>';
+  let html=`<div style="margin:2px 0 4px"><b>Сырьё на ${fmt(N)} шт</b> — с учётом возврата ${(r.ret*100).toFixed(1)}%:</div>`+
+    '<table><tr><th class="item">Ресурс</th><th>На 1 шт</th><th>Цена (ред.)</th><th>Где купить</th><th>Купить всего</th><th>Сумма</th></tr>';
   let total=0;
   for(const [rid,c] of Object.entries(rm.raws)){
     const p=refRawBest(rid,r);
+    const pc=p?p.city:r.city;
     const need=Math.ceil(c*N*(1-r.ret));
     const cost=p?need*p.price:null;
     if(cost!=null) total+=cost;
     const nm=DATA.matNames?.[rid]||{};
-    html+=`<tr><td class="item">${icon(rid)} ${nmA(nm)||rid}${cpBtn(rid)}</td><td>${fmt(need)}</td><td>${cost!=null?fmt(cost)+(p?' <span class=fresh>('+p.city+')</span>':''):'—'}</td></tr>`;
+    html+=`<tr><td class="item">${icon(rid)} ${nmA(nm)||rid}${cpBtn(rid)}${nmB(nm)?' <span class="fresh">'+nmB(nm)+'</span>':''}${p&&p.ovr?' <span style="color:var(--accent)">✎</span>':''}</td>`+
+      `<td>${c}</td>`+
+      `<td><input type="number" style="width:90px" value="${p?Math.round(p.price):''}" placeholder="—"
+         onclick="event.stopPropagation()" onchange="setOverride('${rid}','${pc}',this.value)"
+         title="Введи свою цену покупки. Пустое поле или 0 — вернуть цену из API."></td>`+
+      `<td>${p?p.city:'—'}</td>`+
+      `<td><b>${fmt(need)}</b></td><td>${cost!=null?fmt(cost):'—'}</td></tr>`;
   }
   if(rm.cat){
-    const need=Math.ceil(rm.cat.n*N*(1-r.ret));
     const nm=DATA.matNames?.[rm.cat.id]||{};
-    html+=`<tr><td class="item">${icon(rm.cat.id)} ${nmA(nm)||rm.cat.id}${cpBtn(rm.cat.id)}</td><td>${fmt(need)}</td><td><span class="fresh">рынок или своя переработка — см. выше</span></td></tr>`;
+    const localMode = ($('refModeSel')?.value||'local')==='local';
+    let cp=null, catCity=r.city;
+    if(localMode){ cp = matPrice(rm.cat.id, r.city); }
+    else { const b=bestBuy(rm.cat.id, routeCities()); if(b){ cp=b; catCity=b.city; } }
+    const selfFallback = cp ? null : S.selfCost[rm.cat.id+'|'+r.city];   // если в продаже нет вовсе
+    const unit = cp ? cp.price : (selfFallback?selfFallback.cost:null);
+    const need = Math.ceil(rm.cat.n*N*(1-r.ret));
+    const cost = unit!=null ? need*unit : null;
+    if(cost!=null) total+=cost;
+    html+=`<tr><td class="item">${icon(rm.cat.id)} ${nmA(nm)||rm.cat.id}${cpBtn(rm.cat.id)}${nmB(nm)?' <span class="fresh">'+nmB(nm)+'</span>':''}${cp&&cp.ovr?' <span style="color:var(--accent)">✎</span>':''} <span class="fresh">(катализатор младшего тира)</span></td>`+
+      `<td>${rm.cat.n}</td>`+
+      `<td><input type="number" style="width:90px" value="${unit!=null?Math.round(unit):''}" placeholder="—"
+         onclick="event.stopPropagation()" onchange="setOverride('${rm.cat.id}','${catCity}',this.value)"
+         title="Своя цена катализатора в ${catCity}. Пустое поле или 0 — вернуть цену из API."></td>`+
+      `<td>${cp?catCity:(selfFallback?`<span class="fresh" title="Ордеров на него сейчас нет, в расчёт идёт стоимость самостоятельной переработки в ${r.city}">своя переработка</span>`:'—')}</td>`+
+      `<td><b>${fmt(need)}</b></td><td>${cost!=null?fmt(cost):'—'}</td></tr>`;
   }
-  html+='</table>';
+  html+=`<tr><td class="item"><b>Итого сырья</b></td><td></td><td></td><td></td><td></td><td><b>${fmt(Math.round(total))}</b></td></tr></table>`;
   const feeN=r.fee*N, revenue=N*r.sell*(1-tax-CFG.setupFee), profit=N*r.net;
   html+=`Станок за партию: <b>${fmt(feeN)}</b> · Вложение всего: <b>${fmt(N*r.cost)}</b> · Выручка: <b>${fmt(revenue)}</b> · `+
     `<b>Профит партии: <span class="${profit>=0?'pos':'neg'}">${fmt(profit)}</span></b>`+
