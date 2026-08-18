@@ -1587,10 +1587,10 @@ function compute(){
       const noRet = new Set(c.noRet||[]);
       let raw=0, rawNoRet=0, worst=0, missing=false;
       for(const [m,n] of Object.entries(c.mats)){
-        const pMat=matPrice(m, city);
+        const pMat=bestMatPrice(m, city);
         if(!pMat){ missing=true; break; }
         if(noRet.has(m)) rawNoRet += pMat.price*n; else raw += pMat.price*n;
-        worst=Math.max(worst,pMat.age);
+        worst=Math.max(worst,pMat.age||0);
       }
       if(missing) continue;
       const bonus = city===home;
@@ -2079,7 +2079,7 @@ function calcConsUpd(idx){
     '<table><tr><th class="item">Ингредиент</th><th>На партию</th><th>Цена (ред.)</th><th>Купить</th><th>Сумма</th></tr>';
   let sum=0, leftVal=0;
   for(const [mid,cnt] of Object.entries(it.mats)){
-    const p=matPrice(mid, r.city);
+    const p=bestMatPrice(mid, r.city);
     const total=noRet.has(mid) ? cnt*batches : needOf(cnt);
     const cost=p?p.price*total:null;
     if(cost!=null) sum+=cost;
@@ -2091,7 +2091,7 @@ function calcConsUpd(idx){
     const nm=(DATA.matNames||{})[mid]||{};
     const mark=noRet.has(mid)?' <i style="color:var(--muted)">без возврата</i>':'';
     m+=`<tr><td class="item">${icon(mid)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${mid}')">${nmA(nm)||mid}</b>${cpBtn(mid)}`+
-       `<span>${nmB(nm)}${mark}${p&&p.ovr?' <span style="color:var(--accent)">✎ моя цена</span>':''}</span></div></td>`+
+       `<span>${nmB(nm)}${mark}${p&&p.ovr?' <span style="color:var(--accent)">✎ моя цена</span>':''}${altNote(p)}</span></div></td>`+
       `<td>${cnt}</td>`+
       `<td><input type="number" style="width:90px" value="${p?Math.round(p.price):''}" placeholder="цена"
          onclick="event.stopPropagation()" onchange="setOverride('${mid}','${r.city}',this.value)"
@@ -2171,6 +2171,73 @@ function detailHTML(r,idx){
   }
   return m;
 }
+
+// ─── Трекинговые артефакты для зелий: их можно разобрать вниз по тирам ───
+// В игре один артефакт пятого тира разбирается в два третьего, один седьмого в два пятого.
+// Значит из седьмого выходит четыре третьих. Младший тир далеко не всегда дешевле:
+// его покупают все, кто варит зелья, а старший часто лежит без спроса.
+// Плюс любой артефакт разбирается в редкие останки (третий даёт 5, пятый 10, седьмой 25),
+// а из останков делаются экстракты для зачарования: базовый 1, очищенный 3, чистый 9.
+// Поэтому для каждого такого компонента считаем все пути и берём самый дешёвый.
+const CONV = () => (DATA && DATA.convert) || null;
+const RARE_RE = /^T(\d)_ALCHEMY_RARE_([A-Z]+)$/;
+
+// самая дешёвая цена одних редких останков: с рынка или через разбор артефакта
+function remainPrice(city){
+  const cv=CONV(); if(!cv) return null;
+  let best=null;
+  const direct = matPrice(cv.remainId, city);
+  if(direct) best={price:direct.price, via:'рынок', srcId:cv.remainId, per:1, age:direct.age};
+  for(const b of cv.beasts) for(const t of Object.keys(cv.remains)){
+    const id=`T${t}_ALCHEMY_RARE_${b}`;
+    const p=matPrice(id, city); if(!p) continue;
+    const per=cv.remains[t], unit=p.price/per;
+    if(!best || unit<best.price) best={price:unit, via:'разбор', srcId:id, per, age:p.age, srcPrice:p.price};
+  }
+  return best;
+}
+// Лучшая цена компонента: напрямую с рынка или через разбор чего-то старшего.
+// Возвращает то же, что matPrice, плюс поле alt с описанием пути.
+function bestMatPrice(id, city){
+  const direct = matPrice(id, city);
+  const cv = CONV(); if(!cv) return direct;
+  let best = direct ? {...direct, alt:null} : null;
+
+  const m = RARE_RE.exec(id);
+  if(m){                                        // артефакт: смотрим старшие тиры
+    const tier=+m[1], beast=m[2];
+    for(let up=tier+2, div=cv.artStep; up<=7; up+=2, div*=cv.artStep){
+      const p=matPrice(`T${up}_ALCHEMY_RARE_${beast}`, city); if(!p) continue;
+      const unit=p.price/div;
+      if(!best || unit<best.price)
+        best={price:unit, age:p.age, ovr:false,
+              alt:{via:'разбор', srcId:`T${up}_ALCHEMY_RARE_${beast}`, srcPrice:p.price, div}};
+    }
+    return best;
+  }
+  const need = cv.extract[id];
+  if(need){                                     // экстракт: считаем через останки
+    const r=remainPrice(city);
+    if(r){
+      const unit=need*r.price;
+      if(!best || unit<best.price)
+        best={price:unit, age:r.age, ovr:false,
+              alt:{via:'останки', srcId:r.srcId, srcPrice:r.srcPrice||r.price, per:r.per, need}};
+    }
+  }
+  return best;
+}
+// подпись под ценой: откуда она взялась
+function altNote(p){
+  if(!p || !p.alt) return '';
+  const a=p.alt, nm=id=>nmA((DATA.matNames||{})[id]||{})||id;
+  if(a.via==='разбор' && a.div)
+    return ` <span class="fresh" style="color:var(--green)" title="Один ${nm(a.srcId)} разбирается на ${a.div} шт этого компонента. Купить старший тир и разобрать выходит дешевле, чем брать младший напрямую.">↓ из ${nm(a.srcId)} по ${fmt(Math.round(a.srcPrice))}</span>`;
+  if(a.via==='останки')
+    return ` <span class="fresh" style="color:var(--green)" title="Экстракт делается из ${a.need} редких останков. Дешевле всего останки выходят так: ${a.per>1?`разобрать ${nm(a.srcId)} за ${fmt(Math.round(a.srcPrice))}, он даёт ${a.per} шт`:'купить на рынке'}.">↓ через останки</span>`;
+  return '';
+}
+
 // ─── Рунофикация: разбор строки и калькулятор партии ───
 function detailEnchHTML(r, idx){
   const it=r.it, tgt=itemById(r.targetId);
