@@ -60,6 +60,8 @@ body.loading #status::before{content:'';width:14px;height:14px;border:2px solid 
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* ── скелетон загрузки ── */
+tr.brk td{background:rgba(238,188,78,.06);border-bottom:1px solid var(--border)}
+button.brkBtn{padding:2px 7px;font-size:11px;margin-left:6px;border-radius:6px;vertical-align:middle}
 .skel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:8px;overflow:hidden}
 .skel-row{height:46px;border-radius:8px;margin:6px;background:linear-gradient(90deg,var(--panel2) 25%,var(--panel3) 45%,var(--panel2) 65%);
   background-size:220% 100%;animation:shimmer 1.4s infinite}
@@ -2077,7 +2079,7 @@ function calcConsUpd(idx){
   let m=`<b>Материалы на ${fmt(made)} шт (${fmt(batches)} ${batches===1?'партия':'партий'}), цены в ${r.city}`+
     (chain&&batches>1?', закупка впритык':'')+':</b>'+
     '<table><tr><th class="item">Ингредиент</th><th>На партию</th><th>Цена (ред.)</th><th>Купить</th><th>Сумма</th></tr>';
-  let sum=0, leftVal=0;
+  let sum=0, leftVal=0, brkN=0;
   for(const [mid,cnt] of Object.entries(it.mats)){
     const p=bestMatPrice(mid, r.city);
     const total=noRet.has(mid) ? cnt*batches : needOf(cnt);
@@ -2090,13 +2092,18 @@ function calcConsUpd(idx){
     }
     const nm=(DATA.matNames||{})[mid]||{};
     const mark=noRet.has(mid)?' <i style="color:var(--muted)">без возврата</i>':'';
+    // если компонент выгоднее получить разбором, под строкой прячется расчёт закупки
+    const brkId = `brk${idx}_${brkN++}`;
+    const brk = p && p.alt ? breakdownRow(p, total, r.city, brkId) : null;
     m+=`<tr><td class="item">${icon(mid)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${mid}')">${nmA(nm)||mid}</b>${cpBtn(mid)}`+
+       `${brk?` <button class="mini brkBtn" onclick="toggleBrk('${brkId}',this)" title="Показать, сколько и чего купить, чтобы разобрать">▸ разбор</button>`:''}`+
        `<span>${nmB(nm)}${mark}${p&&p.ovr?' <span style="color:var(--accent)">✎ моя цена</span>':''}${altNote(p)}</span></div></td>`+
       `<td>${cnt}</td>`+
       `<td><input type="number" style="width:90px" value="${p?Math.round(p.price):''}" placeholder="цена"
          onclick="event.stopPropagation()" onchange="setOverride('${mid}','${r.city}',this.value)"
          title="Своя цена, если на рынке другая. Оставь пусто или поставь 0, чтобы вернуть цену с рынка."></td>`+
       `<td><b>${fmt(total)}</b></td><td>${cost!=null?fmt(cost):'нет'}</td></tr>`;
+    if(brk) m+=brk;
   }
   m+=`<tr><td class="item"><b>Итого сырья</b></td><td></td><td></td><td></td><td><b>${fmt(sum)}</b></td></tr></table>`;
 
@@ -2237,6 +2244,49 @@ function altNote(p){
     return ` <span class="fresh" style="color:var(--green)" title="Экстракт делается из ${a.need} редких останков. Дешевле всего останки выходят так: ${a.per>1?`разобрать ${nm(a.srcId)} за ${fmt(Math.round(a.srcPrice))}, он даёт ${a.per} шт`:'купить на рынке'}.">↓ через останки</span>`;
   return '';
 }
+
+
+// Подстрока «что купить, чтобы разобрать». Прячется под кнопкой у ингредиента.
+// Считает целыми штуками: артефакты и останки нельзя купить дробно, поэтому
+// показываем, сколько брать по факту и сколько при этом останется лишнего.
+function breakdownRow(p, total, city, rowId){
+  const a=p.alt; if(!a) return '';
+  const nm = id => nmA((DATA.matNames||{})[id]||{}) || id;
+  const sp = matPrice(a.srcId, city);
+  const price = sp ? sp.price : a.srcPrice;
+  let buy, leftover, what, per;
+  if(a.div){                                   // артефакт: один старший даёт a.div младших
+    buy = Math.ceil(total / a.div);
+    leftover = buy*a.div - total;
+    per = a.div;
+    what = `Один ${nm(a.srcId)} разбирается на ${a.div} шт. Нужно ${fmt(total)}, значит берём ${fmt(buy)}.`;
+  } else {                                     // экстракт: считаем через редкие останки
+    const remains = total * a.need;
+    per = a.per || 1;
+    buy = Math.ceil(remains / per);
+    leftover = 0;
+    what = per>1
+      ? `На ${fmt(total)} экстрактов нужно ${fmt(remains)} останков. Один ${nm(a.srcId)} даёт ${per}, значит берём ${fmt(buy)}.`
+      : `На ${fmt(total)} экстрактов нужно ${fmt(remains)} останков, покупаем их на рынке.`;
+  }
+  const cost = price!=null ? buy*price : null;
+  return `<tr class="brk" id="${rowId}" style="display:none">`+
+    `<td class="item" style="padding-left:26px">${icon(a.srcId)}<div class="iname">`+
+      `<b class="lnk" onclick="event.stopPropagation();openItem('${a.srcId}')">${nm(a.srcId)}</b>${cpBtn(a.srcId)}`+
+      `<span>${what}${leftover>0?` Останется лишних ${fmt(leftover)} шт.`:''}</span></div></td>`+
+    `<td class="fresh">${per>1?'1 = '+per:''}</td>`+
+    `<td><input type="number" style="width:90px" value="${price!=null?Math.round(price):''}" placeholder="цена"
+       onclick="event.stopPropagation()" onchange="setOverride('${a.srcId}','${city}',this.value)"
+       title="Своя цена того, что покупаешь на разбор. Оставь пусто или поставь 0, чтобы вернуть цену с рынка."></td>`+
+    `<td><b>${fmt(buy)}</b></td><td>${cost!=null?fmt(cost):'нет'}</td></tr>`;
+}
+window.toggleBrk = (id, btn)=>{
+  event.stopPropagation();
+  const tr=document.getElementById(id); if(!tr) return;
+  const open = tr.style.display==='none';
+  tr.style.display = open ? '' : 'none';
+  btn.textContent = open ? '▾ разбор' : '▸ разбор';
+};
 
 // ─── Рунофикация: разбор строки и калькулятор партии ───
 function detailEnchHTML(r, idx){
