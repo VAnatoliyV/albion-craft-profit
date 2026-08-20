@@ -354,6 +354,10 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
         <option value="local" selected>📍 На месте (локальный цикл)</option>
       </select>
     </label>
+    <span class="ctl" id="routeCityWrap" style="display:none">Города маршрута<span class="help" title="Оставить в маршруте только выбранные города. Сайт будет искать сырьё и продажу только среди них.&#10;&#10;Нужно, когда ездить по всем семи неохота: отметил два или три, и в расчёте появятся только те цепочки, которые реально проедешь.&#10;&#10;Ничего не отмечено, значит считаются все города.">?</span>
+      <span id="routeCities"></span>
+      <button class="mini" id="routeCitiesAll" title="Снять отметки и снова считать по всем городам">все</button>
+    </span>
     <label class="ctl">Маржа ≥ <input type="number" id="minMargin" value="0" style="width:60px">%</label>
     <label class="ctl">Объём ≥ <input type="number" id="minVol" value="0" style="width:60px">/д</label>
     <label class="ctl" title="Оставить только те строки, которые были в плюсе хотя бы столько дней за последние три недели.&#10;&#10;80 процентов значит «зарабатывало почти всегда». Строки без истории фильтр не выбрасывает: «не знаем» это не «плохо».">В плюсе ≥ <input type="number" id="minTrend" value="0" min="0" max="100" style="width:56px">% дней</label>
@@ -379,6 +383,8 @@ const ROYAL_CITIES = ['Martlock','Bridgewatch','Lymhurst','Fort Sterling','Thetf
 // Бресильен тоже безопасен: до королевских городов есть безопасный путь.
 // Опасен только Карлеон, он на чёрном острове, туда и оттуда везут через красные и чёрные зоны.
 const SAFE_CITIES = [...ROYAL_CITIES, 'Brecilien'];
+const CITY_SHORT = {Martlock:'Мартлок', Bridgewatch:'Бриджуотч', Lymhurst:'Лимхёрст',
+  'Fort Sterling':'Ф-Стерлинг', Thetford:'Тетфорд', Caerleon:'Карлеон', Brecilien:'Бресильен'};
 // Потолок правдоподобной цены продажи на городском рынке. Минимальный селл-ордер сам по себе
 // ничего не доказывает: когда реальные продавцы разобраны, сверху остаётся чей-нибудь троллевый
 // прайс. Сумка мастера в Бресильене стоит 799 991 при рынке около 50 000, и такая строка давала
@@ -509,7 +515,30 @@ function trendCell(r){
 // Удалять такие нельзя, настоящая находка выглядит так же,, но в топ они попадать не должны.
 function tooCheap(id, q, price){ const n=normPrice(id,q); return !!(n && price < n.price*CFG.askFloor); }
 function safeRoutes(){ return !!$('safeChk')?.checked; }
-function routeCities(){ return safeRoutes() ? SAFE_CITIES : CITIES; }
+// Города маршрута. Обычно это все города, а с включёнными безопасными маршрутами
+// королевская пятёрка плюс Бресильен. Но если руками отмечены свои города, считаем
+// только по ним: ездить по всем семи в жизни всё равно никто не будет.
+let ROUTE_PICK = (()=>{ try{ return JSON.parse(localStorage.getItem('acp_routeCities')||'[]'); }catch(e){ return []; } })();
+function routeCities(){
+  const base = safeRoutes() ? SAFE_CITIES : CITIES;
+  const pick = ROUTE_PICK.filter(c=>base.includes(c));
+  return pick.length>=2 ? pick : base;
+}
+window.toggleRouteCity = (c)=>{
+  ROUTE_PICK = ROUTE_PICK.includes(c) ? ROUTE_PICK.filter(x=>x!==c) : [...ROUTE_PICK, c];
+  try{ localStorage.setItem('acp_routeCities', JSON.stringify(ROUTE_PICK)); }catch(e){}
+  fillRouteCities(); compute(); render();
+};
+function fillRouteCities(){
+  const box=$('routeCities'); if(!box) return;
+  const base = safeRoutes() ? SAFE_CITIES : CITIES;
+  box.innerHTML = base.map(c=>{
+    const on = ROUTE_PICK.includes(c);
+    return `<button class="grp rc${on?' on':''}" onclick="toggleRouteCity('${c}')" title="${on?'Убрать из маршрута':'Добавить в маршрут'}">${CITY_SHORT[c]||c}</button>`;
+  }).join('');
+  const n = ROUTE_PICK.filter(c=>base.includes(c)).length;
+  const btn=$('routeCitiesAll'); if(btn) btn.style.display = n ? '' : 'none';
+}
 // «Безопасный крафт»: и варим, и продаём только в королевской пятёрке, ЧР выключен
 function safeCraft(){ return !!$('safeCraftChk')?.checked; }
 function craftCities(){ return safeCraft() ? SAFE_CITIES : CITIES; }
@@ -3019,21 +3048,25 @@ const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг → ЧР',
 // какие контролы нужны на каждой вкладке (премиум, возраст данных, обновление и поиск, всегда)
 const TAB_CONTROLS={
   craft:   ['wrapCity','wrapFocus','wrapSelfRef','wrapQual','wrapFee','wrapCat','wrapSafeCraft','wrapLocal'],
-  ref:     ['wrapCity','wrapFocus','wrapSafe','wrapFee','refModeWrap'],
+  ref:     ['wrapCity','wrapFocus','wrapSafe','wrapFee','refModeWrap','routeCityWrap'],
   flip:    ['wrapCity','wrapSafe','wrapCat'],
-  cityflip:['wrapRoute','wrapSafe','wrapCat'],
-  ench:    ['wrapCity','wrapSafe','wrapCat','wrapLocal'],
+  cityflip:['wrapRoute','wrapSafe','wrapCat','routeCityWrap'],
+  ench:    ['wrapCity','wrapSafe','wrapCat','wrapLocal','routeCityWrap'],
   cons:    ['wrapCity','wrapFocus','wrapFee','wrapSafeCraft','wrapLocal'],
   item:    [],
   roads:   [],
 };
-const ALL_WRAPS=['wrapCity','wrapRoute','wrapFocus','wrapSafe','wrapSafeCraft','wrapLocal','wrapSelfRef','wrapQual','wrapFee','wrapCat','refModeWrap'];
+const ALL_WRAPS=['wrapCity','wrapRoute','wrapFocus','wrapSafe','wrapSafeCraft','wrapLocal','wrapSelfRef','wrapQual','wrapFee','wrapCat','refModeWrap','routeCityWrap'];
 function setTab(t){
   S.tab=t; S.open={}; S.lastOrder=null;
+  fillRouteCities();
   const el=$('secName'); if(el) el.textContent=TAB_NAMES[t]||'';
   const vis=TAB_CONTROLS[t]||[];
   for(const id of ALL_WRAPS){ const w=$(id); if(w) w.style.display = vis.includes(id)?'':'none'; }
   const flt=$('filters'); if(flt) flt.style.display = (t==='roads'||t==='item')?'none':'';
+  // в Переработке города маршрута нужны только когда включён сам маршрут
+  const rcw=$('routeCityWrap');
+  if(rcw && t==='ref' && ($('refModeSel')?.value||'local')!=='route') rcw.style.display='none';
   buildGroups();
   const gr=$('grpRow');
   if(gr) gr.style.display = ((TAB_CONTROLS[t]||[]).includes('wrapCat') || TAB_GROUPS[t]) ? 'flex' : 'none';
@@ -3042,7 +3075,9 @@ function setTab(t){
   if(S.loaded && t!=='roads') compute();
   render();
 }
-$('refModeSel').onchange=()=>{ compute(); render(); };
+$('refModeSel').onchange=()=>{ setTab(S.tab); compute(); render(); };
+$('routeCitiesAll').onclick=()=>{ ROUTE_PICK=[]; try{ localStorage.setItem('acp_routeCities','[]'); }catch(e){}
+  fillRouteCities(); compute(); render(); };
 $('backHome').onclick=()=>goHome();
 $('selfRefChk').onchange=()=>{ compute(); render(); };
 // Полоска групп. Группа и точная категория не воюют: выбрал группу, точная
@@ -3092,7 +3127,7 @@ function buildGroups(){
 }
 buildGroups();
 $('catSel').addEventListener('change', ()=>{ if($('catSel').value){ S.grp='all'; paintGroups(); } });
-$('safeChk').onchange=()=>{ compute(); render(); };
+$('safeChk').onchange=()=>{ fillRouteCities(); compute(); render(); };
 ['flipFrom','flipTo'].forEach(id=>$(id).onchange=()=>{ S.limit=0; compute(); render(); });
 $('flipSwap').onclick=()=>{ const a=$('flipFrom'), b=$('flipTo'); const t=a.value; a.value=b.value; b.value=t; S.limit=0; compute(); render(); };
 $('safeCraftChk').onchange=()=>{ S.limit=0; compute(); render(); };
