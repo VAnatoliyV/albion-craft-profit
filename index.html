@@ -209,6 +209,10 @@ footer{padding:16px 22px;color:var(--muted);font-size:11.5px;border-top:1px soli
   background:rgba(255,255,255,.04);border:1px solid var(--border);white-space:nowrap}
 .mchip b{font-size:12.5px}
 .mchip.proxy{border-color:rgba(106,165,224,.4);color:var(--blue)}
+/* Возраст цены в поиске. Старше суток красным: цена показывается, но видно, что она вчерашняя. */
+.aold{color:var(--red);font-weight:700}
+.pold{background:rgba(228,111,97,.10);border:1px solid rgba(228,111,97,.28);border-radius:6px;padding:1px 6px;display:inline-block}
+.mchip.old{border-color:rgba(228,111,97,.35);background:rgba(228,111,97,.08)}
 .mchip.err{border-color:rgba(228,111,97,.45);color:var(--red)}
 /* индикатор загрузки в полосе */
 .sbar .spin{width:14px;height:14px;border:2px solid var(--panel3);border-top-color:var(--accent);
@@ -1911,6 +1915,14 @@ function fmtAge(h){
   if(h<48) return Math.round(h)+' ч';
   return Math.round(h/24)+' дн';
 }
+// Возраст цены для поиска. Цену старше суток не прячем, а красим красным:
+// пусть будет видно и цену, и то, что она вчерашняя.
+const isOldPrice = h => h!=null && h<1e8 && h>CFG.staleHours;
+function ageMark(h){
+  if(h==null || h>1e8) return '<span class="fresh">нет</span>';
+  if(!isOldPrice(h)) return '<span class="fresh">'+fmtAge(h)+'</span>';
+  return '<span class="aold" title="Этой цене уже '+fmtAge(h)+'. Значит, в этом городе давно никто не запускал сборщик данных. Цена показана как есть, но в игре она наверняка уже другая: проверь на рынке, прежде чем на неё рассчитывать.">'+fmtAge(h)+' ⚠</span>';
+}
 const WARN_TIP = 'Подозрительные цифры: аномальная маржа или крупная маржа при крошечном объёме. Обычно это один жирный ордер или кривые данные, проверь в игре перед закупкой.';
 const QUAL_RU = {1:'Обычное',2:'Хорошее',3:'Выдающееся',4:'Отличное',5:'Шедевр'};
 function icon(id,q){ return `<img loading="lazy" src="https://render.albiononline.com/v1/item/${enc(id)}.png?size=64${q?`&quality=${q}`:''}" alt="">`; }
@@ -3028,10 +3040,14 @@ function priceCell(v, vol){
     ? `<br><span class="fresh" title="Сколько штук в день продаётся в этом городе, в среднем за неделю">⇅ ${vol<10?vol.toFixed(1):fmt(vol)}/д</span>` : '';
   if(!v) return '<span class="fresh">нет</span>'+volLine;
   const sell = v.sell ?? v.price ?? 0, buy = v.buy||0;
-  const ts = v.ts, bts = v.buyTs;
-  return `${sell?`<b>${fmt(sell)}</b> <span class="fresh">${fmtAge(hoursAgo(ts))}</span>`:'<span class="fresh">нет ордеров</span>'}`
-    + (buy?`<br><span style="color:var(--blue)">${fmt(buy)}</span> <span class="fresh">${fmtAge(hoursAgo(bts))}</span>`:'')
-    + volLine;
+  const ha = sell ? hoursAgo(v.ts) : null, hb = buy ? hoursAgo(v.buyTs) : null;
+  const body = `${sell?`<b>${fmt(sell)}</b> ${ageMark(ha)}`:'<span class="fresh">нет ордеров</span>'}`
+    + (buy?`<br><span style="color:var(--blue)">${fmt(buy)}</span> ${ageMark(hb)}`:'');
+  // рамку ставим, только если старое всё, что есть в ячейке: иначе она будет краснеть
+  // из-за одного лишь бай-ордера, хотя цена покупки свежая
+  const anyFresh = (sell && !isOldPrice(ha)) || (buy && !isOldPrice(hb));
+  const oldAny = (sell && isOldPrice(ha)) || (buy && isOldPrice(hb));
+  return (oldAny && !anyFresh ? `<span class="pold">${body}</span>` : body) + volLine;
 }
 function itemCardHTML(id){
   const it = DATA.items.find(x=>x.id===id);
@@ -3051,14 +3067,16 @@ function itemCardHTML(id){
     const v = isMat ? byCity[c] : byCity[c]?.[1];
     if(!v) continue;
     const sell = v.sell ?? v.price ?? 0, buy = v.buy||0;
-    if(sell && (!cheap || sell<cheap.p)) cheap={c, p:sell, ts:v.ts};
-    if(buy && (!rich || buy>rich.p)) rich={c, p:buy, ts:v.buyTs};
+    // при равной цене берём город со свежей ценой: незачем звать в тот, где данные вчерашние
+    const fresher = (a,b) => isOldPrice(hoursAgo(a)) && !isOldPrice(hoursAgo(b));
+    if(sell && (!cheap || sell<cheap.p || (sell===cheap.p && fresher(cheap.ts, v.ts)))) cheap={c, p:sell, ts:v.ts};
+    if(buy && (!rich || buy>rich.p || (buy===rich.p && fresher(rich.ts, v.buyTs)))) rich={c, p:buy, ts:v.buyTs};
   }
   const bmQ1 = bmQ(bm,1) || bmQ(bm,2);
   out += `<div style="margin:12px 0;display:flex;gap:10px;flex-wrap:wrap">
-    <span class="mchip">🛒 дешевле купить: <b>${cheap?fmt(cheap.p)+' · '+cheap.c:'нет'}</b></span>
-    <span class="mchip">💰 дороже сдать: <b>${rich?fmt(rich.p)+' · '+rich.c:'нет'}</b></span>
-    ${bmQ1?`<span class="mchip">🖤 ЧР ${bmQ1.src==='ордер'?'даёт сейчас':bmQ1.src}: <b>${fmt(bmQ1.price)}</b>${bmQ1.ts?' <span class="fresh">'+ageTxt(bmQ1.ts)+'</span>':''} · объём ${fmt(bmQ1.vol||0)}/д</span>`:''}
+    <span class="mchip${cheap && isOldPrice(hoursAgo(cheap.ts)) ? ' old' : ''}">🛒 дешевле купить: <b>${cheap?fmt(cheap.p)+' · '+cheap.c:'нет'}</b>${cheap?' '+ageMark(hoursAgo(cheap.ts)):''}</span>
+    <span class="mchip${rich && isOldPrice(hoursAgo(rich.ts)) ? ' old' : ''}">💰 дороже сдать: <b>${rich?fmt(rich.p)+' · '+rich.c:'нет'}</b>${rich?' '+ageMark(hoursAgo(rich.ts)):''}</span>
+    ${bmQ1?`<span class="mchip">🖤 ЧР ${bmQ1.src==='ордер'?'даёт сейчас':bmQ1.src}: <b>${fmt(bmQ1.price)}</b>${bmQ1.ts?' '+ageMark((Date.now()-bmQ1.ts)/3.6e6):''} · объём ${fmt(bmQ1.vol||0)}/д</span>`:''}
   </div>`;
 
   // таблица по городам
@@ -3096,7 +3114,7 @@ function itemCardHTML(id){
   } else if(!isMat){
     out += '<div class="fresh" style="margin-top:12px">На чёрном рынке сделок по этому предмету за неделю не зафиксировано.</div>';
   }
-  out += `<div class="fresh" style="margin-top:12px">Верхнее число это самый дешёвый селл-ордер, за сколько купить. <span style="color:var(--blue)">Синее</span> это максимальный бай-ордер (за сколько сдать мгновенно). Рядом возраст цены. По чёрному рынку в расчёт профита идёт «даёт сейчас», но не выше «обычной за месяц»: заявка НПС скачет по часам и регулярно висит вдвое выше того, за сколько предмет реально уходит. Число рядом с обычной ценой, сколько дней из тридцати по этому качеству вообще были сделки; если их мало, доверия к строке меньше.</div></div>`;
+  out += `<div class="fresh" style="margin-top:12px">Верхнее число это самый дешёвый селл-ордер, за сколько купить. <span style="color:var(--blue)">Синее</span> это максимальный бай-ордер (за сколько сдать мгновенно). Рядом возраст цены. Если он <span class="aold">красный</span>, цене больше суток: её никто не обновлял, показываем как есть, но в игре она наверняка уже другая. По чёрному рынку в расчёт профита идёт «даёт сейчас», но не выше «обычной за месяц»: заявка НПС скачет по часам и регулярно висит вдвое выше того, за сколько предмет реально уходит. Число рядом с обычной ценой, сколько дней из тридцати по этому качеству вообще были сделки; если их мало, доверия к строке меньше.</div></div>`;
   return out;
 }
 function itemTabHTML(){
