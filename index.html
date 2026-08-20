@@ -310,7 +310,7 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
         <option value="12">12 ч</option><option value="24" selected>24 ч</option>
       </select>
     </label>
-    <label class="ctl" id="wrapDaily" title="Дневной бонус производства. В игре он лежит в окне Activities. Раз в сутки две категории получают плюс 10 процентов к возврату ресурсов.&#10;&#10;Сам сайт это узнать не может. Такой информации нет ни в одном открытом API, она есть только в игре. Поэтому отметь руками то, что видишь сегодня. Сайт прибавит 10 процентов к возврату по этим категориям и поставит на них значок.&#10;&#10;Выбор запоминается до конца суток и сам сбрасывается на следующий день, чтобы вчерашний бонус не занижал сегодняшнюю себестоимость.&#10;&#10;Сверься со станком в игре, там написан итоговый процент возврата. Если цифры разойдутся, скажи, поправлю формулу.">Дневной бонус
+    <label class="ctl" id="wrapDaily" title="Дневной бонус производства. В игре он лежит в окне Activities. Раз в сутки две категории получают плюс 10 процентов к возврату ресурсов. Первыми в списке идут ресурсы (Ore, Hide, Fiber, Wood, Stone), под ними вещи: слова те же, что в игре.&#10;&#10;Сам сайт это узнать не может. Такой информации нет ни в одном открытом API, она есть только в игре. Поэтому отметь руками то, что видишь сегодня. Сайт прибавит 10 процентов к возврату по этим категориям и поставит на них значок.&#10;&#10;Выбор запоминается до конца суток и сам сбрасывается на следующий день, чтобы вчерашний бонус не занижал сегодняшнюю себестоимость.&#10;&#10;Сверься со станком в игре, там написан итоговый процент возврата. Если цифры разойдутся, скажи, поправлю формулу.">Дневной бонус
       <select id="daily1"></select><select id="daily2" style="margin-left:4px"></select>
     </label>
     <label class="ctl" title="На каком языке показывать названия вещей. И, что важнее, что копируется кнопкой ⧉.&#10;&#10;Поиск на рынке в игре ищет по названию твоего клиента. Если клиент английский, то и копировать надо английское название, «Runite Steel Bar», а не «Брусок рунита». Поэтому по умолчанию стоит английский.&#10;&#10;Второе название остаётся подписью снизу, так что ничего не пропадёт.">Названия
@@ -3243,16 +3243,27 @@ function fillCats(){
     .forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=catName(c); cs.appendChild(o); });
   cs.value=keep;
 }
-// Списки «дневного бонуса»: категории предметов плюс цепочки переработки.
+// Списки «дневного бонуса». В игре бонус пишут одним словом: «+10% Hide», «+10% Sword».
+// Поэтому ресурсы стоят первыми и подписаны тем же словом, что в окне Activities:
+// ищешь Hide, находишь Hide, а не «Переработка: Шкуры → Кожа» в самом низу списка.
+const DAILY_RES = [['ore','Ore'], ['hide','Hide'], ['fiber','Fiber'], ['wood','Wood'], ['rock','Stone']];
 function fillDaily(){
-  const opts = [['','нет']];
+  const ru = LANG==='ru';
+  const esc = t => String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  const opt = (v,t) => `<option value="${esc(v)}">${esc(t)}</option>`;
   const cats = [...new Set(DATA.items.map(i=>i.cat))].sort((a,b)=>catName(a).localeCompare(catName(b)));
-  for(const c of cats) opts.push([c, catName(c)]);
-  opts.push(['potion', catName('potion')], ['meal', catName('meal')]);
-  for(const k of Object.keys(CHAIN_RU||{})) opts.push(['chain:'+k, (LANG==='ru'?'Переработка: ':'Refining: ')+chainName(k)]);
+  const gear = cats.map(c=>[c, catName(c)]);
+  gear.push(['potion', catName('potion')], ['meal', catName('meal')]);
+  const html = opt('', ru?'нет':'none')
+    + `<optgroup label="${ru?'Ресурсы (переработка)':'Resources (refining)'}">`
+    + DAILY_RES.map(([k,word])=>opt('chain:'+k, ru ? word+' · '+chainName(k) : chainName(k))).join('')
+    + '</optgroup>'
+    + `<optgroup label="${ru?'Вещи (крафт)':'Gear (crafting)'}">`
+    + gear.map(([v,t])=>opt(v,t)).join('')
+    + '</optgroup>';
   for(const [i,id] of [[0,'daily1'],[1,'daily2']]){
     const sel=$(id); if(!sel) continue;
-    sel.innerHTML = opts.map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
+    sel.innerHTML = html;
     sel.value = DAILY[i] || '';
     sel.onchange = ()=>{
       DAILY = [$('daily1').value, $('daily2').value].filter(Boolean);
