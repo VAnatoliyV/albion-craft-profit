@@ -246,7 +246,7 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
     <div class="card" onclick="enterApp('craft')"><b>🛠 Крафт</b>
       <span>Что выгодно крафтить в каждом городе: себестоимость с бонусами и станком, продажа на чёрный рынок или городские рынки. Золотая середина, калькулятор партии, журналы.</span></div>
     <div class="card" onclick="enterApp('ref')"><b>♻️ Переработка</b>
-      <span>Локальный цикл без перевозок: купил сырьё → переработал → продал ресурс в том же городе. Бонусные города дают +40% возврата.</span></div>
+      <span>Локальный цикл без перевозок: купил сырьё → переработал → продал ресурс в том же городе. В бонусном городе возврат 36,7% вместо 15,2%.</span></div>
     <div class="card" onclick="enterApp('flip')"><b>🖤 Флиппинг → Чёрный рынок</b>
       <span>Купить на рынке любого города и продать на чёрный рынок. Если покупать прямо в Карлеоне, везти вообще не надо. Город покупки виден в каждой строке, каждое качество считается отдельно.</span></div>
     <div class="card" onclick="enterApp('cityflip')"><b>🐂 Флиппинг между городами</b>
@@ -314,8 +314,8 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
         <option value="12">12 ч</option><option value="24" selected>24 ч</option>
       </select>
     </label>
-    <label class="ctl" id="wrapDaily" title="Дневной бонус производства. В игре он лежит в окне Activities. Раз в сутки две категории получают плюс 10 процентов к возврату ресурсов. Первыми в списке идут ресурсы (Ore, Hide, Fiber, Wood, Stone), под ними вещи: слова те же, что в игре.&#10;&#10;Сам сайт это узнать не может. Такой информации нет ни в одном открытом API, она есть только в игре. Поэтому отметь руками то, что видишь сегодня. Сайт прибавит 10 процентов к возврату по этим категориям и поставит на них значок.&#10;&#10;Выбор запоминается до конца суток и сам сбрасывается на следующий день, чтобы вчерашний бонус не занижал сегодняшнюю себестоимость.&#10;&#10;Сверься со станком в игре, там написан итоговый процент возврата. Если цифры разойдутся, скажи, поправлю формулу.">Дневной бонус
-      <select id="daily1"></select><select id="daily2" style="margin-left:4px"></select>
+    <label class="ctl" id="wrapDaily" title="Дневной бонус производства. В игре он лежит в окне Activities. Раз в сутки две категории получают прибавку к бонусу производства, обычно +10, редко +20. Это НЕ десять пунктов к возврату: прибавка идёт в общую сумму бонусов, и в бонусном городе возврат из 36,7% становится 40,4%, ровно как на станке в игре. Первыми в списке идут ресурсы (Ore, Hide, Fiber, Wood, Stone), под ними вещи: слова те же, что в игре.&#10;&#10;Сам сайт это узнать не может. Такой информации нет ни в одном открытом API, она есть только в игре. Поэтому отметь руками то, что видишь сегодня. Сайт добавит эту прибавку к бонусу по отмеченным категориям и поставит на них значок.&#10;&#10;Выбор запоминается до конца суток и сам сбрасывается на следующий день, чтобы вчерашний бонус не занижал сегодняшнюю себестоимость.&#10;&#10;Сверься со станком в игре, там написан итоговый процент возврата. Если цифры разойдутся, скажи, поправлю формулу.">Дневной бонус
+      <select id="daily1"></select><select id="daily1v" class="dv" style="display:none"></select><select id="daily2" style="margin-left:4px"></select><select id="daily2v" class="dv" style="display:none"></select>
     </label>
     <label class="ctl" title="На каком языке показывать названия вещей. И, что важнее, что копируется кнопкой ⧉.&#10;&#10;Поиск на рынке в игре ищет по названию твоего клиента. Если клиент английский, то и копировать надо английское название, «Runite Steel Bar», а не «Брусок рунита». Поэтому по умолчанию стоит английский.&#10;&#10;Второе название остаётся подписью снизу, так что ничего не пропадёт.">Названия
       <span class="lngbox"><button class="lng on" data-l="en" onclick="setLang('en')">EN</button><button class="lng" data-l="ru" onclick="setLang('ru')">RU</button></span>
@@ -381,7 +381,7 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
 <footer id="appFooter" style="display:none">
   <b>Откуда цены.</b> Их собирает Albion Online Data Project, то есть сами игроки со сборщиком данных. Чем больше людей сейчас играет со сборщиком, тем свежее цены. Иконки берутся с официального Render API.<br>
   <b>Как считается продажа.</b> На чёрном рынке берётся живой бай-ордер, то есть сколько дадут за вещь прямо сейчас. Если ордера нет, берётся последняя дневная цена сделок, и только потом средняя за неделю. В городе берётся самый дешёвый селл-ордер, но не выше обычной цены за месяц.<br>
-  <b>Возврат ресурсов.</b> В обычном городе 15,3%, в бонусном 24,8%. С фокусом это 43,5% и 47,9%.<br>
+  <b>Возврат ресурсов.</b> В крафте: в обычном городе 15,2%, в бонусном 24,8%, с фокусом 43,5% и 47,9%. В переработке: 15,2% и 36,7%. Дневной бонус идёт не поверх этих процентов, а в общую сумму бонусов, поэтому в бонусном городе с ним выходит 40,4%, а не 46,7%.<br>
   <b>Что в базе.</b> Тиры с 4 по 8, зачарование с 0 по 3, вместе с артефактными вещами. Артефакт считается по самой низкой цене среди городов, и возврат на него не действует. Материалы покупаются в том городе, где ты крафтишь.<br>
   <b>Журналы.</b> Считаются по славе, а не по числу крафтов: сколько славы влезет в журнал, столько и уйдёт.<br>
   <b>Качество на чёрном рынке.</b> «Обычное» это осторожный счёт по сделкам белого качества. «Взвешенно» это средняя по всем качествам с учётом того, сколько чего продаётся, и это ближе к жизни, если спек прокачан.<br>
@@ -626,7 +626,8 @@ function refRowsForRoute(route, fee100, tax, focus){
         if(rmat.cat && catCost>0) parts.push([rmat.cat.id, catCost*(1-ret), 'mat']);
         best={rmat, city:rc, cost, sell:ca.price, askNow:sp.price, sellSpike:ca.spike,
               sellNorm:ca.norm, sellCapped:ca.capped, sellCity, buyCities:[...buyCities],
-              net, bonus, ret, fee, parts, stale:Math.max(worst, sp.age||0)};
+              net, bonus, ret, fee, parts, daily:dailyFor('chain:'+rmat.chain),
+              stale:Math.max(worst, sp.age||0)};
       }
     }
     if(!best) continue;
@@ -753,7 +754,7 @@ const CFG = {
   askCap: 1.4,        // селл-ордер дороже нормы во столько раз, фантом, продать по нему нельзя
   askFloor: 0.5,      // дешевле половины нормы, скорее всего одна вещь по ошибке, помечаем
   carryKg: 50,        // грузоподъёмность по умолчанию: пеший персонаж без сумки
-  dailyBonus: 0.10,   // дневной бонус производства: +10 процентных пунктов к возврату
+  dailyBonus: 0.10,   // дневной бонус производства: прибавка к сумме бонусов (0.10, редко 0.20)
 
   histBatch: 50, priceBatch: 150, concurrency: 4,
   // Журналы наполняются СЛАВОЙ, а не числом крафтов. Ёмкость пустого журнала по тирам
@@ -767,16 +768,33 @@ const CFG = {
   famePerMat:  {4:22.5, 5:90,   6:270,  7:645,  8:1395},
 };
 const rr = b => b/(1+b); // возврат из суммы бонусов
+// Игра в окне станка обрезает дробь вниз, а не округляет: 40.476% показывается как 40.4%.
+// Делаем так же, чтобы цифра на сайте один в один совпадала с той, что видишь в игре.
+const retPct = x => (Math.floor(x*1000)/10).toFixed(1);
 // Дневной бонус производства (окно Activities): раз в сутки две категории получают
-// +10% к возврату ресурсов. В API этого нет нигде, только руками. Храним вместе с
-// датой: назавтра выбор протухает сам, иначе вчерашний бонус тихо занижал бы цену.
+// прибавку. В API этого нет нигде, только руками. Храним вместе с датой: назавтра выбор
+// протухает сам, иначе вчерашний бонус тихо занижал бы цену.
+//
+// ВАЖНО про число. В окне игры написано «+10% Hide», и это НЕ десять пунктов к возврату.
+// В festivities.xml дневной бонус лежит той же строкой, что и бонус города:
+//   <craftbonusevent category="hide" value="0.10" weight="9"/>
+//   <craftbonusevent category="hide" value="0.20" weight="1"/>
+// То есть 0.10 приплюсовывается к сумме бонусов, и только потом сумма превращается в
+// возврат по формуле b/(1+b). Мартлок на кожу: 0.18 города + 0.40 профиля + 0.10 дня
+// = 0.68, возврат 40.4%, ровно как показывает станок в игре. Раньше сайт прибавлял
+// десять пунктов к готовому возврату и рисовал 46.7%, то есть занижал себестоимость.
+// Раз в десять дней вместо 0.10 выпадает 0.20, вес 1 против 9, поэтому выбор есть.
 const DAILY_KEY='acp_daily';
 const dayStamp = () => new Date().toISOString().slice(0,10);
+// хранится как [{k:'chain:hide', v:0.10}, ...]; старый формат (просто строки) читаем тоже
+const normDaily = a => (a||[]).map(x => typeof x==='string' ? {k:x, v:CFG.dailyBonus} : x)
+                              .filter(x => x && x.k);
 let DAILY = (()=>{ try{ const v=JSON.parse(localStorage.getItem(DAILY_KEY)||'null');
-  return (v && v.d===dayStamp()) ? (v.c||[]) : []; }catch(e){ return []; } })();
+  return (v && v.d===dayStamp()) ? normDaily(v.c) : []; }catch(e){ return []; } })();
 function saveDaily(){ try{ localStorage.setItem(DAILY_KEY, JSON.stringify({d:dayStamp(), c:DAILY})); }catch(e){} }
-// +0.10 к итоговому возврату, если категория строки отмечена как сегодняшний бонус
-const dailyFor = key => (key && DAILY.includes(key)) ? CFG.dailyBonus : 0;
+// прибавка к СУММЕ бонусов, если категория строки отмечена как сегодняшний бонус
+const dailyFor = key => { if(!key) return 0;
+  const h = DAILY.find(x=>x.k===key); return h ? (h.v||CFG.dailyBonus) : 0; };
 // бонусные города потребляемых: алхимия, Бресилиен, кухня, Карлеон
 const CONS_BONUS_CITY = {potion:'Brecilien', meal:'Caerleon'};
 
@@ -1155,12 +1173,12 @@ async function loadAll(force){
 
 // ─── Расчёт ───
 function returnRate(bonus, focus, daily){
-  let b = CFG.cityBase + (bonus?CFG.specialty:0) + (focus?CFG.focus:0);
-  return Math.min(0.95, rr(b) + (daily||0));
+  const b = CFG.cityBase + (bonus?CFG.specialty:0) + (focus?CFG.focus:0) + (daily||0);
+  return Math.min(0.95, rr(b));
 }
 function refReturnRate(bonus, focus, daily){
-  let b = CFG.cityBase + (bonus?CFG.refSpecialty:0) + (focus?CFG.focus:0);
-  return Math.min(0.95, rr(b) + (daily||0));
+  const b = CFG.cityBase + (bonus?CFG.refSpecialty:0) + (focus?CFG.focus:0) + (daily||0);
+  return Math.min(0.95, rr(b));
 }
 // себестоимость самостоятельной переработки материала в городе (снизу вверх по тирам)
 function buildSelfCosts(focus){
@@ -1280,7 +1298,7 @@ function craftCostIn(item, city, focus){
   }
   if(item.art && artCost>0) parts.push([item.art.id, artCost, 'mat']);
   return {cost: raw*(1-ret)+rawNoRet+artCost+fee, cash: raw+rawNoRet+artCost+fee,
-    bonus, ret, fee, raw, rawNoRet, artCost, artInfo, stale:worst, selfMats, parts, daily:dly>0};
+    bonus, ret, fee, raw, rawNoRet, artCost, artInfo, stale:worst, selfMats, parts, daily:dly};
 }
 // ─── Стабильность: сколько дней из последних трёх недель позиция была в плюсе ───
 // Считаем не «какая была маржа тогда» (историю ордеров никто не хранит), а как бы
@@ -1460,7 +1478,7 @@ function compute(){
       // стабильность: тянем ту же сделку по дням. Материалы, по своим рядам,
       // плата за станцию не зависит от цен и в ряды не входит.
       const tr = trendStats(cc.parts, cc.fee, rev, trendSeriesOf(channel==='ЧР'?'bm':'city', it.id));
-      rows.push({tr, it, city, cost:cc.cost, bonus:cc.bonus, daily:!!cc.daily, rev, channel, net, margin,
+      rows.push({tr, it, city, cost:cc.cost, bonus:cc.bonus, daily:cc.daily||0, rev, channel, net, margin,
         vol, pool: vol*Math.max(net,0), cash:cc.cash, ...goldOf(net, cc.cost, vol, stale, cc.cash), stale, warn,
         bmPrice, bmSrc, cityPrice:bestCityPrice||null, fee:cc.fee, ret:cc.ret, raw:cc.raw, rawNoRet:cc.rawNoRet||0,
         bmNow: bq1?bq1.now:null, bmBase: bq1?bq1.base:null, spike, swing,
@@ -1575,7 +1593,7 @@ function compute(){
         const stale = Math.max(sc.stale, mp.age||0);
         const warn = margin>300 || (margin>100 && vol!=null && vol<10);
         const tr = trendStats(sc.parts, sc.fee, sell*(1-tax-CFG.setupFee), trendSeriesOf('mat', rmat.id));
-        refRows.push({tr, rmat, city, daily:dailyFor('chain:'+rmat.chain)>0, cost:sc.cost, sell, net, margin, vol,
+        refRows.push({tr, rmat, city, daily:dailyFor('chain:'+rmat.chain), cost:sc.cost, sell, net, margin, vol,
           askNow:mp.price, sellSpike:ca.spike, sellNorm:ca.norm, sellCapped:ca.capped,
           pool: vol!=null?vol*Math.max(net,0):null,
           cash:sc.cash, ...goldOf(net, sc.cost, vol, stale, sc.cash),
@@ -1628,7 +1646,7 @@ function compute(){
           const parts = rparts.map(([id,s])=>[id, s*(1-ret), 'mat']);
           if(rmat.cat && catCost>0) parts.push([rmat.cat.id, catCost*(1-ret), 'mat']);
           best={rmat, city:rc, cost, sell:ca.price, askNow:sp.price, sellSpike:ca.spike, sellNorm:ca.norm, sellCapped:ca.capped, sellCity:sp.city,
-            buyCities:[...buyCities], net, bonus, ret, fee, parts,
+            buyCities:[...buyCities], net, bonus, ret, fee, parts, daily:dly,
             stale:Math.max(worst, sp.age||0)};
         }
       }
@@ -1803,7 +1821,7 @@ function compute(){
         cparts.push([m, pMat.price*n*(noRet.has(m)?1:(1-ret))/c.batch, 'mat']);
       }
       const tr = trendStats(cparts, fee/c.batch, rev, trendSeriesOf('city', c.id));
-      consRows.push({tr, it:c, city, bonus, daily:dly>0, cost, costBatch, cash, cashBatch, raw, rawNoRet, ret, fee, rev,
+      consRows.push({tr, it:c, city, bonus, daily:dly, cost, costBatch, cash, cashBatch, raw, rawNoRet, ret, fee, rev,
         channel:sellCity, sellPrice:fair.price, askNow:sellPrice, cityNorm:fair.norm, citySpike:fair.spike,
         sellBid:(S.cityPrices[c.id]?.[sellCity]?.[1]?.buy)||0, sellAge:hoursAgo(sellTs), net, margin, vol,
         pool: vol!=null?vol*Math.max(net,0):null,
@@ -2080,7 +2098,7 @@ function render(){
       : '';
     if(craft){
       const bonusBadge = (r.bonus?'<span class="badge b-bonus">бонус</span>':'')
-        + (r.daily?'<span class="badge b-bonus" title="Сегодняшний дневной бонус производства. Плюс 10 процентов к возврату ресурсов на эту категорию. Ты отметил это в шапке.">+10% день</span>':'');
+        + (r.daily?`<span class="badge b-bonus" title="Сегодняшний дневной бонус производства из окна Activities. Он прибавляется к сумме бонусов, а не к готовому возврату, и уже сидит внутри процента рядом. Ты отметил это в шапке.">+${Math.round(r.daily*100)}% день</span>`:'');
       const chLabel = r.channel==='ЧР' ? `ЧР · ${qualMode==='q1'?'обыч. кач.':'все кач.'}` : r.channel+' · обыч. кач.';
       const qualText = qualMode==='q1' ? 'Обычное' : 'Все качества (взвеш.)';
       html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}">${nameCell(it, topBadge+limBadge+openBadge+spikeBadge+citySpikeBadge+warnBadge+staleBadge, qualText)}
@@ -2095,7 +2113,7 @@ function render(){
       html+=`<tr class="det" style="display:none"><td colspan="12" id="det${i}"></td></tr>`;
     } else if(S.tab==='cons'){
       const bonusBadge = (r.bonus?'<span class="badge b-bonus">бонус</span>':'')
-        + (r.daily?'<span class="badge b-bonus" title="Сегодняшний дневной бонус производства. Плюс 10 процентов к возврату ресурсов на эту категорию.">+10% день</span>':'');
+        + (r.daily?`<span class="badge b-bonus" title="Сегодняшний дневной бонус производства из окна Activities. Он прибавляется к сумме бонусов, а не к готовому возврату, и уже сидит внутри процента рядом. Ты отметил это в шапке.">+${Math.round(r.daily*100)}% день</span>`:'');
       html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}"><td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${nmA(it)}</b>${topBadge+limBadge+openBadge+citySpikeBadge+warnBadge+staleBadge}
         <span>${nmB(it)} · T${it.tier}${it.ench?'.'+it.ench:''} · ${it.cat==='potion'?'Зелье':'Еда'} · партия ${it.batch} шт</span></div></td>
         <td>${r.city}${bonusBadge}</td><td>${fmt(r.cost)}</td>
@@ -2147,9 +2165,14 @@ function render(){
         <td class="fresh">${fmtAge(r.stale)}</td></tr>`;
     } else {
       const rm=r.rmat;
-      const bonusBadge = r.bonus
-        ? '<span class="badge b-bonus" title="В этом городе на такой ресурс даётся плюс 40 процентов возврата">＋40% возврат</span>'
-        : `<span class="badge b-ch" title="Обычный город: возврат всего ${(r.ret*100).toFixed(1)}%. В бонусном городе было бы выгоднее.">${(r.ret*100).toFixed(0)}% возврат</span>`;
+      // Раньше тут в бонусном городе всегда было написано «＋40% возврат». Это число из
+      // файлов игры, надбавка к бонусу города, а не сам возврат. Настоящий возврат выходил
+      // 36,7%, а с дневным бонусом 46,7%, и значок спорил с расчётом прямо под ним.
+      const retTip = r.bonus
+        ? `Бонусный город на этот ресурс. Игра добавляет ему +40 к бонусу переработки, и вместе с базовым бонусом города это даёт возврат ${retPct(r.ret)}%${r.daily?', уже с сегодняшним дневным бонусом':''}. В обычном городе было бы 15,2%.`
+        : `Обычный город: возврат всего ${retPct(r.ret)}%${r.daily?' (тут уже есть сегодняшний дневной бонус)':''}. В бонусном городе на этот ресурс было бы 36,7%.`;
+      const bonusBadge = `<span class="badge ${r.bonus?'b-bonus':'b-ch'}" title="${retTip}">возврат ${retPct(r.ret)}%${r.bonus?' · бонусный город':''}</span>`
+        + (r.daily?`<span class="badge b-bonus" title="Сегодняшний дневной бонус производства из окна Activities. Он прибавляется к сумме бонусов, а не к готовому возврату, и уже сидит внутри процента рядом. Ты отметил это в шапке.">+${Math.round(r.daily*100)}% день</span>`:'');
       const route = r.sellCity
         ? `<span class="fresh">🛒 купить сырьё: <b style="color:var(--text)">${r.buyCities.join(', ')}</b><br>⚒ переработать: <b style="color:var(--text)">${r.city}</b> ${bonusBadge}<br>💰 продать: <b style="color:var(--text)">${r.sellCity}</b></span>`
         : `<b>${r.city}</b> ${bonusBadge}<br><span class="fresh">купить сырьё, переработать и продать, всё в одном городе</span>`;
@@ -2289,7 +2312,7 @@ function calcConsUpd(idx){
 
   const invest=r.costBatch*batches, profit=r.net*made;
   const days=r.vol?(made/Math.max(1,r.vol*CFG.marketShare)).toFixed(1):null;
-  m+=`Обычное сырьё: <b>${fmt(r.raw*batches)}</b> · Возврат <b>${(r.ret*100).toFixed(1)}%</b> → эффективно ${fmt(r.raw*(1-r.ret)*batches)}`+
+  m+=`Обычное сырьё: <b>${fmt(r.raw*batches)}</b> · Возврат <b>${retPct(r.ret)}%</b> → эффективно ${fmt(r.raw*(1-r.ret)*batches)}`+
      (r.rawNoRet?` · Редкие компоненты <b>${fmt(r.rawNoRet*batches)}</b> <i style="color:var(--muted)">без возврата</i>`:'')+
      ` · Станок <b>${fmt(r.fee*batches)}</b><br>`+
      `Себестоимость штуки: <b>${fmt(r.cost)}</b> · Продажа: рынок ${r.channel}, ордер
@@ -2328,7 +2351,7 @@ function detailHTML(r,idx){
       <span class="help" title="«Впритык, с возвратом»: возврат падает в сумку после каждого крафта, и его можно пустить в следующий. Тогда покупать надо примерно на четверть меньше. Но возврат случайный. 24.8% это среднее за много крафтов, а на одной партии может не повезти. Поэтому сюда заложено 5% запаса. Раньше его не было, и партия вставала на последней штуке.&#10;&#10;Важно. Станок проверяет материалы сразу на весь заказ. Поставить 100 штук одной кнопкой в этом режиме не выйдет, крафтить придётся кусками по 10 или 20 штук, подбирая возврат из сумки.&#10;&#10;«На всё количество»: полный рецепт на все штуки. Одна кнопка и никакой возни, но денег нужно на четверть больше, а в конце останется гора возвращённых материалов. Профит от выбора не меняется: остатки стоят ровно столько, сколько ты переплатил.">?</span>
       <div id="calcOut${idx}" style="margin-top:6px"></div>`;
   const sOvr = S.overrides['SELL|'+it.id]!=null;
-  m+=(r.raw ? `Сырьё: <b>${fmt(r.raw)}</b> · Возврат: <b>${(r.ret*100).toFixed(1)}%</b> → эффективно ${fmt(r.raw*(1-r.ret))} · ` : '')+
+  m+=(r.raw ? `Сырьё: <b>${fmt(r.raw)}</b> · Возврат: <b>${retPct(r.ret)}%</b> → эффективно ${fmt(r.raw*(1-r.ret))} · ` : '')+
      (r.rawNoRet ? `Компоненты: <b>${fmt(r.rawNoRet)}</b> <i style="color:var(--muted)">без возврата</i> · ` : '')+
      (r.fee ? `Станок: <b>${fmt(r.fee)}</b> · ` : '')+
      `Итого себестоимость: <b>${fmt(r.cost)}</b><br>`+
@@ -2664,7 +2687,7 @@ function detailRefHTML(r, idx){
       <div id="rcalcOut${idx}" style="margin-top:6px"></div>`;
   const sellCity=r.sellCity||r.city;
   const sellOvr=S.overrides[rm.id+'|'+sellCity]!=null;
-  m+=`Возврат ресурсов: <b>${(r.ret*100).toFixed(1)}%</b>${r.bonus?' (бонусный город!)':''} · Станок: <b>${fmt(r.fee)}</b> · `+
+  m+=`Возврат ресурсов: <b>${retPct(r.ret)}%</b>${r.bonus?' (бонусный город!)':''} · Станок: <b>${fmt(r.fee)}</b> · `+
      `Итого себестоимость: <b>${fmt(r.cost)}</b> · Продажа в ${sellCity}${sellOvr?' <span style="color:var(--accent)">✎</span>':''}:
       <input type="number" style="width:100px" value="${Math.round(r.sell)}" onclick="event.stopPropagation()"
         onchange="setOverride('${rm.id}','${sellCity}',this.value)"
@@ -2684,7 +2707,7 @@ function calcRefUpd(idx){
   const r=(window.__refDetRows||{})[idx]; if(!r) return;
   const N=Math.max(1,+($('rcalcN'+idx)?.value||100));
   const rm=r.rmat, tax=$('premChk').checked?0.04:0.08;
-  let html=`<div style="margin:2px 0 4px"><b>Сырьё на ${fmt(N)} шт</b>, с учётом возврата ${(r.ret*100).toFixed(1)}%:</div>`+
+  let html=`<div style="margin:2px 0 4px"><b>Сырьё на ${fmt(N)} шт</b>, с учётом возврата ${retPct(r.ret)}%:</div>`+
     '<table><tr><th class="item">Ресурс</th><th>На 1 шт</th><th>Цена (ред.)</th><th>Где купить</th><th>Купить всего</th><th>Сумма</th></tr>';
   let total=0;
   for(const [rid,c] of Object.entries(rm.raws)){
@@ -3279,15 +3302,37 @@ function fillDaily(){
     + `<optgroup label="${ru?'Вещи (крафт)':'Gear (crafting)'}">`
     + gear.map(([v,t])=>opt(v,t)).join('')
     + '</optgroup>';
+  // Второй списочек рядом: +10 или +20. Обычно выпадает +10, но раз примерно в десять
+  // дней игра даёт «редкий» бонус вдвое больше, и это заметно меняет себестоимость.
+  const vHtml = `<option value="0.10">+10</option><option value="0.20">+20</option>`;
+  const readDaily = ()=>{
+    const out=[];
+    for(const [id,vid] of [['daily1','daily1v'],['daily2','daily2v']]){
+      const k=$(id)?.value; if(!k) continue;
+      out.push({k, v:+($(vid)?.value||CFG.dailyBonus)});
+    }
+    return out;
+  };
+  const paintV = ()=>{
+    for(const [id,vid] of [['daily1','daily1v'],['daily2','daily2v']]){
+      const box=$(vid); if(box) box.style.display = $(id)?.value ? '' : 'none';
+    }
+  };
+  const apply = ()=>{ DAILY = readDaily(); saveDaily(); paintV(); S.limit=0; compute(); render(); };
   for(const [i,id] of [[0,'daily1'],[1,'daily2']]){
     const sel=$(id); if(!sel) continue;
     sel.innerHTML = html;
-    sel.value = DAILY[i] || '';
-    sel.onchange = ()=>{
-      DAILY = [$('daily1').value, $('daily2').value].filter(Boolean);
-      saveDaily(); S.limit=0; compute(); render();
-    };
+    sel.value = DAILY[i]?.k || '';
+    sel.onchange = apply;
+    const box=$(id+'v');
+    if(box){
+      box.innerHTML = vHtml;
+      box.value = String((DAILY[i]?.v ?? CFG.dailyBonus).toFixed(2));
+      box.title = 'Насколько сегодня подняли эту категорию. В окне Activities это написано прямо: «+10% Hide» или «+20% Hide». Обычно +10, редко +20.';
+      box.onchange = apply;
+    }
   }
+  paintV();
 }
 function buildGroups(){
   const row=$('grpRow'); if(!row) return;
