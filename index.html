@@ -60,6 +60,14 @@ body.loading #status::before{content:'';width:14px;height:14px;border:2px solid 
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* ── скелетон загрузки ── */
+.rtRow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+button.rt{position:relative;overflow:hidden;text-align:left;padding:8px 12px;border-radius:10px;
+  background:var(--panel2);border:1px solid var(--border2);min-width:210px;flex:0 1 auto}
+button.rt b{display:block;font-size:13.5px}
+button.rt span{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
+button.rt i{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);opacity:.5}
+button.rt.on{border-color:var(--accent);background:var(--panel3)}
+button.rt.on i{opacity:1}
 tr.brk td{background:rgba(238,188,78,.06);border-bottom:1px solid var(--border)}
 button.brkBtn{padding:2px 7px;font-size:11px;margin-left:6px;border-radius:6px;vertical-align:middle}
 .skel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:8px;overflow:hidden}
@@ -279,6 +287,7 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
     <label class="ctl" id="wrapLocal" title="Куда везти товар.&#10;&#10;«Лучший маршрут»: сайт ищет самую выгодную цену среди всех городов и считает, что ты туда доедешь. Сколько это весит и во сколько поездок выльется, написано в колонке «Мне за день». Риск, что тебя убьют по дороге, сайт не считает.&#10;&#10;«На месте»: покупка, крафт и продажа в одном городе. В Рунофикации так же: вещь, камни и продажа в одном месте. Везти никуда не надо. Это ответ на вопрос «сколько выйдет, если я никуда не поеду».&#10;&#10;Отдельный случай Карлеон. Там чёрный рынок рядом, поэтому продажа на нём считается продажей на месте.&#10;&#10;В режиме «все города» перебираются все доступные и остаётся лучший вариант по каждому предмету.">Режим
       <select id="modeSel">
         <option value="route">Лучший маршрут</option>
+        <option value="opt">🧭 Оптимальный маршрут (2 или 3 города по пути)</option>
         <option value="local">📍 На месте</option>
       </select>
     </label>
@@ -348,9 +357,10 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
     <label class="ctl">Зачар.
       <select id="enchSel"><option value="">любое</option><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select>
     </label>
-    <label class="ctl" id="refModeWrap" style="display:none">Режим переработки<span class="help" title="Локальный цикл: купил сырьё, переработал и продал в одном городе. Ничего никуда не везёшь.&#10;&#10;Лучший маршрут: сайт ищет максимум денег. Сырьё покупается там, где дешевле, переработка идёт в выбранном городе или в бонусном, если выбраны «Все города», а готовый ресурс продаётся там, где дороже. Возить между городами придётся тебе, и риск по дороге сайт не считает.">?</span>
+    <label class="ctl" id="refModeWrap" style="display:none">Режим переработки<span class="help" title="Локальный цикл: купил сырьё, переработал и продал в одном городе. Ничего никуда не везёшь.&#10;&#10;Оптимальный маршрут: два или три города подряд по кольцу, в одну сторону, без возврата назад. Покупаешь в первом, перерабатываешь по дороге, продаёшь в последнем. Сверху список маршрутов с деньгами и числом переходов.&#10;&#10;Лучший маршрут: сайт ищет максимум денег. Сырьё покупается там, где дешевле, переработка идёт в выбранном городе или в бонусном, если выбраны «Все города», а готовый ресурс продаётся там, где дороже. Возить между городами придётся тебе, и риск по дороге сайт не считает.">?</span>
       <select id="refModeSel">
         <option value="route">Лучший маршрут</option>
+        <option value="opt">🧭 Оптимальный маршрут (2 или 3 города по пути)</option>
         <option value="local" selected>📍 На месте (локальный цикл)</option>
       </select>
     </label>
@@ -519,6 +529,123 @@ function safeRoutes(){ return !!$('safeChk')?.checked; }
 // королевская пятёрка плюс Бресильен. Но если руками отмечены свои города, считаем
 // только по ним: ездить по всем семи в жизни всё равно никто не будет.
 let ROUTE_PICK = (()=>{ try{ return JSON.parse(localStorage.getItem('acp_routeCities')||'[]'); }catch(e){ return []; } })();
+
+// ─── Кольцо королевских городов и расстояния между соседями ───
+// Числа переходов сняты с карты мира: они нужны, чтобы отличать «по пути» от
+// «через полкарты и обратно». Карлеон и Бресильен в кольцо не входят: до первого
+// дорога через красные зоны, до второго через Дороги Авалона.
+const RING = ['Thetford','Fort Sterling','Lymhurst','Bridgewatch','Martlock'];
+const RING_HOPS = [6, 7, 6, 8, 6];        // Тетфорд-ФС, ФС-Лимхёрст, Лимхёрст-Бридж, Бридж-Мартлок, Мартлок-Тетфорд
+// Все отрезки кольца из двух и трёх городов, в обе стороны. Ровно двадцать штук.
+function ringRoutes(){
+  const out=[], n=RING.length;
+  for(let i=0;i<n;i++) for(const dir of [1,-1]) for(const len of [2,3]){
+    const cities=[], hops=[];
+    for(let k=0;k<len;k++) cities.push(RING[(i + dir*k + n*3) % n]);
+    for(let k=0;k<len-1;k++){
+      const a=(i + dir*k + n*3) % n;
+      hops.push(RING_HOPS[dir>0 ? a : (a-1+n)%n]);
+    }
+    out.push({cities, hops, total:hops.reduce((x,y)=>x+y,0), key:cities.join('>')});
+  }
+  return out;
+}
+const routeLabel = r => r.cities.map(c=>CITY_SHORT[c]||c).join(' → ');
+
+// Список отрезков кольца над таблицей. Сверху тот, что сегодня даёт больше всего,
+// но видно и остальные: если ты уже стоишь в Тетфорде, тебе нужен свой, а не чемпион.
+function routesPanelHTML(){
+  if(S.tab!=='ref' || ($('refModeSel')?.value)!=='opt') return '';
+  const list = S.optRoutes || [];
+  if(!list.length) return '';
+  const best = list[0].sum || 1;
+  const chip = r => {
+    const on = r.key===S.optRoute;
+    const per = r.total ? r.sum/r.total : 0;
+    const bar = Math.max(2, Math.round((r.sum/best)*100));
+    return `<button class="rt${on?' on':''}" onclick="pickRoute('${r.key}')"
+      title="${r.n} позиций в плюсе на этом маршруте. ${fmt(Math.round(per))} серебра на один переход.">
+      <b>${routeLabel(r)}</b>
+      <span>${fmt(Math.round(r.sum))} за день · ${r.total} ${r.total%10===1&&r.total%100!==11?'переход':(r.total%10>=2&&r.total%10<=4&&(r.total%100<10||r.total%100>=20))?'перехода':'переходов'}</span>
+      <i style="width:${bar}%"></i></button>`;
+  };
+  return `<div class="panel" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <b>🧭 Куда ехать сегодня</b>
+      <span class="fresh">два или три города подряд, в одну сторону, без возврата назад</span>
+    </div>
+    <div class="rtRow">${list.map(chip).join('')}</div>
+    <div class="fresh" style="margin-top:8px">Сумма это пять лучших позиций маршрута: столько увезёшь за поездку, а не весь список. В таблице ниже показаны все позиции выбранного маршрута.</div>
+  </div>`;
+}
+window.pickRoute = k => { S.optRoute = k; S.open={}; S.lastOrder=null; S.limit=0; compute(); render(); };
+
+
+// Строки для одного отрезка кольца. Правило простое: покупаем не позже, чем
+// перерабатываем, а продаём только в последнем городе. Возврата назад нет.
+function refRowsForRoute(route, fee100, tax, focus){
+  const rows=[];
+  const sellCity = route.cities[route.cities.length-1];
+  for(const rmat of (DATA.refining||[])){
+    let best=null;
+    // город переработки: любой по дороге, но не после города продажи
+    for(let ri=0; ri<route.cities.length; ri++){
+      const rc = route.cities[ri];
+      const upto = route.cities.slice(0, ri+1);          // где уже можно было купить
+      let raws=0, ok=true, worst=0; const buyCities=new Set(); const rparts=[];
+      for(const [rid,c] of Object.entries(rmat.raws)){
+        const bp = bestBuy(rid, upto);
+        if(!bp){ ok=false; break; }
+        raws+=bp.price*c; worst=Math.max(worst,bp.age); buyCities.add(bp.city);
+        rparts.push([rid, bp.price*c, 'mat']);
+      }
+      if(!ok) continue;
+      let catCost=0;
+      if(rmat.cat){
+        const cb = bestBuy(rmat.cat.id, upto);
+        const cm = cb ? cb.price : Infinity;
+        const self_ = S.selfCost[rmat.cat.id+'|'+rc];
+        const eff = isFinite(cm) ? cm : (self_?self_.cost:Infinity);
+        if(!isFinite(eff)) continue;
+        catCost = eff*rmat.cat.n;
+      }
+      const bonus = DATA.refBonus[rmat.chain]===rc;
+      const ret = refReturnRate(bonus, focus, dailyFor('chain:'+rmat.chain));
+      const fee = rmat.iv*CFG.nutritionFactor*fee100/100;
+      const cost = (raws+catCost)*(1-ret)+fee;
+      const sp = matPrice(rmat.id, sellCity);
+      if(!sp || (!sp.ovr && sp.age>CFG.staleHours)) continue;
+      const ca = refAsk(rmat.id, sp.price);
+      const net = ca.price*(1-tax-CFG.setupFee) - cost;
+      if(!best || net>best.net){
+        const parts = rparts.map(([id,x])=>[id, x*(1-ret), 'mat']);
+        if(rmat.cat && catCost>0) parts.push([rmat.cat.id, catCost*(1-ret), 'mat']);
+        best={rmat, city:rc, cost, sell:ca.price, askNow:sp.price, sellSpike:ca.spike,
+              sellNorm:ca.norm, sellCapped:ca.capped, sellCity, buyCities:[...buyCities],
+              net, bonus, ret, fee, parts, stale:Math.max(worst, sp.age||0)};
+      }
+    }
+    if(!best) continue;
+    const margin = best.net/best.cost*100;
+    const vol = (S.matHist||{})[rmat.id]?.[best.sellCity] ?? null;
+    const warn = margin>300 || (margin>100 && vol!=null && vol<10);
+    const tr = trendStats(best.parts, best.fee, best.sell*(1-tax-CFG.setupFee), trendSeriesOf('mat', rmat.id));
+    rows.push({...best, tr, margin, vol, route,
+      pool: vol!=null?vol*Math.max(best.net,0):null,
+      ...goldOf(best.net, best.cost, vol, best.stale), warn});
+  }
+  return rows;
+}
+// Сколько маршрут стоит за день. Берём пять лучших позиций: столько реально увезёшь
+// за поездку, а не весь список из сорока строк.
+const ROUTE_TOP = 5;
+function scoreRoute(rows){
+  const plus = rows.filter(r=>r.net>0);
+  const top = [...plus].sort((a,b)=>(b.real||0)-(a.real||0)).slice(0, ROUTE_TOP);
+  return {sum: top.reduce((s,r)=>s+Math.max(0, r.real||0), 0), n: plus.length};
+}
+
+
 function routeCities(){
   const base = safeRoutes() ? SAFE_CITIES : CITIES;
   const pick = ROUTE_PICK.filter(c=>base.includes(c));
@@ -661,6 +788,7 @@ const S = {
   cityHist:{},         // itemId -> {city: {q: vol/день}}  (объёмы рынков городов, догружается)
   cityBase:{},         // itemId -> {q: {base, days}}      (обычная цена по городам за месяц)
   matBase:{},          // matId  -> {base, days}            (то же для материалов)
+  optRoutes:[], optRoute:null,   // отрезки кольца и выбранный
   loaded:false, rows:[], flipRows:[], cityFlipRows:[], sortKey:'real', sortDir:-1, open:{}, lastOrder:null, grp:'all',
   itemQ:'', itemSel:null, itemFrom:null, itemTier:'', itemEnch:'',   // поиск цены предмета
   roads:{loaded:false, loading:false, kills:[], fetched:0, err:null, at:null},
@@ -1415,7 +1543,17 @@ function compute(){
   if(need('ref')){
   const refMode = $('refModeSel') ? $('refModeSel').value : 'local';
   const fee100 = +$('feeInp').value||0;
-  if(refMode==='local'){
+  if(refMode==='opt'){
+    // оптимальный маршрут: перебираем все двадцать отрезков кольца и считаем каждый
+    const all = ringRoutes().map(rt=>{
+      const rows = refRowsForRoute(rt, fee100, tax, focus);
+      return {...rt, rows, ...scoreRoute(rows)};
+    }).sort((a,b)=>b.sum-a.sum);
+    S.optRoutes = all.map(({rows, ...rest})=>rest);
+    const pick = all.find(r=>r.key===S.optRoute) || all[0];
+    S.optRoute = pick ? pick.key : null;
+    if(pick) refRows.push(...pick.rows);
+  } else if(refMode==='local'){
     // локальный цикл: купить сырьё → переработать → продать в том же городе
     for(const rmat of (DATA.refining||[])){
       const tryCities = citySel==='ALL' ? [DATA.refBonus[rmat.chain]] : [citySel];
@@ -1890,7 +2028,8 @@ function render(){
     S.lastOrder = Object.fromEntries(rows.map((r,i)=>[rowKey(r), i]));
   }
   const cols = craft?COLS_CRAFT : S.tab==='flip'?COLS_FLIP : S.tab==='cityflip'?COLS_CITYFLIP : S.tab==='ench'?COLS_ENCH : S.tab==='cons'?COLS_CONS : COLS_REF;
-  let html='<table><thead><tr>'+cols.map(([k,t])=>
+  let html = routesPanelHTML();
+  html += '<table><thead><tr>'+cols.map(([k,t])=>
     `<th class="${k==='item'?'item':''}" data-k="${k}"${COL_TIPS[k]?` title="${COL_TIPS[k]}"`:''}>${t}${COL_TIPS[k]?'<span class="help">?</span>':''}${key===k?(dir<0?' ↓':' ↑'):''}</th>`).join('')+'</tr></thead><tbody>';
   const qualMode = $('qualSel').value;
   const isMobile = (window.matchMedia && window.matchMedia('(max-width: 768px)').matches);
@@ -2488,7 +2627,16 @@ function refRawBest(rid, r){
     const p=matPrice(rid, r.city);
     return p?{...p, city:r.city}:null;
   }
-  return bestBuy(rid, routeCities());
+  return bestBuy(rid, refBuyPool(r));
+}
+// Города, в которых этой строке разрешено покупать. На оптимальном маршруте это
+// только города до переработки включительно: назад за сырьём никто не поедет.
+function refBuyPool(r){
+  if(r && r.route){
+    const i = r.route.cities.indexOf(r.city);
+    return r.route.cities.slice(0, (i<0?r.route.cities.length:i+1));
+  }
+  return routeCities();
 }
 function detailRefHTML(r, idx){
   const rm=r.rmat;
@@ -2547,7 +2695,7 @@ function calcRefUpd(idx){
     const localMode = ($('refModeSel')?.value||'local')==='local';
     let cp=null, catCity=r.city;
     if(localMode){ cp = matPrice(rm.cat.id, r.city); }
-    else { const b=bestBuy(rm.cat.id, routeCities()); if(b){ cp=b; catCity=b.city; } }
+    else { const b=bestBuy(rm.cat.id, refBuyPool(r)); if(b){ cp=b; catCity=b.city; } }
     const selfFallback = cp ? null : S.selfCost[rm.cat.id+'|'+r.city];   // если в продаже нет вовсе
     const unit = cp ? cp.price : (selfFallback?selfFallback.cost:null);
     const need = Math.ceil(rm.cat.n*N*(1-r.ret));
