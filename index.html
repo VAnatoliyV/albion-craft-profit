@@ -1047,6 +1047,15 @@ function applyOwnPrices(d){
     const sMin = v.sellTs ? v.sellTs/60 : 0, bMin = v.buyTs ? v.buyTs/60 : 0;
     const mine = Math.max(sMin, bMin);
     if(!mine) continue;
+    // Чёрный рынок это не город: он не покупается, он у тебя покупает. Поэтому его
+    // бай-ордер кладём туда же, где живёт «ЧР даёт сейчас», а не в цены городов.
+    if(city === 'Black Market'){
+      if(!v.buy) continue;
+      const rec = (S.bm[id] ||= {qs:{}, vol:0, last:0});
+      const cell = (rec.qs[q] ||= {price:0, vol:0, last:0, lastTs:0});
+      cell.order = v.buy; cell.orderTs = v.buyTs*1000; cell.own = true;
+      n++; continue;
+    }
     const mat = S.matPrices[id];
     if(mat && q === 1){
       const cur = mat[city];
