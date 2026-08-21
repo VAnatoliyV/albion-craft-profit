@@ -84,6 +84,10 @@ jobs:
           echo "Свежего сбора нет, беру опубликованный снимок, чтобы сайт вышел с ценами"
           curl -sfL --retry 2 -o data.json \
             "https://vanatoliyv.github.io/albion-craft-profit/data.json" || true
+          # Паспорт снимка тоже переносим: по нему следующий прогон решает, пора ли
+          # собирать заново. Без него возраст читается как 999 и сбор идёт каждый раз.
+          curl -sfL --retry 2 -o data-stats.json \
+            "https://vanatoliyv.github.io/albion-craft-profit/data-stats.json" || true
           if [ -s data.json ]; then echo "Взят прежний снимок ($(wc -c < data.json) байт)"; else echo "Прежнего снимка нет"; fi
 
       - name: Собрать сайт
