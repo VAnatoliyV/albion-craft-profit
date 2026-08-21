@@ -1017,12 +1017,24 @@ setInterval(()=>{ if(S.st && S.st.kind==='ok') renderStatus(); }, 30000); // в�
 // Если сайт открыт с локального приёмника, рядом лежит own.json с ценами, снятыми
 // прямо с твоего игрового клиента. Кладём их поверх публичных, но только там, где
 // они свежее. Приёмника нет, файла нет, ничего не меняется, сайт работает как обычно.
+let ownTimer = null;
 async function loadOwnPrices(){
   try{
     const r = await fetch('own.json?z='+Date.now(), {cache:'no-store'});
-    if(!r.ok) return;
-    applyOwnPrices(await r.json());
+    if(!r.ok) return;                       // сайт открыт не с приёмника, опрашивать нечего
+    const d = await r.json();
+    armOwnPoll();                           // приёмник есть, значит следим за ним дальше
+    // Приёмник меняет метку built, только когда реально что-то записал. Одинаковая
+    // метка значит «ничего нового», и пересчитывать всю таблицу незачем.
+    if(S.own && S.own.at === (d.built||0)*1000) return;
+    applyOwnPrices(d);
   }catch(e){ /* приёмник не запущен, это нормально */ }
+}
+// Пока ты играешь, приёмник пишет новые цены. Раз в двадцать секунд забираем их,
+// чтобы не надо было перезагружать страницу руками.
+function armOwnPoll(){
+  if(ownTimer) return;
+  ownTimer = setInterval(loadOwnPrices, 20000);
 }
 function applyOwnPrices(d){
   const P = d && d.prices; if(!P) return;
@@ -1038,7 +1050,7 @@ function applyOwnPrices(d){
     const mat = S.matPrices[id];
     if(mat && q === 1){
       const cur = mat[city];
-      if(cur && cur.ts >= mine) continue;         // публичная свежее, не трогаем
+      if(cur && !cur.own && cur.ts >= mine) continue;   // публичная свежее, не трогаем
       mat[city] = {price: v.sell || (cur&&cur.price) || 0, ts: sMin || (cur&&cur.ts) || 0,
                    buy: v.buy || 0, buyTs: bMin || 0, own: true};
       n++; continue;
@@ -1047,7 +1059,7 @@ function applyOwnPrices(d){
     if(it){
       const byQ = (it[city] ||= {});
       const cur = byQ[q];
-      if(cur && cur.ts >= mine) continue;
+      if(cur && !cur.own && cur.ts >= mine) continue;
       byQ[q] = {sell: v.sell || (cur&&cur.sell) || 0, ts: sMin || (cur&&cur.ts) || 0,
                 buy: v.buy || 0, buyTs: bMin || 0, own: true};
       n++;
