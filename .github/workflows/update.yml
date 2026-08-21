@@ -76,16 +76,17 @@ jobs:
         continue-on-error: true
         run: node fetch.mjs
 
-      - name: Если сбор не удался — взять уже опубликованный снимок
-        if: steps.gate.outputs.go == 'true' && steps.fetch.outcome != 'success'
+      # Снимок нужен всегда, а не только когда собирали заново: сайт публикуется
+      # на каждом прогоне, и выкладывать его без цен нельзя.
+      - name: Взять уже опубликованный снимок
+        if: steps.gate.outputs.go != 'true' || steps.fetch.outcome != 'success'
         run: |
-          echo "Сбор не удался, пробую сохранить прежние данные с сайта"
+          echo "Свежего сбора нет, беру опубликованный снимок, чтобы сайт вышел с ценами"
           curl -sfL --retry 2 -o data.json \
             "https://vanatoliyv.github.io/albion-craft-profit/data.json" || true
           if [ -s data.json ]; then echo "Взят прежний снимок ($(wc -c < data.json) байт)"; else echo "Прежнего снимка нет"; fi
 
       - name: Собрать сайт
-        if: steps.gate.outputs.go == 'true'
         run: |
           mkdir -p public
           cp index.html items.json public/
@@ -95,13 +96,11 @@ jobs:
           ls -lh public/
 
       - uses: actions/upload-pages-artifact@v3
-        if: steps.gate.outputs.go == 'true'
         with:
           path: public
 
   deploy:
     needs: build
-    if: needs.build.outputs.collected == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
