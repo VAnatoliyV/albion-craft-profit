@@ -213,6 +213,8 @@ footer{padding:16px 22px;color:var(--muted);font-size:11.5px;border-top:1px soli
 .aold{color:var(--red);font-weight:700}
 .pold{background:rgba(228,111,97,.10);border:1px solid rgba(228,111,97,.28);border-radius:6px;padding:1px 6px;display:inline-block}
 .mchip.old{border-color:rgba(228,111,97,.35);background:rgba(228,111,97,.08)}
+.mchip.own{border-color:rgba(98,201,111,.45);color:var(--green)}
+.ownTag{font-size:10.5px;padding:1px 5px;border-radius:5px;background:rgba(98,201,111,.15);color:var(--green);border:1px solid rgba(98,201,111,.3)}
 /* Лайт и Про. Лайт прячет всё, что новичку только мешает: он хочет увидеть,
    на чём заработать, а не двенадцать колонок и двадцать настроек. */
 body.light .proOnly{display:none!important}
@@ -857,6 +859,7 @@ const S = {
   cityBase:{},         // itemId -> {q: {base, days}}      (обычная цена по городам за месяц)
   matBase:{},          // matId  -> {base, days}            (то же для материалов)
   optRoutes:[], optRoute:null,   // отрезки кольца и выбранный
+  own:null,            // свои цены с локального приёмника, если он запущен
   loaded:false, rows:[], flipRows:[], cityFlipRows:[], sortKey:'real', sortDir:-1, open:{}, lastOrder:null, grp:'all',
   itemQ:'', itemSel:null, itemFrom:null, itemTier:'', itemEnch:'',   // поиск цены предмета
   roads:{loaded:false, loading:false, kills:[], fetched:0, err:null, at:null},
@@ -1001,6 +1004,7 @@ function renderStatus(){
       <span class="sep proOnly"></span>
       <span class="mchip proOnly">⚒ <b>${(DATA&&DATA.items.length||0).toLocaleString('ru-RU')}</b> предметов</span>
       <span class="mchip proOnly">📊 <b>${Object.keys(S.bm||{}).length.toLocaleString('ru-RU')}</b> с историей ЧР</span>
+      ${S.own && S.own.n ? `<span class="mchip own" title="Цены, снятые прямо с твоего игрового клиента через локальный приёмник. Они свежее публичных, поэтому подставлены вместо них. Всего в твоей базе ${fmt(S.own.total)} позиций.">🔒 своих цен: <b>${fmt(S.own.n)}</b></span>` : ''}
       ${S.viaProxy?'<span class="mchip proxy">через прокси-зеркало</span>':''}
       ${st.partial?`<span class="mchip err">частично: ${st.partial}</span>`:''}`;
   }
@@ -1008,6 +1012,50 @@ function renderStatus(){
 }
 function setStatus(st){ S.st = {...(S.st||{}), ...st}; renderStatus(); }
 setInterval(()=>{ if(S.st && S.st.kind==='ok') renderStatus(); }, 30000); // возраст тикает сам
+
+// ─── Свои цены ───
+// Если сайт открыт с локального приёмника, рядом лежит own.json с ценами, снятыми
+// прямо с твоего игрового клиента. Кладём их поверх публичных, но только там, где
+// они свежее. Приёмника нет, файла нет, ничего не меняется, сайт работает как обычно.
+async function loadOwnPrices(){
+  try{
+    const r = await fetch('own.json?z='+Date.now(), {cache:'no-store'});
+    if(!r.ok) return;
+    applyOwnPrices(await r.json());
+  }catch(e){ /* приёмник не запущен, это нормально */ }
+}
+function applyOwnPrices(d){
+  const P = d && d.prices; if(!P) return;
+  let n = 0;
+  for(const [k, v] of Object.entries(P)){
+    const i = k.lastIndexOf('|'); if(i < 0) continue;
+    const j = k.lastIndexOf('|', i-1); if(j < 0) continue;
+    const id = k.slice(0, j), city = k.slice(j+1, i), q = +k.slice(i+1) || 1;
+    // у нас время хранится в минутах, а приёмник пишет секунды
+    const sMin = v.sellTs ? v.sellTs/60 : 0, bMin = v.buyTs ? v.buyTs/60 : 0;
+    const mine = Math.max(sMin, bMin);
+    if(!mine) continue;
+    const mat = S.matPrices[id];
+    if(mat && q === 1){
+      const cur = mat[city];
+      if(cur && cur.ts >= mine) continue;         // публичная свежее, не трогаем
+      mat[city] = {price: v.sell || (cur&&cur.price) || 0, ts: sMin || (cur&&cur.ts) || 0,
+                   buy: v.buy || 0, buyTs: bMin || 0, own: true};
+      n++; continue;
+    }
+    const it = S.cityPrices[id];
+    if(it){
+      const byQ = (it[city] ||= {});
+      const cur = byQ[q];
+      if(cur && cur.ts >= mine) continue;
+      byQ[q] = {sell: v.sell || (cur&&cur.sell) || 0, ts: sMin || (cur&&cur.ts) || 0,
+                buy: v.buy || 0, buyTs: bMin || 0, own: true};
+      n++;
+    }
+  }
+  S.own = {n, at: (d.built||0)*1000, total: Object.keys(P).length};
+  if(n){ compute(); render(); if(typeof renderStatus==='function') renderStatus(); }
+}
 
 // ─── Данные с «мини-сервера» (GitHub Actions обновляет data.json по расписанию) ───
 function applyServerData(d){
@@ -1096,6 +1144,7 @@ async function loadAll(force){
       
       const hs=$('homeStatus'); if(hs) hs.textContent='Цены готовы ✓';
       compute(); render();
+      loadOwnPrices();           // свои цены, если сайт открыт с локального приёмника
       return;
     }
     setStatus({kind:'loading', text:'Снимок сервера недоступен, опрашиваю API напрямую…'});
@@ -1214,6 +1263,7 @@ async function loadAll(force){
     setStatus({kind:'ok', src:'api', at:Date.now(), partial:null});
   }
   compute(); render();
+  loadOwnPrices();               // свои цены, если рядом работает приёмник
   if(gotData) loadCityVolumes(); // объёмы городов фоном (только в режиме прямого опроса API)
 }
 
@@ -3136,7 +3186,8 @@ function priceCell(v, vol){
   if(!v) return '<span class="fresh">нет</span>'+volLine;
   const sell = v.sell ?? v.price ?? 0, buy = v.buy||0;
   const ha = sell ? hoursAgo(v.ts) : null, hb = buy ? hoursAgo(v.buyTs) : null;
-  const body = `${sell?`<b>${fmt(sell)}</b> ${ageMark(ha)}`:'<span class="fresh">нет ордеров</span>'}`
+  const mine = v.own ? ' <span class="ownTag" title="Своя цена: снята с твоего игрового клиента, а не из публичной базы">своё</span>' : '';
+  const body = `${sell?`<b>${fmt(sell)}</b> ${ageMark(ha)}${mine}`:'<span class="fresh">нет ордеров</span>'}`
     + (buy?`<br><span style="color:var(--blue)">${fmt(buy)}</span> ${ageMark(hb)}`:'');
   // рамку ставим, только если старое всё, что есть в ячейке: иначе она будет краснеть
   // из-за одного лишь бай-ордера, хотя цена покупки свежая
