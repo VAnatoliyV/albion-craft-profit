@@ -27,7 +27,12 @@ header{padding:12px 22px;border-bottom:1px solid var(--border);display:flex;flex
   position:sticky;top:0;z-index:50;box-shadow:0 2px 14px rgba(0,0,0,.35)}
 h1{font-size:17px;margin:0;color:var(--accent);white-space:nowrap;letter-spacing:.2px;display:flex;align-items:center;gap:6px}
 h1 small{color:var(--muted);font-weight:400;font-size:11.5px;margin-left:6px;letter-spacing:0}
-h1.logo{cursor:pointer;transition:opacity .15s}
+h1.logo{cursor:pointer;transition:opacity .15s;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+h1.logo small{flex-basis:100%}
+canvas.logoc{image-rendering:pixelated;background:transparent;display:block}
+#logoHdr{height:34px;width:auto;flex:none}
+#logoHome{height:150px;width:auto;margin:0 auto 10px}
+@media(max-width:640px){#logoHome{height:104px}#logoHdr{height:28px}}
 h1.logo:hover{opacity:.85}
 .controls{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
 select,input[type=number],input[type=text]{background:var(--bg2);color:var(--text);border:1px solid var(--border2);
@@ -264,7 +269,8 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
 </head>
 <body>
 <div id="home">
-  <h1>⚒ Albion <span>Craft Profit</span></h1>
+  <canvas id="logoHome" class="logoc" width="65" height="96" title="Albion Craft Profit"></canvas>
+  <h1>Albion <span>Craft Profit</span></h1>
   <div class="sub"><span class="proOnly">Europe-сервер · живые цены Albion Online Data Project · выбери раздел</span><span class="liteOnly">Живые цены с рынков Albion, сервер Europe. Выбери, чем хочешь заняться.</span></div>
   <div id="homeView"><span class="viewbox" title="Лайт: на экране только то, что нужно, чтобы понять, на чём заработать. Про: все колонки и все настройки."><button data-v="light" onclick="setView('light')">Лайт</button><button data-v="pro" onclick="setView('pro')">Про</button></span>
     <span class="fresh">Лайт показывает только главное. Про открывает все колонки и настройки.</span></div>
@@ -290,7 +296,7 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
   <div class="foot">Данные: Albion Online Data Project (краудсорсинг) · Иконки: официальный Render API</div>
 </div>
 <header id="appHeader" style="display:none">
-  <h1 class="logo" onclick="goHome()" title="На главный экран">⚒ Albion Craft Profit<small>Europe · чёрный рынок и города</small></h1>
+  <h1 class="logo" onclick="goHome()" title="На главный экран"><canvas id="logoHdr" class="logoc" width="32" height="48"></canvas>Albion Craft Profit<small>Europe · чёрный рынок и города</small></h1>
   <div class="controls">
     <label class="ctl" id="wrapCity">Город
       <select id="citySel">
@@ -865,6 +871,77 @@ function syncBmMode(){
 const bmMode = () => ($('bmModeSel')||{}).value || 'instant';
 const bmAsking = () => bmMode()==='order';
 const bmRate = tax => bmAsking() ? (1-tax-CFG.setupFee) : (1-tax);
+// ─── Живое лого ──────────────────────────────────────────────────────
+// Картинка разобрана на части тела прямо в пикселях: два уха, голова и два глаза.
+// Каждая часть двигается сама, поэтому он ведёт головой, дёргает ушами и подмигивает,
+// а не «мигает целиком». Два уровня яркости: плотное ядро и полутон, который живёт
+// рябью — из-за него лого шевелится даже между движениями.
+const LOGO_BIG="65,96,AAAGkAAAAAAAAAAAAAAAAAAAAqkAAAAAAAAAAAAAAAAAAACqgAAAAAAAAAAAAAAAAAAAKqgAAAAAAAAAAABkAAAAAAaqgAAAAAAAAAABqQAAAAAWqqQAAAAAAAAAAqpAAAAAAGqqUAAAAAAAAAKqkAAAAABqqqAAAAAAAAACqqkAAAAAGqaoAAAAAAAAAZWqAAAAAAapKoAAAAAAAACRapAAAAABqgKoAAAAAAAAoBqoAAAAAGqAKgAAAAAAACQGqlQAAAAakAqgAAAAAAAoAGqAAAAAAaAAagAAAAAAGQBqqAAAAABoAAqQAAAAABkABqgAAAABWpAAqAAAAAAGQABqAAAAAAKkACpUAAAAAaQAGoAAAAACqAAClAAAAAGgAAagAAAAQCpAAKoAAAAAaAABqUAAAAAKkAAZAAAAABkAAWoAAAAABqgAApAAAAAaVAAKQAAAAACqVABkAAAABlAABpAAAAAAKoAACgAAAAGQAAGkAAAAAAagVQKAAAAApBAAqAAAAAAFqVAAoAAAASkAAGoAAAAAAWpUQCgAAABaAAAqAAAAAAAClQAKQqqABkAACoAAAAAAAKlAAZamqkGAABaQAAAAAABqkABqQaqqoAACkAAAAAAAAaQAGkFqlaQAFaQAAAAAAAAqAAYBWqkKQAClAAAAAAAABpABQFaqoYAEaAAAAAAAAACkAAAVqqlUABoAAAAAAAAAClAABWqqlAAKAAAAAAAAAAGAAAVWqpkACkAAAAAAAAAAZAAFqWqpQAZAAAAAAAAAACkABZqmmVQGkAAAAAAAAAAoQAVRlqlVQZAAAAAAAAAAGQABAalpVVQoAAAAAAAAAAoAAAGqlVVVRkAAAAAAAAACQAAGpVpVVVSgAAAAAAAAAYAAGpABpVVVCgAAAAAAAACQAGpAAAZFVVKAAAAAAAAAJABoAAAAaFVUYAAAAAAAABkAaAAAAAaVVVkAAAAAAAAKAGQAAAAAGlVSgAAAAAAABkBkAAAAAAClVWQAAAAAAAKAZAAAAAAABkVKAAAAAAAAkCQAAAAAAABkUkAAAAAAABQkAQAAAAAABgRkAAAAAAAoKAGgCQAoBkBgCgAAAAAACRkAagqAGkagBgJAAAAAAAIJABqWkAKmpABkoAAAAAACSQABqqAAKqQAChlQAAAAAIkAABqgAAakAACiVAAAAABVAAAGpAAAqkAACZAAAAAAFkAABqoAAKqgAAGZAAAAAAZAAAKqoACqqQAFakAAAAABkAABqKoAahqQAAKQAAAAAKAAAGgKgBpBoAAAYAAAAAAoQABUAIFRQBQAACQAAAAABkAABAAAqQAFAAApAAAAAACgAABQAGqQBUAACQAAAABVGQAABUBqqQVAAAoAAAAAAVaQAABkaqqlQAAWgBAAAAAGWAAABWqqqkAACSkJAAAABkGAAAEaqqlQAAUClAAAABpAGAAASaqqRAAGAGpAAAAaQAGAABFimVEABgBlpAAAGAAAGAAAWGZUQAZAFBlABCpQAAGAABYYlQAFQBVaqQUqpAAAGAAFhiVABkAFVUKhCoBQAAGQAFGZUAYABVVVaABVBAAAGQAEYkAGAAVVVVAAApAAAAGQARSQBgAAVVFAAABBQAAAGAAFFAYAAFVZAAAAEFUEAAGQAUQGAAAAAgAAAAQRQAAAGQBQBUAAAACQAAABAFABAAGAFAFAAAAAIAAAAEAAAEAAFQABQAAAUAgAAAAQAAAQBBFAAUAAAFABAAAABAAACQEIFAFAAAVQAEAAAAAAAQJABgFAUAABQAAAAAAAAAAAgAGAEBAAFABQAAAAAAAAAAAAYQEUAAUAAAAAAAAAAAAAABQABQFBQAAAAAAAAAAAAEAFAAFAUFAAAAAAAAAAAAAQAAAAUAAUAAAAAAAAAAAABAAAABQABQAAAAAAAAAAAAEAABQAAUEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAFAAAAAAAAAA", LOGO_SMALL="32,48,ACgAAAAAAAAAKQAAAAAEAAAqQAAAACkAAGqQAAABqQAAaaAAAAJaAABoZAAABRpAACQYAAAIGkAAKAoAABQKAAAoBkAAJAoAACgCQAAgCkAAGQFAAGAGAAAZAYAAkAoAABpBgAGQGQAACkCZlIAYAAAGQKGmQCQAAAGAQaVAYAAAAJAFqUCQAAAAUBWqQUAAAACQVmlCAAAAAUAKlVJAAAABAGVlVYAAAAUFQAVVgAAABRgAAZVQAAAIYAAAFWAAABSAAAAFEAAAFUYUJYEUAAAVAqQagFQAAFQBkAoAFAAAYAKgGoAZAABQBmglkAgAAFAEAUBABAAAJAEGkUAgAABUAFqpAFRAAYUAGqQBSkAFAUAWVAUVgBkAUBVUFBVkFQAUBVBQVVQFQAUBUUBVAARQAUEBAAEABABAEAQAAQAEAEAUEAEBAAAAQEQQAAAAAAAAQEAQAAAAAABAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+function logoUnpack(str, k){
+  const p=str.split(','), w=+p[0], h=+p[1], bin=atob(p[2]);
+  const px=[];
+  const EAR_Y=26*k, EY0=49*k, EY1=59*k, L0=20*k, L1=31*k, R0=33*k, R1=43*k;
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const i=y*w+x, v=(bin.charCodeAt(i>>2)>>(6-2*(i&3)))&3;
+    if(!v) continue;
+    let part='head';
+    if(y>=EY0&&y<=EY1&&x>=L0&&x<=L1) part='eyeL';
+    else if(y>=EY0&&y<=EY1&&x>=R0&&x<=R1) part='eyeR';
+    else if(y<EAR_Y) part = x<w/2 ? 'earL' : 'earR';
+    px.push({x,y,v,part});
+  }
+  return {w,h,px,k,eyeL:{x0:20*k,x1:31*k,y:54*k},eyeR:{x0:33*k,x1:43*k,y:54*k},earY:26*k,pivot:80*k};
+}
+const LOGO={}; let logoRAF=null;
+function logoHash(i,k){ let n=(i*374761393+k*668265263)&0x7fffffff; n=(n^(n>>13))*1274126177&0x7fffffff; return ((n^(n>>16))&0xffff)/0xffff; }
+const logoBell = p => p<=0||p>=1 ? 0 : Math.sin(p*Math.PI);
+function logoEv(t,at,dur,period){ const p=((t-at)%period+period)%period; return p<dur ? logoBell(p/dur) : 0; }
+function logoDraw(t, ctx, g){
+  const k=g.k, P=9600;
+  let sway = 0.020*Math.sin(t/2300) + 0.011*Math.sin(t/1370);
+  sway += logoEv(t,7000,1400,P)*0.055;
+  const bob = Math.round(0.8*Math.sin(t/1900)*k);
+  const twL = Math.max(logoEv(t,4400,420,P), logoEv(t,8600,380,P));
+  const twR = Math.max(logoEv(t,1200,420,P), logoEv(t,8700,380,P));
+  const closedR = logoEv(t,2600,620,P)>0.35 || logoEv(t,5600,300,P)>0.35;
+  const closedL = logoEv(t,5600,300,P)>0.35;
+  const shear = y => Math.round(sway*(g.pivot-y));
+  const noise = Math.floor(t/90);
+  ctx.clearRect(0,0,g.w,g.h);
+  for(let i=0;i<g.px.length;i++){
+    const q=g.px[i];
+    if((q.part==='eyeL'&&closedL)||(q.part==='eyeR'&&closedR)) continue;
+    let a=1;
+    if(q.v===1){ const r=logoHash(i,noise); if(r>0.62) continue; a=0.30+r*0.75; }
+    let dx=shear(q.y);
+    if(q.part==='earL'||q.part==='earR'){
+      const r=(g.earY-q.y)/g.earY;
+      dx += Math.round((q.part==='earL'?-twL:twR)*r*r*3.4*k);
+    }
+    ctx.fillStyle = a>=1?'#f2efe9':'rgba(242,239,233,'+a+')';
+    ctx.fillRect(q.x+dx, q.y+bob, 1, 1);
+  }
+  const lid = e => { const y=Math.round(e.y+bob), dx=shear(e.y), u=Math.max(1,Math.round(k));
+    ctx.fillStyle='#f2efe9';
+    ctx.fillRect(e.x0+1+dx, y, e.x1-e.x0-1, u);
+    ctx.fillRect(e.x0+dx, y-u, u, u); ctx.fillRect(e.x1+dx, y-u, u, u); };
+  if(closedL) lid(g.eyeL);
+  if(closedR) lid(g.eyeR);
+}
+function logoStart(){
+  if(!LOGO.big){ LOGO.big=logoUnpack(LOGO_BIG,1); LOGO.small=logoUnpack(LOGO_SMALL,0.5); }
+  if(logoRAF) return;
+  const t0=performance.now();
+  // Свёрнутую вкладку не рисуем: незачем греть ноутбук ради невидимой картинки.
+  (function loop(now){
+    logoRAF=requestAnimationFrame(loop);
+    if(document.hidden) return;
+    const t=now-t0;
+    const a=$('logoHome'), b=$('logoHdr');
+    if(a && a.offsetParent!==null) logoDraw(t, a.getContext('2d'), LOGO.big);
+    if(b && b.offsetParent!==null) logoDraw(t, b.getContext('2d'), LOGO.small);
+  })(t0);
+}
 function paintView(){
   document.body.classList.toggle('light', isLite());
   document.querySelectorAll('.viewbox button').forEach(b=>b.classList.toggle('on', b.dataset.v===VIEW));
@@ -3691,6 +3768,7 @@ window.goHome=()=>{
     if(hs) hs.innerHTML='<span style="color:var(--red)">Не удалось загрузить базу предметов (items.json). Обнови страницу.</span>';
     return;
   }
+  logoStart();  // кролик оживает сразу, ещё до того как приедут цены
   fillCats();   // категории в фильтр, на выбранном языке
   fillDaily();   // списки дневного бонуса зависят от базы предметов, строим после её загрузки
   if(hs) hs.textContent='Цены загружаются в фоне, выбирай раздел…';
