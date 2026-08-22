@@ -897,6 +897,20 @@ function logoHash(i,k){ let n=(i*374761393+k*668265263)&0x7fffffff; n=(n^(n>>13)
 const logoBell = p => p<=0||p>=1 ? 0 : Math.sin(p*Math.PI);
 function logoEv(t,at,dur,period){ const p=((t-at)%period+period)%period; return p<dur ? logoBell(p/dur) : 0; }
 function logoDraw(t, ctx, g){
+  // Рисуем не полутора тысячами вызовов fillRect, а одним куском памяти: складываем
+  // кадр в буфер и отдаём его целиком. На пиксельной картинке это в разы дешевле,
+  // а на глаз результат тот же.
+  const buf = g._buf || (g._buf = ctx.createImageData(g.w, g.h));
+  const u32 = g._u32 || (g._u32 = new Uint32Array(buf.data.buffer));
+  u32.fill(0);
+  const INK = 0x00E9EFF2;                 // цвет пикселя, альфа добавляется отдельно
+  const set = (x,y,a)=>{
+    x=x|0; y=y|0;
+    if(x<0||y<0||x>=g.w||y>=g.h) return;
+    const v = (Math.min(255, a*255|0)<<24) | INK;
+    const i = y*g.w+x;
+    if((u32[i]>>>24) < (v>>>24)) u32[i] = v;
+  };
   const k=g.k, P=9600;
   let sway = 0.020*Math.sin(t/2300) + 0.011*Math.sin(t/1370);
   sway += logoEv(t,7000,1400,P)*0.055;
@@ -907,7 +921,6 @@ function logoDraw(t, ctx, g){
   const closedL = logoEv(t,5600,300,P)>0.35;
   const shear = y => Math.round(sway*(g.pivot-y));
   const noise = Math.floor(t/90);
-  ctx.clearRect(0,0,g.w,g.h);
   for(let i=0;i<g.px.length;i++){
     const q=g.px[i];
     if((q.part==='eyeL'&&closedL)||(q.part==='eyeR'&&closedR)) continue;
@@ -918,24 +931,28 @@ function logoDraw(t, ctx, g){
       const r=(g.earY-q.y)/g.earY;
       dx += Math.round((q.part==='earL'?-twL:twR)*r*r*3.4*k);
     }
-    ctx.fillStyle = a>=1?'#f2efe9':'rgba(242,239,233,'+a+')';
-    ctx.fillRect(q.x+dx, q.y+bob, 1, 1);
+    set(q.x+dx, q.y+bob, a);
   }
   const lid = e => { const y=Math.round(e.y+bob), dx=shear(e.y), u=Math.max(1,Math.round(k));
-    ctx.fillStyle='#f2efe9';
-    ctx.fillRect(e.x0+1+dx, y, e.x1-e.x0-1, u);
-    ctx.fillRect(e.x0+dx, y-u, u, u); ctx.fillRect(e.x1+dx, y-u, u, u); };
+    for(let x=e.x0+1;x<e.x1;x++) for(let j=0;j<u;j++) set(x+dx, y+j, 1);
+    for(let j=0;j<u;j++){ set(e.x0+dx, y-u+j, 1); set(e.x1+dx, y-u+j, 1); } };
   if(closedL) lid(g.eyeL);
   if(closedR) lid(g.eyeR);
+  ctx.putImageData(buf, 0, 0);
 }
 function logoStart(){
   if(!LOGO.big){ LOGO.big=logoUnpack(LOGO_BIG,1); LOGO.small=logoUnpack(LOGO_SMALL,0.5); }
   if(logoRAF) return;
   const t0=performance.now();
+  let last=0;
   // Свёрнутую вкладку не рисуем: незачем греть ноутбук ради невидимой картинки.
+  // И 60 кадров в секунду тут ни к чему: рябь и так меняется раз в 90 мс, а движения
+  // мягкие. Тридцати хватает, а работы ровно вдвое меньше.
   (function loop(now){
     logoRAF=requestAnimationFrame(loop);
     if(document.hidden) return;
+    if(now-last < 32) return;
+    last=now;
     const t=now-t0;
     const a=$('logoHome'), b=$('logoHdr');
     if(a && a.offsetParent!==null) logoDraw(t, a.getContext('2d'), LOGO.big);
