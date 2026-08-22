@@ -98,6 +98,11 @@ td.item img{width:42px;height:42px;flex:none;filter:drop-shadow(0 2px 4px rgba(0
     font-size:11px;line-height:1;padding:2px 5px;margin-left:6px;cursor:pointer;vertical-align:middle}
 .cp:hover{color:var(--accent);border-color:var(--accent)}
 .cp.cpok{color:var(--green);border-color:var(--green)}
+.fold{cursor:pointer;color:var(--accent);font-weight:600;list-style:none;margin:6px 0;user-select:none}
+.fold::-webkit-details-marker{display:none}
+.fold::before{content:'▸ ';display:inline-block;transition:transform .12s}
+details[open] > .fold::before{content:'▾ '}
+.fold .fresh{font-weight:400}
 .jhead{display:flex;align-items:center;gap:9px;margin:12px 0 5px}
 .jhead img{width:30px;height:30px;flex:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))}
 .jhead b{font-size:13px}
@@ -2553,12 +2558,31 @@ function bmAltHTML(r){
   const altRev = alt*(asking ? (1-tax) : (1-tax-CFG.setupFee));
   const altNet = altRev - r.cost;
   const diff = Math.round(altNet - r.net);
-  return '<br><span class="fresh">' + (asking
-    ? `Если сдать сразу: <b style="color:var(--text)">${fmt(Math.round(alt))}</b> → на руки ${fmt(Math.round(altRev))} (только налог), профит `
-    : `Если выставить ордер: <b style="color:var(--text)">${fmt(Math.round(alt))}</b> → на руки ${fmt(Math.round(altRev))} (налог + сбор 2,5%), профит `)
-    + `<b class="${altNet>=0?'pos':'neg'}">${fmt(Math.round(altNet))}</b> за штуку`
-    + (diff ? ` (${diff>0?'+':''}${fmt(diff)} к тому, что в таблице)` : '')
-    + (asking ? '. Деньги сразу и гарантированно.' : '. Исполнится, только когда ЧР поднимет свою цену до твоей, и сбор за выставление не вернётся.')
+  const tip = asking ? 'Сдать сразу: продаёшь по живому бай-ордеру, деньги в ту же секунду и гарантированно, платится только налог.'
+                     : 'Выставить ордер: ставишь свой на продажу и ждёшь, пока ЧР поднимет свою цену до твоей. Может и не подняться, а сбор за выставление 2,5% не вернётся.';
+  return `<br><span class="fresh" title="${tip}">${asking?'Сдать сразу':'Ордером'}: `
+    + `<b style="color:var(--text)">${fmt(Math.round(alt))}</b> → ${fmt(Math.round(altRev))}, профит `
+    + `<b class="${altNet>=0?'pos':'neg'}">${fmt(Math.round(altNet))}</b>/шт`
+    + (diff ? ` (${diff>0?'+':''}${fmt(diff)})` : '') + '</span>';
+}
+// Норма за месяц одной строкой. На чёрном рынке каждая сделка это исполнившийся ордер
+// на продажу, значит месячная средняя и есть ответ на вопрос «а по какой цене такие ордера
+// реально уходили». Если сегодняшний ордер стоит заметно выше неё, он может просто простоять.
+function bmNormHTML(r){
+  if(r.channel!=='ЧР'){
+    if(!r.cityNorm) return '';
+    return `<br><span class="fresh">За месяц в ${r.channel} уходило по <b style="color:var(--text)">${fmt(r.cityNorm)}</b>`
+      + (r.citySpike>0 ? ` · сейчас просят на ${r.citySpike}% выше, в расчёт взята обычная` : '') + '</span>';
+  }
+  if(!r.bmBase) return '';
+  const over = r.bmPrice ? Math.round((r.bmPrice/r.bmBase-1)*100) : 0;
+  const tip = 'Средняя цена сделок на чёрном рынке за месяц. На ЧР каждая сделка это исполнившийся ордер на продажу, '
+    + 'поэтому это и есть ответ на вопрос, по какой цене такие ордера реально уходили.';
+  return `<br><span class="fresh" title="${tip}">За месяц сделки на ЧР закрывались по <b style="color:var(--text)">${fmt(r.bmBase)}</b>`
+    + (r.swing?` · цена гуляет на ${r.swing}%`:'')
+    + (bmAsking() && over>=15
+        ? ` · <b style="color:var(--accent)">твой ордер на ${over}% выше</b>, он может простоять`
+        : (!bmAsking() && r.spike>0 ? ` · сейчас дают на ${r.spike}% выше, в расчёт взята обычная` : ''))
     + '</span>';
 }
 function detailHTML(r,idx){
@@ -2578,27 +2602,32 @@ function detailHTML(r,idx){
       <span class="help" title="«Впритык, с возвратом»: возврат падает в сумку после каждого крафта, и его можно пустить в следующий. Тогда покупать надо примерно на четверть меньше. Но возврат случайный. 24.8% это среднее за много крафтов, а на одной партии может не повезти. Поэтому сюда заложено 5% запаса. Раньше его не было, и партия вставала на последней штуке.&#10;&#10;Важно. Станок проверяет материалы сразу на весь заказ. Поставить 100 штук одной кнопкой в этом режиме не выйдет, крафтить придётся кусками по 10 или 20 штук, подбирая возврат из сумки.&#10;&#10;«На всё количество»: полный рецепт на все штуки. Одна кнопка и никакой возни, но денег нужно на четверть больше, а в конце останется гора возвращённых материалов. Профит от выбора не меняется: остатки стоят ровно столько, сколько ты переплатил.">?</span>
       <div id="calcOut${idx}" style="margin-top:6px"></div>`;
   const sOvr = S.overrides['SELL|'+it.id]!=null;
-  m+=(r.raw ? `Сырьё: <b>${fmt(r.raw)}</b> · Возврат: <b>${retPct(r.ret)}%</b> → эффективно ${fmt(r.raw*(1-r.ret))} · ` : '')+
-     (r.rawNoRet ? `Компоненты: <b>${fmt(r.rawNoRet)}</b> <i style="color:var(--muted)">без возврата</i> · ` : '')+
-     (r.fee ? `Станок: <b>${fmt(r.fee)}</b> · ` : '')+
-     `Итого себестоимость: <b>${fmt(r.cost)}</b><br>`+
-     `Продажа: ${r.channel==='ЧР'?`ЧР, ${sOvr?'моя цена':(r.bmSrc==='ордера на продажу'||r.bmSrc==='мой ордер')?'цена выставленных ордеров':(r.bmSrc==='ордер'?'бай-ордер сейчас':r.bmSrc==='сделки'?'последние сделки':'средняя за 7 дней')}`:`рынок ${r.channel}, ордер`}${sOvr?' <span style="color:var(--accent)">✎</span>':''}
+  // Раньше это были две длинные строки с разбором себестоимости и продажи. Разбор ушёл
+  // в подсказку: цифры те же, но глазами читается одна строка, а не абзац.
+  const costTip = [
+    r.raw ? `сырьё ${fmt(r.raw)}, возврат ${retPct(r.ret)}% → эффективно ${fmt(Math.round(r.raw*(1-r.ret)))}` : '',
+    r.rawNoRet ? `компоненты ${fmt(r.rawNoRet)} (без возврата)` : '',
+    r.fee ? `станок ${fmt(r.fee)}` : '',
+  ].filter(Boolean).join(' · ');
+  const sellWhat = r.channel==='ЧР'
+    ? (sOvr ? 'ЧР, моя цена' : bmAsking() ? 'ЧР, ордером' : 'ЧР, сразу')
+    : `${r.channel}, ордером`;
+  m+=`Себестоимость <b title="${costTip}">${fmt(r.cost)}</b> · `+
+     `Продажа <span title="${r.channel==='ЧР'?(bmAsking()?'Цена выставленных на ЧР ордеров на продажу. Минус налог и сбор 2,5%.':'Живой бай-ордер чёрного рынка. Минус налог.'):'Свой ордер на городском рынке. Минус налог и сбор 2,5%.'}">${sellWhat}</span>${sOvr?' <span style="color:var(--accent)">✎</span>':''}
       <input type="number" style="width:100px" value="${Math.round(r.bmPrice??r.cityPrice??0)}"
         onchange="setSellOverride('${it.id}',this.value)"
-        title="По какой цене ты реально продашь на чёрном рынке. Оставь пусто или поставь 0, чтобы вернуть цену с рынка.">
+        title="По какой цене ты реально продашь. Оставь пусто или поставь 0, чтобы вернуть цену с рынка.">
       → нетто <b>${fmt(r.rev)}</b> · `+
-     `Реалистичный профит/день: <b>${fmt(r.real)}</b>`+
+     `<span title="Сколько ты реально заработаешь за день, если будешь крафтить и продавать эту позицию: профит с штуки умножен на то, сколько штук рынок съедает за день.">профит/день <b>${fmt(r.real)}</b></span>`+
      bmAltHTML(r)+
-     (r.bmBase ? `<br><span class="fresh">Обычная цена ЧР за месяц: <b style="color:var(--text)">${fmt(r.bmBase)}</b>`+
-        (r.bmNow&&r.bmNow!==r.bmBase ? ` · сейчас дают ${fmt(r.bmNow)}${r.spike>0?` (<b style="color:var(--accent)">+${r.spike}% всплеск</b>, в расчёт не берём)`:''}` : '')+
-        (r.swing?` · за месяц цена гуляет на ${r.swing}%`:'')+'</span>' : '')+
+     bmNormHTML(r)+
      // продаём в городе, норма тоже нужна: именно по ней видно, сколько эта вещь стоит
      // из месяца в месяц, а не в конкретный час
      (r.channel!=='ЧР' && r.cityNorm ? `<br><span class="fresh">Обычная цена в ${r.channel} за месяц: <b style="color:var(--text)">${fmt(r.cityNorm)}</b>`+
         (r.citySpike>0 ? ` · сейчас просят ${fmt(r.cityAskNow||r.askNow)}, это на ${r.citySpike}% выше, в расчёт взята обычная` : '')+'</span>' : '');
   const bm = S.bm[it.id];
   if(bm){
-    m+='<br><b>ЧР по качествам:</b><table><tr><th>Качество</th><th>Бай-ордер</th><th title="Обычная цена за месяц. Это то, за сколько вещь уходит изо дня в день. Если бай-ордер сейчас выше неё, профит считается по обычной цене.">Обычная за месяц</th><th>Средняя 7д</th><th title="Самый дешёвый выставленный на продажу ордер на чёрном рынке. По этой цене можно встать в очередь и ждать.">Ордер на продажу</th><th>Объём/д</th></tr>';
+    m+='<br><details onclick="event.stopPropagation()"><summary class="fold">ЧР по качествам</summary><table><tr><th>Качество</th><th>Бай-ордер</th><th title="Обычная цена за месяц. Это то, за сколько вещь уходит изо дня в день. Если бай-ордер сейчас выше неё, профит считается по обычной цене.">Обычная за месяц</th><th>Средняя 7д</th><th title="Самый дешёвый выставленный на продажу ордер на чёрном рынке. По этой цене можно встать в очередь и ждать.">Ордер на продажу</th><th>Объём/д</th></tr>';
     for(let q=1;q<=5;q++){ const d=bm.qs[q]; if(!d) continue;
       const hot = d.base && d.order && d.order>d.base ? Math.round((d.order/d.base-1)*100) : 0;
       m+=`<tr><td style="text-align:left">${QUAL_RU[q]}</td>`
@@ -2607,7 +2636,7 @@ function detailHTML(r,idx){
        + `<td><span class="fresh">${d.price?fmt(d.price):'нет'}</span></td>`
        + `<td>${d.ask?'<b>'+fmt(d.ask)+'</b> <span class="fresh">'+ageTxt(d.askTs)+'</span>':'<span class="fresh">нет</span>'}</td>`
        + `<td>${fmt(d.vol)}</td></tr>`; }
-    m+='</table>';
+    m+='</table></details>';
   }
   return m;
 }
@@ -2821,7 +2850,7 @@ function calcUpd(idx){
   html+='</table>';
   const feeN = r.fee*N;
   // журналы: 3 крафта = 1 журнал своего тира
-  let jHtml='', jNet=0;
+  let jHtml='', jNet=0, jSum='';
   if(it.j && DATA.jinfo[it.tier]){
     const ji=DATA.jinfo[it.tier];
     const fame=craftFame(it);
@@ -2864,24 +2893,30 @@ function calcUpd(idx){
         `Заполнится целиком: <b>${fmt(jFull)}</b> шт, сдаём в <b>${r.city}</b> по ${fmt(fLoc.price)}${better} → `+
         `<b class="${jNet>=0?'pos':'neg'}">${jNet>=0?'+':''}${fmt(jNet)}</b> к профиту партии<br>`+
         (jRest>0 ? `<span class="fresh">Последний журнал заполнится на ${restPct}% (${fmt(Math.round(jRest))} славы из ${fmt(cap)}). Сдать его нельзя, он остаётся у тебя и дозаполнится следующей партией, в профит не включён.</span><br>` : '') + tail;
+      jSum = `<b class="${jNet>=0?'pos':'neg'}">${jNet>=0?'+':''}${fmt(jNet)}</b> <span class="fresh">к профиту партии</span>`;
     } else if(best){
       // в городе крафта полные не продаются, считаем без них, но показываем куда везти
       jHtml = head +
         `Нужно <b>${fmt(nJ)}</b> шт · пустые по <b>${fmt(emptyUnit)}</b> (${emptySrc}) = ${fmt(emptyCostReal)}<br>`+
         `<span class="fresh">Заполнится целиком ${fmt(jFull)} шт${jRest>0?`, последний на ${restPct}%`:''}. В ${r.city} полные журналы никто не покупает. Дороже всего берут в ${best.city}, ${fmt(best.price)} за штуку, это ${fmt(jFull*best.price*(1-tax-CFG.setupFee)-nJ*emptyUnit)} за партию, но туда надо везти. В профит не включено.</span><br>` + tail;
+      jSum = `<span class="fresh">в ${r.city} не сдать, в профит не вошли</span>`;
     } else {
       jHtml = head +
         `Нужно <b>${fmt(nJ)}</b> шт · пустые по <b>${fmt(emptyUnit)}</b> (${emptySrc}) = ${fmt(emptyCostReal)}<br>`+
         `<span class="fresh">Цен на полные журналы на рынке не видно, поэтому в расчёт они не вошли.</span><br>` + tail;
+      jSum = `<span class="fresh">цен нет, в профит не вошли</span>`;
     }
+    jHtml = `<details onclick="event.stopPropagation()"><summary class="fold">📓 Журналы: ${jSum}</summary>${jHtml}</details>`;
   }
   const invest=matTotal+feeN+ (jNet<0?0:0);
   const revenue=N*r.rev;
   const profit=N*r.net + jNet;
-  html+=jHtml+(feeN?`Станок за партию: <b>${fmt(feeN)}</b> · `:'')+`Вложение: <b>${fmt(invest)}</b><br>`+
-    `Выручка: <b>${fmt(revenue)}</b> (${r.channel==='ЧР'?'чёрный рынок':'рынок '+r.channel}) · `+
-    `<b>Итоговый профит партии: <span class="${profit>=0?'pos':'neg'}">${fmt(profit)}</span></b>`+
-    (r.vol?` · при объёме рынка ${fmt(r.vol)}/д партия уйдёт за ~${(N/Math.max(1,r.vol*CFG.marketShare)).toFixed(1)} дн. (10% рынка)`:'');
+  const investTip = `Сырьё и станок${feeN?` (станок за партию ${fmt(feeN)})`:''}. Возврат придёт материалами уже после крафта.`;
+  html+=jHtml+
+    `<b>Партия ${fmt(N)} шт:</b> вложение <b title="${investTip}">${fmt(invest)}</b> → `+
+    `выручка <b>${fmt(revenue)}</b> <span class="fresh">(${r.channel==='ЧР'?'ЧР':r.channel})</span> → `+
+    `<b>профит <span class="${profit>=0?'pos':'neg'}">${fmt(profit)}</span></b>`+
+    (r.vol?` <span class="fresh" title="Считаем, что ты забираешь 10% дневного оборота рынка, ${fmt(r.vol)}/д.">· уйдёт за ~${(N/Math.max(1,r.vol*CFG.marketShare)).toFixed(1)} дн</span>`:'');
   const el=$('calcOut'+idx); if(el) el.innerHTML=html;
 }
 
