@@ -541,6 +541,24 @@ window.copyName = (id, ev)=>{ ev.stopPropagation(); copyText(nameOfId(id), ev.cu
 // кнопка ставится только там, где предмет надо ПОКУПАТЬ
 const cpBtn = id => `<button class="cp" onclick="copyName('${id}',event)" title="Скопировать название. Вставь его в поиск на рынке в игре">⧉</button>`;
 
+// Обычная цена за месяц под ценой продажи. Сегодняшний ордер бывает случайным, а это то,
+// за сколько вещь уходит изо дня в день: по ней и видно, на чём можно зарабатывать постоянно.
+function normLine(r){
+  const bm = r.channel==='ЧР';
+  const n = bm ? r.bmBase : r.cityNorm;
+  if(!n) return '';
+  // Проценты показываем только когда сравниваем сравнимое. В режиме «выставить ордер»
+  // цена канала это ордер, а норма посчитана по сделкам: ордер всегда стоит выше, и
+  // разница между ними ничего не говорит о всплеске.
+  const same = !(bm && bmAsking());
+  const gross = bm ? r.bmPrice : r.cityPrice;
+  const d = (same && gross) ? Math.round((gross/n - 1)*100) : null;
+  const tip = `Обычная цена за месяц: ${fmt(n)} (по сделкам${bm?' на ЧР':' в '+r.channel}). Это то, за сколько вещь уходит `
+    + `изо дня в день, а не цена одного случайного ордера. `
+    + (d==null ? 'Сейчас в расчёте стоит цена выставленного ордера, она по смыслу выше цены сделок, поэтому разницу тут не считаем.'
+       : d>0 ? `Сегодня дают на ${d}% выше обычного.` : d<0 ? `Сегодня дают на ${-d}% ниже обычного.` : 'Сегодня ровно столько же.');
+  return `<br><span class="fresh" title="${tip}">обычно ${fmt(n)}${d!=null&&d>=8?` <b style="color:var(--accent)">+${d}%</b>`:''}</span>`;
+}
 // Ячейка «Стабильность»: сколько дней из последних трёх недель позиция была в плюсе
 // и какая маржа была обычной. Короткая история, серым: «3 из 4 дней» ничего не значит.
 function trendCell(r){
@@ -826,6 +844,19 @@ const refMode = () => ($('refModeSel')||{}).value || 'local';
 // Как продаём на чёрном рынке. «Сдача» это мгновенно по живому бай-ордеру, гарантированно,
 // платится только налог. «Ордер» это выставить свой на продажу по цене таких же ордеров:
 // денег больше, но ждать, пока ЧР поднимет свою цену до твоей, и сверху сбор за выставление.
+// У каждого раздела свой способ по умолчанию. В Крафте зарабатывают выставленным
+// ордером: сделал партию и поставил её в очередь. Во Флиппинге наоборот, там весь смысл
+// в обороте, купил в городе и сразу сдал по бай-ордеру, ждать там нечего.
+const BM_DEFAULT = {craft:'order'};
+const bmModeKey = t => 'acp_bmmode_' + (t || S.tab || 'craft');
+function bmModeFor(t){
+  try{ const v = localStorage.getItem(bmModeKey(t)); if(v==='order'||v==='instant') return v; }catch(e){}
+  return BM_DEFAULT[t || S.tab] || 'instant';
+}
+function syncBmMode(){
+  const el = $('bmModeSel'); if(!el) return;
+  el.value = bmModeFor(S.tab);
+}
 const bmMode = () => ($('bmModeSel')||{}).value || 'instant';
 const bmAsking = () => bmMode()==='order';
 const bmRate = tax => bmAsking() ? (1-tax-CFG.setupFee) : (1-tax);
@@ -2012,14 +2043,14 @@ async function loadCityVolumes(){
 // Объём и пул из Лайта убраны: они про одно и то же с «за день», а глаз ловит три числа
 // и не понимает, на какое смотреть.
 const LITE_COLS = {
-  craft:    ['item','city','cost','rev','net','margin','vol'],
-  ref:      ['item','city','cost','sell','net','margin','vol'],
-  cons:     ['item','city','cost','channel','net','margin','vol'],
-  flip:     ['item','q','buy','bmPrice','net','margin','vol'],
-  cityflip: ['item','q','buy','sell','net','margin','vol'],
-  ench:     ['item','q','buy','sell','net','margin','vol'],
+  craft:    ['item','city','cost','rev','net','margin','vol','trend'],
+  ref:      ['item','city','cost','sell','net','margin','vol','trend'],
+  cons:     ['item','city','cost','channel','net','margin','vol','trend'],
+  flip:     ['item','q','buy','bmPrice','net','margin','vol','trend'],
+  cityflip: ['item','q','buy','sell','net','margin','vol','trend'],
+  ench:     ['item','q','buy','sell','net','margin','vol','trend'],
 };
-const LITE_HEAD = {cost:'Себестоимость', rev:'Продажа', channel:'Продажа', vol:'Продаж в день'};
+const LITE_HEAD = {cost:'Себестоимость', rev:'Продажа', channel:'Продажа', vol:'Продаж в день', trend:'Стабильно в плюсе'};
 const COLS_CONS = [
   ['item','Предмет'],['city','Город крафта'],['cost','Себестоимость/шт'],['channel','Продажа'],
   ['net','Профит/шт'],['margin','Маржа %'],['vol','Объём/д'],['pool','Пул/день'],['real','Мне за день'],['trend','Стабильность'],['stale','Данные'],
@@ -2275,7 +2306,7 @@ function render(){
       const chLabel = r.channel==='ЧР' ? `ЧР ${bmAsking()?'ордером':'сразу'} · ${qualMode==='q1'?'обыч. кач.':'все кач.'}` : r.channel+' · обыч. кач.';
       const qualText = qualMode==='q1' ? 'Обычное' : 'Все качества (взвеш.)';
       html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}">${nameCell(it, topBadge+limBadge+openBadge+spikeBadge+citySpikeBadge+warnBadge+staleBadge, qualText)}
-        <td>${r.city}${bonusBadge}</td><td>${fmt(r.cost)}</td><td>${fmt(r.rev)}</td>
+        <td>${r.city}${bonusBadge}</td><td>${fmt(r.cost)}</td><td>${fmt(r.rev)}${normLine(r)}</td>
         <td><span class="badge b-ch">${chLabel}</span></td>
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
@@ -3399,9 +3430,11 @@ function backBtnHTML(){
 
 // ─── События ───
 ['citySel','focusChk','premChk','feeInp','qualSel','bmModeSel'].forEach(id=>$(id).onchange=()=>{ compute(); render(); });
-// способ продажи на ЧР запоминаем: это не разовая прикидка, а как человек торгует
-try{ const bmm = localStorage.getItem('acp_bmmode'); if(bmm && $('bmModeSel')) $('bmModeSel').value = bmm; }catch(e){}
-if($('bmModeSel')) $('bmModeSel').addEventListener('change', e=>{ try{ localStorage.setItem('acp_bmmode', e.target.value); }catch(err){} });
+// способ продажи на ЧР запоминаем отдельно для каждого раздела: в Крафте и Флиппинге
+// торгуют по-разному, и один общий переключатель каждый раз пришлось бы перещёлкивать
+if($('bmModeSel')) $('bmModeSel').addEventListener('change', e=>{
+  try{ localStorage.setItem(bmModeKey(), e.target.value); }catch(err){}
+});
 ['budgetInp','horizonInp'].forEach(id=>$(id).oninput=()=>{ S.limit=0; compute(); render(); });
 $('carryInp').oninput=()=>render();   // вес на расчёт не влияет, только на подпись «рейсов»
 ['searchInp','minMargin','minVol','minTrend'].forEach(id=>$(id).oninput=()=>{ S.limit=0; render(); });
@@ -3439,22 +3472,23 @@ $('reloadBtn').onclick=async ()=>{ lastCheck=Date.now(); await loadAll(true); S.
 const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', cons:'🧪 Зелья и еда', item:'🔍 Цены предмета', roads:'🛡 Дороги в Карлеон · БЕТА'};
 // какие контролы нужны на каждой вкладке (премиум, возраст данных, обновление и поиск, всегда)
 const TAB_CONTROLS={
-  craft:   ['wrapCity','wrapFocus','wrapSelfRef','wrapQual','wrapFee','wrapCat','wrapSafeCraft','wrapLocal'],
+  craft:   ['wrapCity','wrapFocus','wrapSelfRef','wrapQual','wrapFee','wrapCat','wrapSafeCraft','wrapLocal','wrapBmMode'],
   ref:     ['wrapCity','wrapFocus','wrapSafe','wrapFee','refModeWrap','routeCityWrap'],
-  flip:    ['wrapCity','wrapSafe','wrapCat'],
+  flip:    ['wrapCity','wrapSafe','wrapCat','wrapBmMode'],
   cityflip:['wrapRoute','wrapSafe','wrapCat','routeCityWrap'],
-  ench:    ['wrapCity','wrapSafe','wrapCat','wrapLocal','routeCityWrap'],
-  cons:    ['wrapCity','wrapFocus','wrapFee','wrapSafeCraft','wrapLocal'],
+  ench:    ['wrapCity','wrapSafe','wrapCat','wrapLocal','routeCityWrap','wrapBmMode'],
+  cons:    ['wrapCity','wrapFocus','wrapFee','wrapSafeCraft','wrapLocal','wrapBmMode'],
   item:    [],
   roads:   [],
 };
-const ALL_WRAPS=['wrapCity','wrapRoute','wrapFocus','wrapSafe','wrapSafeCraft','wrapLocal','wrapSelfRef','wrapQual','wrapFee','wrapCat','refModeWrap','routeCityWrap'];
+const ALL_WRAPS=['wrapCity','wrapRoute','wrapFocus','wrapSafe','wrapSafeCraft','wrapLocal','wrapSelfRef','wrapQual','wrapFee','wrapCat','refModeWrap','routeCityWrap','wrapBmMode'];
 function setTab(t){
   S.tab=t; S.open={}; S.lastOrder=null;
   fillRouteCities();
   const el=$('secName'); if(el) el.textContent=TAB_NAMES[t]||'';
   const vis=TAB_CONTROLS[t]||[];
   for(const id of ALL_WRAPS){ const w=$(id); if(w) w.style.display = vis.includes(id)?'':'none'; }
+  syncBmMode();
   const flt=$('filters'); if(flt) flt.style.display = (t==='roads'||t==='item')?'none':'';
   // в Переработке города маршрута нужны только когда включён сам маршрут
   const rcw=$('routeCityWrap');
