@@ -242,12 +242,18 @@ async function main(){
   // Это главная цена для канала «ЧР»: средняя сделок за 7 дней систематически
   // завышает выручку, а история к тому же отстаёт на 2-4 дня.
   console.log(`black market orders: ${itemIds.length} ids`);
-  out.bo = {};
+  // Вторая сторона того же ответа: цены выставленных на ЧР ордеров на продажу. Это уже
+  // не «сколько дадут сейчас», а «почём стоят в очереди те, кто ждёт». Крафтеры торгуют
+  // именно так, и денег там заметно больше. Заполнено не по всем вещам: цена появляется
+  // только когда кто-то открывал на ЧР список продаж. Отдельного запроса не стоит.
+  out.bo = {}; out.ba = {};
   await runPool(chunks(itemIds, PRICE_BATCH).map(ch => async ()=>{
     const d = await getJSON(`${API}/prices/${encodeURIComponent(ch.join(','))}.json?locations=${encodeURIComponent('Black Market')}`);
     for(const e of d||[]){
       const q = e.quality||1;
       const buy = Math.round(e.buy_price_max||0);
+      const ask = Math.round(e.sell_price_min||0);
+      if(ask) (out.ba[e.item_id] ||= {})[q] = [ask, minutes(e.sell_price_min_date)];
       if(!buy) continue;
       (out.bo[e.item_id] ||= {})[q] = [buy, minutes(e.buy_price_max_date)];
     }
@@ -344,6 +350,7 @@ async function main(){
     itemsWithCityPrices: Object.keys(out.c).length,
     itemsWithBM: Object.keys(out.b).length,
     itemsWithBMOrders: Object.keys(out.bo||{}).length,
+    itemsWithBMAsks: Object.keys(out.ba||{}).length,
     resourceVolumes: Object.keys(out.h).length,
     itemsWithCityVolumes: Object.keys(out.ch||{}).length,
     materialsWithBase: Object.keys(out.mb||{}).length,

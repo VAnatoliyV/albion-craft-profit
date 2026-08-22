@@ -320,6 +320,12 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
     <label class="ctl toggle" id="wrapSafe"><input type="checkbox" id="safeChk"> Безопасные маршруты<span class="help" title="Убирает Карлеон из перевозок, потому что дорога туда идёт через красные и чёрные зоны. Бресильен остаётся, до него есть безопасный путь.&#10;&#10;Работает в Переработке на «Лучшем маршруте», во Флиппинге между городами и в Рунофикации. Там вместе с Карлеоном выключается и чёрный рынок, он стоит именно там.&#10;&#10;Не трогает локальные циклы, там ничего не возят. И не трогает продажу на чёрный рынок во Флиппинге: этот раздел как раз про него, дорогу туда ты планируешь сам. Для полного исключения Карлеона из крафта есть отдельный переключатель «Безопасный крафт».">?</span></label>
     <label class="ctl toggle proOnly" id="wrapSelfRef"><input type="checkbox" id="selfRefChk"> Сырьё сам<span class="help" title="Для каждого материала сайт считает два способа. Первый: купить готовый ресурс на рынке, например брусок или кожу. Второй: купить сырьё, например руду или шкуры, и переработать самому в городе крафта, с учётом возврата ресурсов и платы за станок. В себестоимость идёт то, что дешевле. В карточке предмета такие строки помечены значком ⚒.">?</span></label>
     <label class="ctl toggle"><input type="checkbox" id="premChk" checked> Премиум (4%)</label>
+    <label class="ctl" id="wrapBmMode">Продажа на ЧР<span class="help" title="Два разных способа продать на чёрном рынке, и денег они дают разное.&#10;&#10;Сдать сразу: продаёшь по живому бай-ордеру, деньги приходят в ту же секунду, гарантированно. Платится только налог с продаж. Это осторожный вариант, он и стоит по умолчанию.&#10;&#10;Выставить ордер: ставишь свой ордер на продажу по цене таких же ордеров. Денег выходит заметно больше, но исполнится он только когда чёрный рынок сам поднимет свою цену до твоей, а может и не подняться. Сверху берётся сбор за выставление 2,5%, и он не возвращается. Именно так на ЧР работают крафтеры.&#10;&#10;Цены выставленных ордеров есть не по всем вещам: их видно только когда кто-то открывал на ЧР список продаж. Если по предмету такой цены нет, в этом режиме канал ЧР для него просто не считается, останется продажа в городе.">?</span>
+      <select id="bmModeSel">
+        <option value="instant" selected>Сдать сразу (гарантированно)</option>
+        <option value="order">Выставить ордер (дороже, но ждать)</option>
+      </select>
+    </label>
     <label class="ctl" id="wrapFee">Станок/100 пит.
       <input type="number" id="feeInp" value="500" min="0" step="50">
     </label>
@@ -817,6 +823,12 @@ const isLite = () => VIEW==='light';
 // в Лайте тоже, поэтому никакой скрытой логики за ней быть не должно.
 const goldOn = () => S.gold;
 const refMode = () => ($('refModeSel')||{}).value || 'local';
+// Как продаём на чёрном рынке. «Сдача» это мгновенно по живому бай-ордеру, гарантированно,
+// платится только налог. «Ордер» это выставить свой на продажу по цене таких же ордеров:
+// денег больше, но ждать, пока ЧР поднимет свою цену до твоей, и сверху сбор за выставление.
+const bmMode = () => ($('bmModeSel')||{}).value || 'instant';
+const bmAsking = () => bmMode()==='order';
+const bmRate = tax => bmAsking() ? (1-tax-CFG.setupFee) : (1-tax);
 function paintView(){
   document.body.classList.toggle('light', isLite());
   document.querySelectorAll('.viewbox button').forEach(b=>b.classList.toggle('on', b.dataset.v===VIEW));
@@ -1050,10 +1062,12 @@ function applyOwnPrices(d){
     // Чёрный рынок это не город: он не покупается, он у тебя покупает. Поэтому его
     // бай-ордер кладём туда же, где живёт «ЧР даёт сейчас», а не в цены городов.
     if(city === 'Black Market'){
-      if(!v.buy) continue;
+      if(!v.buy && !v.sell) continue;
       const rec = (S.bm[id] ||= {qs:{}, vol:0, last:0});
       const cell = (rec.qs[q] ||= {price:0, vol:0, last:0, lastTs:0});
-      cell.order = v.buy; cell.orderTs = v.buyTs*1000; cell.own = true;
+      if(v.buy){ cell.order = v.buy; cell.orderTs = v.buyTs*1000; cell.own = true; }
+      // цена выставленных ордеров: сколько просят те, кто сдаёт не сразу, а ждёт
+      if(v.sell){ cell.ask = v.sell; cell.askTs = v.sellTs*1000; cell.askOwn = true; }
       n++; continue;
     }
     const mat = S.matPrices[id];
@@ -1108,6 +1122,14 @@ function applyServerData(d){
     for(const [ql,v] of Object.entries(byQ)){
       const cell = (rec.qs[ql] ||= {price:0, vol:0, last:0, lastTs:0});
       cell.order = v[0]; cell.orderTs = (v[1]||0)*6e4;
+    }
+  }
+  // и цены выставленных на ЧР ордеров на продажу: вторая, отложенная сторона рынка
+  for(const [id,byQ] of Object.entries(d.ba||{})){
+    const rec = (S.bm[id] ||= {qs:{}, vol:0, last:0});
+    for(const [ql,v] of Object.entries(byQ)){
+      const cell = (rec.qs[ql] ||= {price:0, vol:0, last:0, lastTs:0});
+      cell.ask = v[0]; cell.askTs = (v[1]||0)*6e4;
     }
   }
   for(const [id,byCi] of Object.entries(d.h||{})){
@@ -1503,8 +1525,16 @@ function journalsFor(it, N){
 // на всплеске,, а всплеск сдувается за пару дней, ровно пока идёт крафт.
 // Живой пример: шипованные перчатки месяц стояли 32 000, за два дня взлетели
 // до 70 500 и вернулись обратно. По старой логике они были бы в топе.
-function bmQ(bm, q){
+function bmQ(bm, q, asking){
   const d = bm && bm.qs && bm.qs[q]; if(!d) return null;
+  if(asking===undefined) asking = bmAsking();
+  if(asking){
+    // Цена выставленных ордеров. Потолком по «обычной за месяц» её не режем: этот потолок
+    // построен на сделках, то есть на той стороне рынка, а ордер и должен стоять выше.
+    if(!d.ask) return null;
+    return {price:d.ask, ts:d.askTs||0, src:d.askOwn?'мой ордер':'ордера на продажу',
+            vol:d.vol, base:d.base||0, spread:d.spread||0, now:d.ask, ask:true};
+  }
   const raw = d.order ? {price:d.order, ts:d.orderTs, src:'ордер', vol:d.vol}
             : d.last  ? {price:d.last,  ts:d.lastTs,  src:'сделки', vol:d.vol}
             : d.price ? {price:d.price, ts:0,         src:'средняя 7д', vol:d.vol}
@@ -1517,12 +1547,12 @@ function bmQ(bm, q){
   }
   return raw;
 }
-function bmExpected(bm, mode){
+function bmExpected(bm, mode, asking){
   // консервативно: цена сделок обычного качества; взвешенно: средняя по всем качествам с весом объёма
   if(!bm) return null;
-  if(mode==='q1'){ const a=bmQ(bm,1)||bmQ(bm,2); return a?a.price:null; }
+  if(mode==='q1'){ const a=bmQ(bm,1,asking)||bmQ(bm,2,asking); return a?a.price:null; }
   let s=0, v=0;
-  for(const ql of Object.keys(bm.qs)){ const a=bmQ(bm,ql); if(!a||!a.vol) continue; s += a.price*a.vol; v += a.vol; }
+  for(const ql of Object.keys(bm.qs)){ const a=bmQ(bm,ql,asking); if(!a||!a.vol) continue; s += a.price*a.vol; v += a.vol; }
   return v ? s/v : null;
 }
 function compute(){
@@ -1558,7 +1588,7 @@ function compute(){
       const bmPrice = !bmOk ? null : (sellOvr!=null ? sellOvr : bmExpected(bm, qualMode));
       const bmSrc = (bmQ(bm,1)||bmQ(bm,2)||{}).src || null; // чем посчитали цену ЧР
       // канал 1: ЧР
-      const revBM = bmPrice!=null ? bmPrice*(1-tax) : null;
+      const revBM = bmPrice!=null ? bmPrice*bmRate(tax) : null;
       // канал 2: лучший рынок города, обычное качество (ордер на продажу: налог + 2.5% сбор)
       let bestCity=null, bestCityPrice=0;
       const cp = S.cityPrices[it.id]||{};
@@ -1629,12 +1659,12 @@ function compute(){
       }
       const bq = bmQ(bm, q);
       if(!buy || !bq) continue;
-      const net = bq.price*(1-tax) - buy.sell;
+      const net = bq.price*bmRate(tax) - buy.sell;
       const margin = net/buy.sell*100;
       const stale = hoursAgo(buy.ts);
       const warn = margin>300 || (margin>100 && bq.vol<10);
       // покупаем на городском рынке, продаём на ЧР, оба ряда у нас есть
-      const tr = trendStats([[it.id, buy.sell, 'city']], 0, bq.price*(1-tax), trendSeriesOf('bm', it.id));
+      const tr = trendStats([[it.id, buy.sell, 'city']], 0, bq.price*bmRate(tax), trendSeriesOf('bm', it.id));
       flip.push({tr, it, q, buy:buy.sell, buyCity:buy.city, bmPrice:bq.price, bmSrc:bq.src, net, margin, vol:bq.vol,
         pool:bq.vol*Math.max(net,0), ...goldOf(net, buy.sell, bq.vol, stale), stale, warn});
     }
@@ -1828,7 +1858,7 @@ function compute(){
         // при «безопасных маршрутах» этот канал отключается целиком, как и сам Карлеон.
         const tq = tgtBm ? bmQ(tgtBm, q) : null;
         const bmReachable = !safeRoutes() && (!localOnly() || buy.city==='Caerleon');
-        const revBM = (tq && bmReachable) ? tq.price*(1-tax) : null;
+        const revBM = (tq && bmReachable) ? tq.price*bmRate(tax) : null;
         // канал 2: городской рынок, ордером на продажу, поэтому налог + сбор 2,5%
         let cityBest=null;
         const capAsk = askCapFor(targetId, q);
@@ -1845,7 +1875,7 @@ function compute(){
         if(revBM!=null && (revCity==null || revBM>=revCity)){ rev=revBM; channel='ЧР'; sell=tq.price; }
         else if(revCity!=null){ rev=revCity; channel=cityBest.city; sell=cityFairE.price; cityBid=cityBest.buy||0; }
         else continue;
-        if(sellOvr!=null){ sell=sellOvr; rev=sellOvr*(channel==='ЧР' ? (1-tax) : (1-tax-CFG.setupFee)); }
+        if(sellOvr!=null){ sell=sellOvr; rev=sellOvr*(channel==='ЧР' ? bmRate(tax) : (1-tax-CFG.setupFee)); }
         const net = rev - cost, margin = net/cost*100;
         // Объём: сколько штук в день реально прогонишь. Раньше считался только сбыт, хотя
         // упирается обычно закупка, исходник на рынке города продаётся ограниченно.
@@ -2042,7 +2072,7 @@ const COL_TIPS = {
   item: 'Предмет или ресурс: иконка, название, тир (например Т4.1 = тир 4 с зачарованием 1), категория и качество. Нажми на строку, чтобы увидеть подробный разбор и калькулятор партии.',
   city: 'Где происходит действие. В Крафте это город, где ты крафтишь. Значок «бонус» значит, что город даёт плюс 15 процентов к возврату на эту категорию. В Переработке это маршрут по шагам: где купить сырьё, где переработать (там же указан возврат), где продать.',
   cost: 'Себестоимость одной штуки: материалы с учётом возврата ресурсов + плата за станок. Артефакт (если нужен) считается без возврата. Правится вручную через карточку предмета.',
-  rev: 'Выручка с одной штуки уже после налога с продаж (4% с премиумом / 8% без) и сбора 2,5%, если продажа ордером на городском рынке.',
+  rev: 'Выручка с одной штуки уже после налога с продаж (4% с премиумом / 8% без) и сбора 2,5%, если продажа своим ордером — на городском рынке или на чёрном, когда в шапке выбрано «выставить ордер».',
   channel: 'Куда выгоднее продать. ЧР это чёрный рынок в Карлеоне, цена по живому бай-ордеру, то есть столько дадут прямо сейчас. Либо обычный городской рынок. Тут же указано, по какому качеству посчитана цена.',
   net: 'Чистый профит с одной штуки: выручка после налогов минус себестоимость. Зелёное значит зарабатываешь, красное значит теряешь.',
   margin: 'Маржа показывает, сколько процентов ты зарабатываешь на каждое вложенное серебро. От 20 до 40 процентов это отлично, выше 300 подозрительно (см. флаг «проверить»).',
@@ -2242,7 +2272,7 @@ function render(){
     if(craft){
       const bonusBadge = (r.bonus?'<span class="badge b-bonus">бонус</span>':'')
         + (r.daily?`<span class="badge b-bonus" title="Сегодняшний дневной бонус производства из окна Activities. Он прибавляется к сумме бонусов, а не к готовому возврату, и уже сидит внутри процента рядом. Ты отметил это в шапке.">+${Math.round(r.daily*100)}% день</span>`:'');
-      const chLabel = r.channel==='ЧР' ? `ЧР · ${qualMode==='q1'?'обыч. кач.':'все кач.'}` : r.channel+' · обыч. кач.';
+      const chLabel = r.channel==='ЧР' ? `ЧР ${bmAsking()?'ордером':'сразу'} · ${qualMode==='q1'?'обыч. кач.':'все кач.'}` : r.channel+' · обыч. кач.';
       const qualText = qualMode==='q1' ? 'Обычное' : 'Все качества (взвеш.)';
       html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}">${nameCell(it, topBadge+limBadge+openBadge+spikeBadge+citySpikeBadge+warnBadge+staleBadge, qualText)}
         <td>${r.city}${bonusBadge}</td><td>${fmt(r.cost)}</td><td>${fmt(r.rev)}</td>
@@ -2285,7 +2315,7 @@ function render(){
         <td>${fmt(r.buy)}<br><span class="fresh">${r.buyCity}</span></td>
         <td>${fmt(r.stoneCost)}<br><span class="fresh">${fmt(r.stoneN)} × ${stoneKind(r.stoneRes)} (${r.stoneCity})</span></td>
         <td>${fmt(r.sell)}<br><span class="fresh">${r.channel==='ЧР'
-            ? 'ЧР · Карлеон'
+            ? 'ЧР · '+(bmAsking()?'ордером':'сразу')
             : r.channel+' · ордером'+(r.cityBid?` (мгновенно ${fmt(r.cityBid)})`:'')}</span></td>
         <td class="${r.net>=0?'pos':'neg'}">${fmt(r.net)}</td>
         <td class="${r.margin>=0?'pos':'neg'}">${r.margin.toFixed(1)}%</td>
@@ -2477,6 +2507,29 @@ function calcConsUpd(idx){
      (days?` · при объёме ${fmt(r.vol)}/д уйдёт за ~${days} дн. (10% рынка)`:'');
   el.innerHTML=m;
 }
+// Второй способ продать на ЧР. Их два, и они дают разные деньги: сдать сразу по бай-ордеру
+// или выставить свой ордер и ждать. Что выбрано, то и в таблице, а второе показываем рядом,
+// чтобы решение было видно целиком, а не по половине рынка.
+function bmAltHTML(r){
+  if(!r || r.channel!=='ЧР') return '';
+  const bm = S.bm[r.it.id]; if(!bm) return '';
+  const tax = $('premChk').checked?0.04:0.08;
+  const asking = bmAsking();
+  const alt = bmExpected(bm, $('qualSel').value, !asking);
+  if(alt==null) return asking
+    ? '<br><span class="fresh">Сдать сразу нельзя: живого бай-ордера по этой вещи сейчас нет.</span>'
+    : '<br><span class="fresh">Цены выставленных на ЧР ордеров по этой вещи нет. Она появится, когда кто-нибудь откроет на чёрном рынке список продаж, свой сборщик такое пишет сам.</span>';
+  const altRev = alt*(asking ? (1-tax) : (1-tax-CFG.setupFee));
+  const altNet = altRev - r.cost;
+  const diff = Math.round(altNet - r.net);
+  return '<br><span class="fresh">' + (asking
+    ? `Если сдать сразу: <b style="color:var(--text)">${fmt(Math.round(alt))}</b> → на руки ${fmt(Math.round(altRev))} (только налог), профит `
+    : `Если выставить ордер: <b style="color:var(--text)">${fmt(Math.round(alt))}</b> → на руки ${fmt(Math.round(altRev))} (налог + сбор 2,5%), профит `)
+    + `<b class="${altNet>=0?'pos':'neg'}">${fmt(Math.round(altNet))}</b> за штуку`
+    + (diff ? ` (${diff>0?'+':''}${fmt(diff)} к тому, что в таблице)` : '')
+    + (asking ? '. Деньги сразу и гарантированно.' : '. Исполнится, только когда ЧР поднимет свою цену до твоей, и сбор за выставление не вернётся.')
+    + '</span>';
+}
 function detailHTML(r,idx){
   const it=r.it;
   // Раньше здесь было две таблицы: сверху материалы на одну штуку, снизу, отдельный
@@ -2498,12 +2551,13 @@ function detailHTML(r,idx){
      (r.rawNoRet ? `Компоненты: <b>${fmt(r.rawNoRet)}</b> <i style="color:var(--muted)">без возврата</i> · ` : '')+
      (r.fee ? `Станок: <b>${fmt(r.fee)}</b> · ` : '')+
      `Итого себестоимость: <b>${fmt(r.cost)}</b><br>`+
-     `Продажа: ${r.channel==='ЧР'?`ЧР, ${sOvr?'моя цена':(r.bmSrc==='ордер'?'бай-ордер сейчас':r.bmSrc==='сделки'?'последние сделки':'средняя за 7 дней')}`:`рынок ${r.channel}, ордер`}${sOvr?' <span style="color:var(--accent)">✎</span>':''}
+     `Продажа: ${r.channel==='ЧР'?`ЧР, ${sOvr?'моя цена':(r.bmSrc==='ордера на продажу'||r.bmSrc==='мой ордер')?'цена выставленных ордеров':(r.bmSrc==='ордер'?'бай-ордер сейчас':r.bmSrc==='сделки'?'последние сделки':'средняя за 7 дней')}`:`рынок ${r.channel}, ордер`}${sOvr?' <span style="color:var(--accent)">✎</span>':''}
       <input type="number" style="width:100px" value="${Math.round(r.bmPrice??r.cityPrice??0)}"
         onchange="setSellOverride('${it.id}',this.value)"
         title="По какой цене ты реально продашь на чёрном рынке. Оставь пусто или поставь 0, чтобы вернуть цену с рынка.">
       → нетто <b>${fmt(r.rev)}</b> · `+
      `Реалистичный профит/день: <b>${fmt(r.real)}</b>`+
+     bmAltHTML(r)+
      (r.bmBase ? `<br><span class="fresh">Обычная цена ЧР за месяц: <b style="color:var(--text)">${fmt(r.bmBase)}</b>`+
         (r.bmNow&&r.bmNow!==r.bmBase ? ` · сейчас дают ${fmt(r.bmNow)}${r.spike>0?` (<b style="color:var(--accent)">+${r.spike}% всплеск</b>, в расчёт не берём)`:''}` : '')+
         (r.swing?` · за месяц цена гуляет на ${r.swing}%`:'')+'</span>' : '')+
@@ -2513,13 +2567,15 @@ function detailHTML(r,idx){
         (r.citySpike>0 ? ` · сейчас просят ${fmt(r.cityAskNow||r.askNow)}, это на ${r.citySpike}% выше, в расчёт взята обычная` : '')+'</span>' : '');
   const bm = S.bm[it.id];
   if(bm){
-    m+='<br><b>ЧР по качествам:</b><table><tr><th>Качество</th><th>Бай-ордер</th><th title="Обычная цена за месяц. Это то, за сколько вещь уходит изо дня в день. Если бай-ордер сейчас выше неё, профит считается по обычной цене.">Обычная за месяц</th><th>Средняя 7д</th><th>Объём/д</th></tr>';
+    m+='<br><b>ЧР по качествам:</b><table><tr><th>Качество</th><th>Бай-ордер</th><th title="Обычная цена за месяц. Это то, за сколько вещь уходит изо дня в день. Если бай-ордер сейчас выше неё, профит считается по обычной цене.">Обычная за месяц</th><th>Средняя 7д</th><th title="Самый дешёвый выставленный на продажу ордер на чёрном рынке. По этой цене можно встать в очередь и ждать.">Ордер на продажу</th><th>Объём/д</th></tr>';
     for(let q=1;q<=5;q++){ const d=bm.qs[q]; if(!d) continue;
       const hot = d.base && d.order && d.order>d.base ? Math.round((d.order/d.base-1)*100) : 0;
       m+=`<tr><td style="text-align:left">${QUAL_RU[q]}</td>`
        + `<td>${d.order?'<b>'+fmt(d.order)+'</b> <span class="fresh">'+ageTxt(d.orderTs)+'</span>'+(hot>CFG.spikeCut?' <span class="fresh" style="color:var(--accent)">+'+hot+'%</span>':''):'<span class="fresh">нет</span>'}</td>`
        + `<td>${d.base?'<b>'+fmt(d.base)+'</b> <span class="fresh">'+d.days+' дн</span>':'<span class="fresh">нет</span>'}</td>`
-       + `<td><span class="fresh">${d.price?fmt(d.price):'нет'}</span></td><td>${fmt(d.vol)}</td></tr>`; }
+       + `<td><span class="fresh">${d.price?fmt(d.price):'нет'}</span></td>`
+       + `<td>${d.ask?'<b>'+fmt(d.ask)+'</b> <span class="fresh">'+ageTxt(d.askTs)+'</span>':'<span class="fresh">нет</span>'}</td>`
+       + `<td>${fmt(d.vol)}</td></tr>`; }
     m+='</table>';
   }
   return m;
@@ -2650,11 +2706,11 @@ function detailEnchHTML(r, idx){
          onchange="setOverride('${r.stoneRes}','${r.stoneCity}',this.value)" title="Цена одного камня. Оставь пусто или поставь 0, чтобы вернуть цену с рынка."></td>`
     + `<td>${fmt(r.stoneCost)}</td></tr></table>`;
   m += `<br>Себестоимость штуки: <b>${fmt(r.cost)}</b>`;
-  m += `<br><b>Продаём ${tgt?nmA(tgt):r.targetId} .${it.ench+1} (${QUAL_RU[r.q]})</b>, идём на ${r.channel==='ЧР'?'чёрный рынок в Карлеоне, мгновенно по бай-ордеру':r.channel+', своим ордером'}`
+  m += `<br><b>Продаём ${tgt?nmA(tgt):r.targetId} .${it.ench+1} (${QUAL_RU[r.q]})</b>, идём на ${r.channel==='ЧР'?(bmAsking()?'чёрный рынок в Карлеоне, своим ордером на продажу':'чёрный рынок в Карлеоне, мгновенно по бай-ордеру'):r.channel+', своим ордером'}`
     + ` <input type="number" style="width:110px" value="${Math.round(r.sell)}" onclick="event.stopPropagation()"
          onchange="setSellOverride('${r.targetId}',this.value)" title="За сколько ты реально продашь. Оставь пусто или поставь 0, чтобы вернуть цену с рынка.">`
     + `${r.sellOvr?' <span style="color:var(--accent)">✎</span>':''}`
-    + ` → на руки <b>${fmt(Math.round(r.rev))}</b> <span class="fresh">(${r.channel==='ЧР'?'налог':'налог + сбор 2,5%'})</span>`;
+    + ` → на руки <b>${fmt(Math.round(r.rev))}</b> <span class="fresh">(${r.channel==='ЧР'&&!bmAsking()?'налог':'налог + сбор 2,5%'})</span>`;
   if(norm) m += `<br><span class="fresh">Обычная цена за месяц: <b style="color:var(--text)">${fmt(norm.price)}</b> (${norm.src}${norm.days?', '+norm.days+(norm.src==='ЧР'?' дн':' замеров'):''})`
     + `${r.sell>norm.price*1.25?` · сейчас просят на ${Math.round((r.sell/norm.price-1)*100)}% выше нормы`:''}</span>`;
   // «замеров», потому что городская норма считается по всем семи рынкам сразу: тридцать дней
@@ -3342,7 +3398,10 @@ function backBtnHTML(){
 }
 
 // ─── События ───
-['citySel','focusChk','premChk','feeInp','qualSel'].forEach(id=>$(id).onchange=()=>{ compute(); render(); });
+['citySel','focusChk','premChk','feeInp','qualSel','bmModeSel'].forEach(id=>$(id).onchange=()=>{ compute(); render(); });
+// способ продажи на ЧР запоминаем: это не разовая прикидка, а как человек торгует
+try{ const bmm = localStorage.getItem('acp_bmmode'); if(bmm && $('bmModeSel')) $('bmModeSel').value = bmm; }catch(e){}
+if($('bmModeSel')) $('bmModeSel').addEventListener('change', e=>{ try{ localStorage.setItem('acp_bmmode', e.target.value); }catch(err){} });
 ['budgetInp','horizonInp'].forEach(id=>$(id).oninput=()=>{ S.limit=0; compute(); render(); });
 $('carryInp').oninput=()=>render();   // вес на расчёт не влияет, только на подпись «рейсов»
 ['searchInp','minMargin','minVol','minTrend'].forEach(id=>$(id).oninput=()=>{ S.limit=0; render(); });
