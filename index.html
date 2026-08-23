@@ -31,8 +31,8 @@ h1.logo{cursor:pointer;transition:opacity .15s;display:flex;align-items:center;g
 h1.logo small{flex-basis:100%}
 canvas.logoc{image-rendering:pixelated;background:transparent;display:block}
 #logoHdr{height:34px;width:auto;flex:none}
-#logoHome{height:150px;width:auto;margin:0 auto 10px}
-@media(max-width:640px){#logoHome{height:104px}#logoHdr{height:28px}}
+#logoHome{height:118px;width:auto;margin:0 auto 14px}
+@media(max-width:640px){#logoHome{height:88px}#logoHdr{height:28px}}
 h1.logo:hover{opacity:.85}
 .controls{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
 select,input[type=number],input[type=text]{background:var(--bg2);color:var(--text);border:1px solid var(--border2);
@@ -269,7 +269,7 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
 </head>
 <body>
 <div id="home">
-  <canvas id="logoHome" class="logoc" width="65" height="96" title="Albion Craft Profit"></canvas>
+  <canvas id="logoHome" class="logoc" width="44" height="36" title="Albion Craft Profit"></canvas>
   <h1>Albion <span>Craft Profit</span></h1>
   <div class="sub"><span class="proOnly">Europe-сервер · живые цены Albion Online Data Project · выбери раздел</span><span class="liteOnly">Живые цены с рынков Albion, сервер Europe. Выбери, чем хочешь заняться.</span></div>
   <div id="homeView"><span class="viewbox" title="Лайт: на экране только то, что нужно, чтобы понять, на чём заработать. Про: все колонки и все настройки."><button data-v="light" onclick="setView('light')">Лайт</button><button data-v="pro" onclick="setView('pro')">Про</button></span>
@@ -940,8 +940,69 @@ function logoDraw(t, ctx, g){
   if(closedR) lid(g.eyeR);
   ctx.putImageData(buf, 0, 0);
 }
+// ─── Наковальня: знак продукта на главной ────────────────────────────
+// По ней бьют. Раз в пару секунд удар: знак целиком вздрагивает, из-под молота
+// летят искры, пыль сыплется гуще. Полосу пикселей тут не сдвигаем: на прямых
+// линиях это читается не как приём, а как поломанная картинка.
+const ANVIL_BODY="44,36,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD////AAAgAAAOAAIAAAAcACAAAAAwAgAAABwAIAAADgAD/4A/AAAABAQAAAAAQEAAAAACCAAAAAAggAAAAAEQAAAAABEAAAAAAggAAAAAQEAAAAAEBAAAAACAIAAAABABAAAAAgAIAAAAIACAAAA8AAeAAAIAAAgAACAAAIAAA///+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+const ANVIL_HITS=[0,2150,2380,4600,6900,7130], ANVIL_PERIOD=9200, ANVIL_TOP=8;
+let ANVIL=null;
+function anvilUnpack(str){
+  const p=str.split(','), w=+p[0], h=+p[1], bin=atob(p[2]), core=[];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const i=y*w+x;
+    if((bin.charCodeAt(i>>3)>>(7-(i&7)))&1) core.push([x,y]);
+  }
+  return {w,h,core};
+}
+function anvilHit(t){
+  let e=0;
+  for(const at of ANVIL_HITS){
+    const p=((t-at)%ANVIL_PERIOD+ANVIL_PERIOD)%ANVIL_PERIOD;
+    if(p<260) e=Math.max(e, 1-p/260);
+  }
+  return e;
+}
+function anvilDraw(t, ctx, g){
+  ctx.clearRect(0,0,g.w,g.h);
+  const e=anvilHit(t);
+  const dy = e>0.55 ? 1 : 0;
+  const dx0 = e>0.45 ? (Math.floor(t/40)%2 ? 1 : -1) : 0;
+  const shake = e>0.25 ? 0.13+e*0.22 : 0.13;
+  const noise=Math.floor(t/120);
+  for(let i=0;i<g.core.length;i++){
+    const [x,y]=g.core[i];
+    ctx.fillStyle='#f2efe9';
+    ctx.fillRect(x+dx0, y+dy, 1, 1);
+    for(let k=0;k<4;k++){
+      const r=logoHash(i*4+k, noise);
+      if(r>shake) continue;
+      ctx.fillStyle='rgba(242,239,233,'+(0.28+r*2.4)+')';
+      ctx.fillRect(x+[1,-1,0,0][k]+dx0, y+[0,0,1,-1][k]+dy, 1, 1);
+    }
+  }
+  for(let i=0;i<4;i++){                       // подтёки под подошвой
+    const per=1900+i*430, p=((t+i*700)%per)/per;
+    const y=32+Math.round(p*3.4);
+    if(y<g.h){ ctx.fillStyle='rgba(242,239,233,0.85)'; ctx.fillRect([13,18,24,29][i]+dx0, y+dy, 1, 1); }
+  }
+  for(const at of ANVIL_HITS){                // искры от удара
+    const age=((t-at)%ANVIL_PERIOD+ANVIL_PERIOD)%ANVIL_PERIOD;
+    if(age>620) continue;
+    const seed=Math.round(at);
+    for(let i=0;i<14;i++){
+      const r1=logoHash(seed+i,1), r2=logoHash(seed+i,2), r3=logoHash(seed+i,3);
+      const x=11+r1*18+(r2-0.5)*0.030*age;
+      const y=ANVIL_TOP-1-(0.045+r3*0.035)*age+0.000055*age*age;
+      if(y<-2||y>ANVIL_TOP+2) continue;
+      ctx.fillStyle='rgba(242,239,233,'+(Math.max(0,1-age/620)*(0.55+r3*0.45))+')';
+      ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+    }
+  }
+}
 function logoStart(){
   if(!LOGO.big){ LOGO.big=logoUnpack(LOGO_BIG,1); LOGO.small=logoUnpack(LOGO_SMALL,0.5); }
+  if(!ANVIL) ANVIL=anvilUnpack(ANVIL_BODY);
   if(logoRAF) return;
   const t0=performance.now();
   let last=0;
@@ -955,7 +1016,7 @@ function logoStart(){
     last=now;
     const t=now-t0;
     const a=$('logoHome'), b=$('logoHdr');
-    if(a && a.offsetParent!==null) logoDraw(t, a.getContext('2d'), LOGO.big);
+    if(a && a.offsetParent!==null) anvilDraw(t, a.getContext('2d'), ANVIL);
     if(b && b.offsetParent!==null) logoDraw(t, b.getContext('2d'), LOGO.small);
   })(t0);
 }
