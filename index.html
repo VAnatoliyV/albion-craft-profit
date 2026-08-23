@@ -267,39 +267,62 @@ body.light td.item{min-width:230px}
 #homeStatus{margin-top:18px;color:var(--muted);font-size:12.5px;display:flex;align-items:center;gap:8px}
 body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px solid var(--panel3);border-top-color:var(--accent);
   border-radius:50%;animation:spin .8s linear infinite;flex:none}
+/* ── окно настроек ── */
+.setback{position:fixed;inset:0;background:rgba(4,6,10,.72);backdrop-filter:blur(2px);z-index:120;display:none;
+  align-items:flex-start;justify-content:center;padding:60px 16px}
+.setback.on{display:flex}
+.setwin{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px 20px;max-width:640px;width:100%;
+  box-shadow:0 24px 60px rgba(0,0,0,.6)}
+.sethead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.sethead b{font-size:16px}
+.setrow{padding:11px 0;border-top:1px solid var(--border)}
+.setlab{color:var(--muted);font-size:12.5px;margin-bottom:7px}
+.setopts{display:flex;gap:7px;flex-wrap:wrap}
+.setopts button{padding:6px 12px;font-size:13px}
+.setopts button.on{background:var(--accent);color:#241a05;border-color:var(--accent)}
+.setopts button[disabled]{opacity:.45;cursor:default}
+.setopts button[disabled]:hover{background:var(--panel2);color:var(--muted);border-color:var(--border2)}
+.setnote{margin-top:14px;color:var(--muted);font-size:11.5px;line-height:1.5}
+#gearBtn{margin-left:6px;font-size:15px;line-height:1}
+
 /* ═══ Пиксельная рама ═══════════════════════════════════════════════
    Правило одно: цифры не трогаем никогда. Пиксельный шрифт живёт только
    на коротких надписях, которые узнают формой слова, а не читают по буквам:
    заголовки, кнопки, шапки колонок, значки. Всё остальное как было. */
 :root{--pix:'Pixelify Sans', ui-monospace, 'SF Mono', monospace}
-#home h1, h1.logo, .card b, th, button, .badge, .mchip, .viewbox button, #secName{
+body.pix #home h1, body.pix h1.logo, body.pix .card b, body.pix th, body.pix button, body.pix .badge, body.pix .mchip, body.pix .viewbox button, body.pix #secName{
   font-family:var(--pix); letter-spacing:.5px}
-th{font-size:13px; text-transform:none; letter-spacing:.6px}
-#home h1{letter-spacing:1px}
-h1.logo{font-size:19px}
-.card b{font-size:17px}
-button{font-size:13.5px}
-.badge{font-size:11.5px}
+body.pix th{font-size:13px; text-transform:none; letter-spacing:.6px}
+body.pix #home h1{letter-spacing:1px}
+body.pix h1.logo{font-size:19px}
+body.pix .card b{font-size:17px}
+body.pix button{font-size:13.5px}
+body.pix .badge{font-size:11.5px}
 /* Цифры отбираем обратно: ячейки, подписи под ценой, проценты и всё,
    что человек читает знак за знаком. */
-td, .fresh, .norm, .iname span, input, select, .sub, .foot, .help, td.tr span{
+body.pix td, body.pix .fresh, body.pix .norm, body.pix .iname span, body.pix input, body.pix select, body.pix .sub, body.pix .foot, body.pix .help, body.pix td.tr span{
   font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif; letter-spacing:normal}
 /* Углы: вместо скруглений пиксельные срезы */
-table, .panel, .card, .skel, button, select, input[type=number], input[type=text],
-.badge, .mchip, .viewbox, .lngbox, .cp, .pold, .ownTag, button.grp, button.rt{border-radius:0}
-.panel, .card, table{position:relative}
-.panel::before, .card::before, table::before{content:'';position:absolute;left:-1px;top:-1px;
+body.pix table, body.pix .panel, body.pix .card, body.pix .skel, body.pix button,
+body.pix select, body.pix input[type=number], body.pix input[type=text],
+body.pix .badge, body.pix .mchip, body.pix .viewbox, body.pix .lngbox, body.pix .cp,
+body.pix .pold, body.pix .ownTag, body.pix button.grp, body.pix button.rt,
+body.pix .setwin{border-radius:0}
+body.pix .panel, body.pix .card, body.pix table, body.pix .setwin{position:relative}
+body.pix .panel::before, body.pix .card::before, body.pix table::before, body.pix .setwin::before{content:'';position:absolute;left:-1px;top:-1px;
   width:4px;height:4px;background:var(--bg);pointer-events:none;z-index:6}
-.panel::after, .card::after, table::after{content:'';position:absolute;right:-1px;bottom:-1px;
+body.pix .panel::after, body.pix .card::after, body.pix table::after, body.pix .setwin::after{content:'';position:absolute;right:-1px;bottom:-1px;
   width:4px;height:4px;background:var(--bg);pointer-events:none;z-index:6}
 /* Кнопка при наведении инвертируется, как в старых интерфейсах */
-button:hover{background:var(--accent);color:#241a05;border-color:var(--accent)}
-button.on, button.grp.on{background:var(--accent);color:#241a05}
+body.pix button:hover{background:var(--accent);color:#241a05;border-color:var(--accent)}
+body.pix button.on, body.pix button.grp.on{background:var(--accent);color:#241a05}
 /* Разделитель строк — пунктир из пикселей, а не сплошная линия */
-th, td{border-bottom:0; background-image:linear-gradient(90deg,var(--border) 50%,transparent 0);
+body.pix th, body.pix td{border-bottom:0; background-image:linear-gradient(90deg,var(--border) 50%,transparent 0);
   background-size:4px 1px; background-repeat:repeat-x; background-position:bottom}
-th{background-color:var(--panel2)}
-tbody tr:last-child td{background-image:none}
+body.pix th{background-color:var(--panel2)}
+/* Слова-ярлыки внутри строк: сам ярлык в нашем шрифте, число рядом обычным */
+body.pix .plab{font-family:var(--pix);letter-spacing:.4px}
+body.pix tbody tr:last-child td{background-image:none}
 </style>
 </head>
 <body>
@@ -330,6 +353,41 @@ tbody tr:last-child td{background-image:none}
   <div id="homeStatus">Загрузка цен начнётся при входе в раздел…</div>
   <div class="foot">Данные: Albion Online Data Project (краудсорсинг) · Иконки: официальный Render API<br>Фан-проект, никак не связан с Sandbox Interactive. Albion Online — торговая марка SBI.</div>
 </div>
+<div id="setBack" class="setback" onclick="if(event.target===this)closeSettings()">
+  <div class="setwin">
+    <div class="sethead"><b>Настройки</b><button class="mini" onclick="closeSettings()">✕</button></div>
+
+    <div class="setrow"><div class="setlab">Стиль<span class="help" title="Пиксельный: срезанные углы, пунктирные разделители, свой шрифт на заголовках и кнопках. Обычный: скруглённые углы и один шрифт везде. На цифры не влияет ни один из них.">?</span></div>
+      <div class="setopts" id="optSkin">
+        <button data-v="pix" onclick="setSkin('pix')">Пиксельный</button>
+        <button data-v="plain" onclick="setSkin('plain')">Обычный</button>
+      </div></div>
+
+    <div class="setrow"><div class="setlab">Язык названий<span class="help" title="На каком языке показывать названия предметов и материалов. Испанские названия взяты из файлов игры; у полутора сотен редких позиций их нет, там останется английское.">?</span></div>
+      <div class="setopts" id="optLang">
+        <button data-v="en" onclick="setLang('en')">English</button>
+        <button data-v="ru" onclick="setLang('ru')">Русский</button>
+        <button data-v="es" onclick="setLang('es')">Español</button>
+      </div></div>
+
+    <div class="setrow"><div class="setlab">Второй язык, подписью<span class="help" title="Мелкая строчка под названием. Она нужна не для красоты: поиск на рынке в игре ищет по языку клиента. Смотришь список по-русски, а искать и копировать надо английское имя — вот оно и стоит снизу.&#10;&#10;«Как получится» само подставит английский, если главный язык русский или испанский, и русский, если главный английский.">?</span></div>
+      <div class="setopts" id="optLang2">
+        <button data-v="auto" onclick="setLang2('auto')">Как получится</button>
+        <button data-v="en" onclick="setLang2('en')">English</button>
+        <button data-v="ru" onclick="setLang2('ru')">Русский</button>
+        <button data-v="es" onclick="setLang2('es')">Español</button>
+        <button data-v="off" onclick="setLang2('off')">Без подписи</button>
+      </div></div>
+
+    <div class="setrow"><div class="setlab">Язык интерфейса<span class="help" title="Подписи, кнопки и подсказки самого сайта. Английского и испанского пока нет: это несколько сотен строк, их надо переводить отдельно от названий предметов.">?</span></div>
+      <div class="setopts">
+        <button class="on" disabled>Русский</button>
+        <button disabled title="Пока не переведено">English · скоро</button>
+        <button disabled title="Пока не переведено">Español · скоро</button>
+      </div></div>
+
+    <div class="setnote">Выбор запоминается в браузере. Настройки языка меняют только названия предметов, на расчёты и цифры они не влияют.</div>
+  </div></div>
 <header id="appHeader" style="display:none">
   <h1 class="logo" onclick="goHome()" title="На главный экран"><canvas id="logoHdr" class="logoc" width="32" height="48"></canvas>Albion Journal<small>Europe · чёрный рынок и города</small></h1>
   <div class="controls">
@@ -391,7 +449,7 @@ tbody tr:last-child td{background-image:none}
       <select id="daily1"></select><select id="daily1v" class="dv" style="display:none"></select><select id="daily2" style="margin-left:4px"></select><select id="daily2v" class="dv" style="display:none"></select>
     </label>
     <label class="ctl" title="На каком языке показывать названия вещей. И, что важнее, что копируется кнопкой ⧉.&#10;&#10;Поиск на рынке в игре ищет по названию твоего клиента. Если клиент английский, то и копировать надо английское название, «Runite Steel Bar», а не «Брусок рунита». Поэтому по умолчанию стоит английский.&#10;&#10;Второе название остаётся подписью снизу, так что ничего не пропадёт.">Названия
-      <span class="lngbox"><button class="lng on" data-l="en" onclick="setLang('en')">EN</button><button class="lng" data-l="ru" onclick="setLang('ru')">RU</button></span>
+      <span class="lngbox"><button class="lng on" data-l="en" onclick="setLang('en')">EN</button><button class="lng" data-l="ru" onclick="setLang('ru')">RU</button><button class="lng" data-l="es" onclick="setLang('es')">ES</button></span><button id="gearBtn" class="mini" title="Настройки: язык и стиль" onclick="openSettings()">⚙</button>
     </label>
     <button class="gold" id="goldBtn" title="Что это такое?&#10;&#10;Одно нажатие, и таблица встаёт по тому, сколько серебра строка принесёт лично тебе за день.&#10;&#10;Сколько штук ты сделаешь, считается по двум пределам: сколько потянет твой кошелёк и сколько съест рынок за выбранный срок. Берётся тот, который закончится раньше. Если бюджет не введён, сайт считает деньги бесконечными и смотрит только на оборот.&#10;&#10;Отсюда простой вывод. При небольших деньгах наверх сами собой выходят строки с высокой маржой. При больших выходят массовые, с большим оборотом. Значок в строке говорит, во что она упирается.&#10;&#10;Старая цена учитывается слабее свежей: суточная считается наполовину, двухсуточная на четверть.&#10;&#10;Отсекаются: маржа ниже 10%, объём ниже 50 шт/день, устаревшие данные и строки с флагом «⚠ проверить». Топ-10 помечается бейджем ТОП.">⭐ Золотая середина</button>
     <label class="ctl proOnly" id="wrapBudget" title="Сколько серебра ты готов вложить в одну строку.&#10;&#10;Пока поле пустое, сайт считает деньги бесконечными и смотрит только на то, сколько съест рынок.&#10;&#10;Как только впишешь сумму, появится предел: больше, чем позволяет твоё серебро, не сделать. При небольших деньгах наверх сами собой полезут строки с высокой маржой. При больших опять станет важнее оборот.">Бюджет
@@ -556,16 +614,49 @@ function trendChartHTML(tr){
 // ─── Язык названий и копирование в буфер ───
 // Поиск на рынке в игре ищет по названию клиента. Клиент английский, значит и
 // копировать надо английское имя. Поэтому en по умолчанию; выбор запоминается.
-let LANG = (()=>{ try{ return localStorage.getItem('acp_lang')==='ru' ? 'ru' : 'en'; }catch(e){ return 'en'; } })();
-const nmA = o => !o ? '' : (LANG==='ru' ? (o.ru||o.en||'') : (o.en||o.ru||''));   // главное имя
-const nmB = o => !o ? '' : (LANG==='ru' ? (o.en||'')       : (o.ru||''));         // подпись снизу
+const LANGS = ['en','ru','es'];
+const LANG_NAME = {en:'English', ru:'Русский', es:'Español'};
+const ls = (k,d)=>{ try{ return localStorage.getItem(k) ?? d; }catch(e){ return d; } };
+const lsSet = (k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
+// Главный язык названий и второй, который идёт мелкой подписью снизу.
+// Второй нужен потому, что поиск на рынке в игре ищет по языку клиента: смотришь
+// по-русски, а копировать и искать надо английское имя.
+let LANG  = LANGS.includes(ls('acp_lang','en')) ? ls('acp_lang','en') : 'en';
+let LANG2 = ['off',...LANGS].includes(ls('acp_lang2','auto')) ? ls('acp_lang2','auto') : 'auto';
+function lang2eff(){                       // auto: под русским и испанским показываем английский
+  if(LANG2==='auto') return LANG==='en' ? 'ru' : 'en';
+  return LANG2;
+}
+const pick = (o,l) => !o ? '' : (o[l] || '');
+const nmA = o => !o ? '' : (pick(o,LANG) || o.en || o.ru || '');
+const nmB = o => {
+  if(!o) return '';
+  const l = lang2eff();
+  if(l==='off' || l===LANG) return '';
+  const v = pick(o,l);
+  return v && v!==nmA(o) ? v : '';
+};
 window.setLang = v => {
-  LANG = (v==='ru' ? 'ru' : 'en');
-  try{ localStorage.setItem('acp_lang', LANG); }catch(e){}
+  LANG = LANGS.includes(v) ? v : 'en';
+  lsSet('acp_lang', LANG);
   document.querySelectorAll('button.lng').forEach(b=>b.classList.toggle('on', b.dataset.l===LANG));
   if(typeof fillDaily==='function') fillDaily();   // «Дневной бонус», теми же словами, что в игре
   if(typeof fillCats==='function')  fillCats();
+  if(typeof paintSettings==='function') paintSettings();
   S.limit = 0; render();
+};
+window.setLang2 = v => {
+  LANG2 = v; lsSet('acp_lang2', v);
+  if(typeof paintSettings==='function') paintSettings();
+  S.limit = 0; render();
+};
+// Стиль: пиксельная рама или обычный вид
+let SKIN = ls('acp_skin','pix')==='plain' ? 'plain' : 'pix';
+window.setSkin = v => {
+  SKIN = (v==='plain' ? 'plain' : 'pix');
+  lsSet('acp_skin', SKIN);
+  document.body.classList.toggle('pix', SKIN==='pix');
+  if(typeof paintSettings==='function') paintSettings();
 };
 function nameOfId(id){
   const m = (DATA.matNames||{})[id]; if(m) return nmA(m);
@@ -603,7 +694,7 @@ function normLine(r){
     + `изо дня в день, а не цена одного случайного ордера. `
     + (d==null ? 'Сейчас в расчёте стоит цена выставленного ордера, она по смыслу выше цены сделок, поэтому разницу тут не считаем.'
        : d>0 ? `Сегодня дают на ${d}% выше обычного.` : d<0 ? `Сегодня дают на ${-d}% ниже обычного.` : 'Сегодня ровно столько же.');
-  return `<br><span class="fresh" title="${tip}">обычно ${fmt(n)}${d!=null&&d>=8?` <b style="color:var(--accent)">+${d}%</b>`:''}</span>`;
+  return `<br><span class="fresh" title="${tip}"><span class="plab">обычно</span> ${fmt(n)}${d!=null&&d>=8?` <b style="color:var(--accent)">+${d}%</b>`:''}</span>`;
 }
 // Ячейка «Стабильность»: сколько дней из последних трёх недель позиция была в плюсе
 // и какая маржа была обычной. Короткая история, серым: «3 из 4 дней» ничего не значит.
@@ -1105,6 +1196,16 @@ function logoStart(){
     if(b && b.offsetParent!==null) logoDraw(t, b.getContext('2d'), LOGO.small);
   })(t0);
 }
+
+// ─── Настройки ───────────────────────────────────────────────────────
+function paintSettings(){
+  const mark=(id,v)=>{ const w=$(id); if(!w) return;
+    w.querySelectorAll('button[data-v]').forEach(b=>b.classList.toggle('on', b.dataset.v===v)); };
+  mark('optSkin', SKIN); mark('optLang', LANG); mark('optLang2', LANG2);
+}
+window.openSettings = ()=>{ paintSettings(); $('setBack').classList.add('on'); };
+window.closeSettings = ()=>{ $('setBack').classList.remove('on'); };
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeSettings(); });
 function paintView(){
   document.body.classList.toggle('light', isLite());
   document.querySelectorAll('.viewbox button').forEach(b=>b.classList.toggle('on', b.dataset.v===VIEW));
@@ -2821,7 +2922,7 @@ function bmNormHTML(r){
   return `<br><span class="fresh" title="${tip}">За месяц сделки на ЧР закрывались по <b style="color:var(--text)">${fmt(r.bmBase)}</b>`
     + (r.swing?` · цена гуляет на ${r.swing}%`:'')
     + (bmAsking() && over>=15
-        ? ` · <b style="color:var(--accent)">твой ордер на ${over}% выше</b>, он может простоять`
+        ? ` · <b class="plab" style="color:var(--accent)">твой ордер выше нормы на</b> <b style="color:var(--accent)">${over}%</b>, он может простоять`
         : (!bmAsking() && r.spike>0 ? ` · сейчас дают на ${r.spike}% выше, в расчёт взята обычная` : ''))
     + '</span>';
 }
@@ -3931,6 +4032,8 @@ window.goHome=()=>{
     if(hs) hs.innerHTML='<span style="color:var(--red)">Не удалось загрузить базу предметов (items.json). Обнови страницу.</span>';
     return;
   }
+  document.body.classList.toggle('pix', SKIN==='pix');
+  paintSettings();
   logoStart();  // кролик оживает сразу, ещё до того как приедут цены
   fillCats();   // категории в фильтр, на выбранном языке
   fillDaily();   // списки дневного бонуса зависят от базы предметов, строим после её загрузки
