@@ -31,8 +31,8 @@ h1.logo{cursor:pointer;transition:opacity .15s;display:flex;align-items:center;g
 h1.logo small{flex-basis:100%}
 canvas.logoc{image-rendering:pixelated;background:transparent;display:block}
 #logoHdr{height:34px;width:auto;flex:none}
-#logoHome{height:118px;width:auto;margin:0 auto 14px}
-@media(max-width:640px){#logoHome{height:88px}#logoHdr{height:28px}}
+#logoHome{height:190px;width:auto;margin:-72px auto 14px}
+@media(max-width:640px){#logoHome{height:142px;margin:-54px auto 10px}#logoHdr{height:28px}}
 h1.logo:hover{opacity:.85}
 .controls{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
 select,input[type=number],input[type=text]{background:var(--bg2);color:var(--text);border:1px solid var(--border2);
@@ -269,7 +269,7 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
 </head>
 <body>
 <div id="home">
-  <canvas id="logoHome" class="logoc" width="44" height="36" title="Albion Craft Profit"></canvas>
+  <canvas id="logoHome" class="logoc" width="44" height="58" title="Albion Craft Profit"></canvas>
   <h1>Albion <span>Craft Profit</span></h1>
   <div class="sub"><span class="proOnly">Europe-сервер · живые цены Albion Online Data Project · выбери раздел</span><span class="liteOnly">Живые цены с рынков Albion, сервер Europe. Выбери, чем хочешь заняться.</span></div>
   <div id="homeView"><span class="viewbox" title="Лайт: на экране только то, что нужно, чтобы понять, на чём заработать. Про: все колонки и все настройки."><button data-v="light" onclick="setView('light')">Лайт</button><button data-v="pro" onclick="setView('pro')">Про</button></span>
@@ -892,7 +892,7 @@ function logoUnpack(str, k){
   }
   return {w,h,px,k,eyeL:{x0:20*k,x1:31*k,y:54*k},eyeR:{x0:33*k,x1:43*k,y:54*k},earY:26*k,pivot:80*k};
 }
-const LOGO={}; let logoRAF=null;
+const LOGO={}; let logoRAF=null, LOGO_T0=0;
 function logoHash(i,k){ let n=(i*374761393+k*668265263)&0x7fffffff; n=(n^(n>>13))*1274126177&0x7fffffff; return ((n^(n>>16))&0xffff)/0xffff; }
 const logoBell = p => p<=0||p>=1 ? 0 : Math.sin(p*Math.PI);
 function logoEv(t,at,dur,period){ const p=((t-at)%period+period)%period; return p<dur ? logoBell(p/dur) : 0; }
@@ -945,21 +945,58 @@ function logoDraw(t, ctx, g){
 // летят искры, пыль сыплется гуще. Полосу пикселей тут не сдвигаем: на прямых
 // линиях это читается не как приём, а как поломанная картинка.
 const ANVIL_BODY="44,36,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD////AAAgAAAOAAIAAAAcACAAAAAwAgAAABwAIAAADgAD/4A/AAAABAQAAAAAQEAAAAACCAAAAAAggAAAAAEQAAAAABEAAAAAAggAAAAAQEAAAAAEBAAAAACAIAAAABABAAAAAgAIAAAAIACAAAA8AAeAAAIAAAgAACAAAIAAA///+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-const ANVIL_HITS=[0,2150,2380,4600,6900,7130], ANVIL_PERIOD=9200, ANVIL_TOP=8;
+const ANVIL_HITS=[0,2150,2380,4600,6900,7130], ANVIL_PERIOD=9200;
+const ANVIL_DY=22, ANVIL_TOP=8+ANVIL_DY;   // тело опущено вниз, сверху место под замах
+let anvilClickT=null;
+// Молот по клику. Пиксельную картинку крутить нельзя — рассыпается, поэтому фигура
+// задана точками, а поворот считается для каждой точки и округляется до пикселя.
+// Угол небольшой, ±30 градусов, на таком повороте ступеньки почти не видны.
+const HAMMER = (()=>{
+  const px=[];
+  for(let x=-4;x<=4;x++){ px.push([x,-6]); px.push([x,0]); }      // боёк, верх и низ
+  for(let y=-5;y<=-1;y++){ px.push([-4,y]); px.push([4,y]); }     // боковины бойка
+  for(let y=-19;y<=-7;y++) px.push([0,y]);                        // рукоять
+  px.push([1,-7]); px.push([1,-8]);                               // утолщение у бойка
+  return px;
+})();
+const HIT_X=18, HIT_Y=8+22, SWING=430;
+// фазы: замах вниз → удар → отскок → уход вверх
+function hammerPose(age){
+  if(age<0||age>SWING) return null;
+  if(age<150){ const k=age/150, e=k*k; return {y:6+(HIT_Y-6)*e, a:(-20+20*e)*Math.PI/180, o:1}; }
+  if(age<300){ const k=(age-150)/150; return {y:HIT_Y-9*k, a:(-20*k)*Math.PI/180, o:1}; }
+  const k=(age-300)/(SWING-300);
+  return {y:HIT_Y-9-14*k, a:(-20-12*k)*Math.PI/180, o:1-k};
+}
+function drawHammer(ctx, age){
+  const p=hammerPose(age); if(!p) return;
+  const c=Math.cos(p.a), sn=Math.sin(p.a);
+  ctx.fillStyle = p.o>=1 ? '#f2efe9' : 'rgba(242,239,233,'+p.o.toFixed(2)+')';
+  for(const [x,y] of HAMMER){
+    const X=Math.round(HIT_X + x*c - y*sn), Y=Math.round(p.y + x*sn + y*c);
+    if(X<-2||X>60||Y<-2||Y>60) continue;
+    ctx.fillRect(X, Y, 1, 1);
+  }
+}
+
 let ANVIL=null;
 function anvilUnpack(str){
   const p=str.split(','), w=+p[0], h=+p[1], bin=atob(p[2]), core=[];
   for(let y=0;y<h;y++) for(let x=0;x<w;x++){
     const i=y*w+x;
-    if((bin.charCodeAt(i>>3)>>(7-(i&7)))&1) core.push([x,y]);
+    if((bin.charCodeAt(i>>3)>>(7-(i&7)))&1) core.push([x,y+ANVIL_DY]);
   }
-  return {w,h,core};
+  return {w,h:h+ANVIL_DY,core};
 }
 function anvilHit(t){
   let e=0;
   for(const at of ANVIL_HITS){
     const p=((t-at)%ANVIL_PERIOD+ANVIL_PERIOD)%ANVIL_PERIOD;
     if(p<260) e=Math.max(e, 1-p/260);
+  }
+  if(anvilClickT!=null){                 // удар от клика: сильнее обычного
+    const p=t-anvilClickT-150;           // 150 мс уходит на замах
+    if(p>=0 && p<300) e=Math.max(e, 1-p/300);
   }
   return e;
 }
@@ -983,28 +1020,41 @@ function anvilDraw(t, ctx, g){
   }
   for(let i=0;i<4;i++){                       // подтёки под подошвой
     const per=1900+i*430, p=((t+i*700)%per)/per;
-    const y=32+Math.round(p*3.4);
+    const y=32+ANVIL_DY+Math.round(p*3.4);
     if(y<g.h){ ctx.fillStyle='rgba(242,239,233,0.85)'; ctx.fillRect([13,18,24,29][i]+dx0, y+dy, 1, 1); }
   }
-  for(const at of ANVIL_HITS){                // искры от удара
-    const age=((t-at)%ANVIL_PERIOD+ANVIL_PERIOD)%ANVIL_PERIOD;
-    if(age>620) continue;
-    const seed=Math.round(at);
-    for(let i=0;i<14;i++){
+  const spark=(age, seed, n, spread)=>{
+    if(age<0||age>620) return;
+    for(let i=0;i<n;i++){
       const r1=logoHash(seed+i,1), r2=logoHash(seed+i,2), r3=logoHash(seed+i,3);
-      const x=11+r1*18+(r2-0.5)*0.030*age;
-      const y=ANVIL_TOP-1-(0.045+r3*0.035)*age+0.000055*age*age;
-      if(y<-2||y>ANVIL_TOP+2) continue;
+      const x=HIT_X-spread/2+r1*spread+(r2-0.5)*0.034*age;
+      const y=ANVIL_TOP-1-(0.048+r3*0.040)*age+0.000058*age*age;
+      if(y<-3||y>ANVIL_TOP+2) continue;
       ctx.fillStyle='rgba(242,239,233,'+(Math.max(0,1-age/620)*(0.55+r3*0.45))+')';
       ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
     }
+  };
+  for(const at of ANVIL_HITS)                 // искры от обычных ударов
+    spark(((t-at)%ANVIL_PERIOD+ANVIL_PERIOD)%ANVIL_PERIOD, Math.round(at), 14, 18);
+  if(anvilClickT!=null){                      // клик: свой молот и вдвое больше искр
+    const age=t-anvilClickT;
+    spark(age-150, 7717, 26, 22);
+    drawHammer(ctx, age);
+    if(age>SWING+700) anvilClickT=null;
   }
 }
 function logoStart(){
   if(!LOGO.big){ LOGO.big=logoUnpack(LOGO_BIG,1); LOGO.small=logoUnpack(LOGO_SMALL,0.5); }
   if(!ANVIL) ANVIL=anvilUnpack(ANVIL_BODY);
+  const home=$('logoHome');
+  if(home && !home.dataset.hit){
+    home.dataset.hit='1';
+    home.style.cursor='pointer';
+    home.title='Стукни по ней';
+    home.addEventListener('pointerdown', ()=>{ anvilClickT = performance.now()-LOGO_T0; });
+  }
   if(logoRAF) return;
-  const t0=performance.now();
+  const t0=performance.now(); LOGO_T0=t0;
   let last=0;
   // Свёрнутую вкладку не рисуем: незачем греть ноутбук ради невидимой картинки.
   // И 60 кадров в секунду тут ни к чему: рябь и так меняется раз в 90 мс, а движения
