@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#0f1115">
-<title>Albion Craft Profit, Europe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&display=swap" rel="stylesheet">
+<title>Albion Journal — крафт, рынки и чёрный рынок</title>
 <style>
 :root{
   --bg:#0b0d12; --bg2:#0f1219; --panel:#151924; --panel2:#1c2130; --panel3:#232a3d;
@@ -265,12 +267,45 @@ body.light td.item{min-width:230px}
 #homeStatus{margin-top:18px;color:var(--muted);font-size:12.5px;display:flex;align-items:center;gap:8px}
 body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px solid var(--panel3);border-top-color:var(--accent);
   border-radius:50%;animation:spin .8s linear infinite;flex:none}
+/* ═══ Пиксельная рама ═══════════════════════════════════════════════
+   Правило одно: цифры не трогаем никогда. Пиксельный шрифт живёт только
+   на коротких надписях, которые узнают формой слова, а не читают по буквам:
+   заголовки, кнопки, шапки колонок, значки. Всё остальное как было. */
+:root{--pix:'Pixelify Sans', ui-monospace, 'SF Mono', monospace}
+#home h1, h1.logo, .card b, th, button, .badge, .mchip, .viewbox button, #secName{
+  font-family:var(--pix); letter-spacing:.5px}
+th{font-size:13px; text-transform:none; letter-spacing:.6px}
+#home h1{letter-spacing:1px}
+h1.logo{font-size:19px}
+.card b{font-size:17px}
+button{font-size:13.5px}
+.badge{font-size:11.5px}
+/* Цифры отбираем обратно: ячейки, подписи под ценой, проценты и всё,
+   что человек читает знак за знаком. */
+td, .fresh, .norm, .iname span, input, select, .sub, .foot, .help, td.tr span{
+  font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif; letter-spacing:normal}
+/* Углы: вместо скруглений пиксельные срезы */
+table, .panel, .card, .skel, button, select, input[type=number], input[type=text],
+.badge, .mchip, .viewbox, .lngbox, .cp, .pold, .ownTag, button.grp, button.rt{border-radius:0}
+.panel, .card, table{position:relative}
+.panel::before, .card::before, table::before{content:'';position:absolute;left:-1px;top:-1px;
+  width:4px;height:4px;background:var(--bg);pointer-events:none;z-index:6}
+.panel::after, .card::after, table::after{content:'';position:absolute;right:-1px;bottom:-1px;
+  width:4px;height:4px;background:var(--bg);pointer-events:none;z-index:6}
+/* Кнопка при наведении инвертируется, как в старых интерфейсах */
+button:hover{background:var(--accent);color:#241a05;border-color:var(--accent)}
+button.on, button.grp.on{background:var(--accent);color:#241a05}
+/* Разделитель строк — пунктир из пикселей, а не сплошная линия */
+th, td{border-bottom:0; background-image:linear-gradient(90deg,var(--border) 50%,transparent 0);
+  background-size:4px 1px; background-repeat:repeat-x; background-position:bottom}
+th{background-color:var(--panel2)}
+tbody tr:last-child td{background-image:none}
 </style>
 </head>
 <body>
 <div id="home">
-  <canvas id="logoHome" class="logoc" width="44" height="58" title="Albion Craft Profit"></canvas>
-  <h1>Albion <span>Craft Profit</span></h1>
+  <canvas id="logoHome" class="logoc" width="44" height="58" title="Albion Journal · стукни по ней"></canvas>
+  <h1>Albion <span>Journal</span></h1>
   <div class="sub"><span class="proOnly">Europe-сервер · живые цены Albion Online Data Project · выбери раздел</span><span class="liteOnly">Живые цены с рынков Albion, сервер Europe. Выбери, чем хочешь заняться.</span></div>
   <div id="homeView"><span class="viewbox" title="Лайт: на экране только то, что нужно, чтобы понять, на чём заработать. Про: все колонки и все настройки."><button data-v="light" onclick="setView('light')">Лайт</button><button data-v="pro" onclick="setView('pro')">Про</button></span>
     <span class="fresh">Лайт показывает только главное. Про открывает все колонки и настройки.</span></div>
@@ -293,10 +328,10 @@ body.loading #homeStatus::before{content:'';width:13px;height:13px;border:2px so
       <span class="proOnly">Стоит ли везти сейчас: живой светофор по убийствам транспортников (киллборд Europe), классификатор «кто вёз на ЧР» и окна Bandit Assault. Раздел дорабатывается.</span><span class="liteOnly">Опасно ли сейчас везти товар в Карлеон.</span></div>
   </div>
   <div id="homeStatus">Загрузка цен начнётся при входе в раздел…</div>
-  <div class="foot">Данные: Albion Online Data Project (краудсорсинг) · Иконки: официальный Render API</div>
+  <div class="foot">Данные: Albion Online Data Project (краудсорсинг) · Иконки: официальный Render API<br>Фан-проект, никак не связан с Sandbox Interactive. Albion Online — торговая марка SBI.</div>
 </div>
 <header id="appHeader" style="display:none">
-  <h1 class="logo" onclick="goHome()" title="На главный экран"><canvas id="logoHdr" class="logoc" width="32" height="48"></canvas>Albion Craft Profit<small>Europe · чёрный рынок и города</small></h1>
+  <h1 class="logo" onclick="goHome()" title="На главный экран"><canvas id="logoHdr" class="logoc" width="32" height="48"></canvas>Albion Journal<small>Europe · чёрный рынок и города</small></h1>
   <div class="controls">
     <label class="ctl" id="wrapCity">Город
       <select id="citySel">
