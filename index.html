@@ -379,11 +379,11 @@ body.pix tbody tr:last-child td{background-image:none}
         <button data-v="off" onclick="setLang2('off')">Без подписи</button>
       </div></div>
 
-    <div class="setrow"><div class="setlab">Язык интерфейса<span class="help" title="Подписи, кнопки и подсказки самого сайта. Английского и испанского пока нет: это несколько сотен строк, их надо переводить отдельно от названий предметов.">?</span></div>
-      <div class="setopts">
-        <button class="on" disabled>Русский</button>
-        <button disabled title="Пока не переведено">English · скоро</button>
-        <button disabled title="Пока не переведено">Español · скоро</button>
+    <div class="setrow"><div class="setlab">Язык интерфейса<span class="help" title="Подписи, кнопки и подсказки самого сайта. Переведена вся основная обвязка: главный экран, шапка, фильтры, названия колонок и настройки. Длинные подсказки внутри карточек пока остаются на русском — их несколько сотен, они идут вторым заходом.">?</span></div>
+      <div class="setopts" id="optUI">
+        <button data-v="ru" onclick="setUI('ru')">Русский</button>
+        <button data-v="en" onclick="setUI('en')">English</button>
+        <button data-v="es" onclick="setUI('es')">Español</button>
       </div></div>
 
     <div class="setnote">Выбор запоминается в браузере. Настройки языка меняют только названия предметов, на расчёты и цифры они не влияют.</div>
@@ -1197,11 +1197,68 @@ function logoStart(){
   })(t0);
 }
 
+// ─── Язык интерфейса ─────────────────────────────────────────────────
+// Подписи сайта не вынесены в отдельные ключи: их сотни и они разбросаны
+// по всему коду. Поэтому переводим готовую страницу: проходим по текстовым
+// узлам и подсказкам и подменяем те, что нашлись в словаре. Чего в словаре
+// нет — остаётся по-русски, и это видно сразу, а не ломается молча.
+const T_UI = {"% дней":["% of days","% de días"],"/д":["/day","/día"],"10 мин":["10 min","10 min"],"12 ч":["12 h","12 h"],"24 ч":["24 h","24 h"],"3 ч":["3 h","3 h"],"30 мин":["30 min","30 min"],"5 мин":["5 min","5 min"],"6 ч":["6 h","6 h"],"English · скоро":["English","English"],"Español · скоро":["Español","Español"],"Europe · чёрный рынок и города":["Europe · Black Market and cities","Europe · Mercado Negro y ciudades"],"Europe-сервер · живые цены Albion Online Data Project · выбери раздел":["Europe server · live prices from Albion Online Data Project · pick a section","Servidor Europe · precios en vivo de Albion Online Data Project · elige una sección"],"Автообновление":["Auto-refresh","Auto-actualizar"],"Без подписи":["No subtitle","Sin subtítulo"],"Безопасные маршруты":["Safe routes","Rutas seguras"],"Бресильен":["Brecilien","Brecilien"],"Бриджуотч":["Bridgewatch","Bridgewatch"],"Бюджет":["Budget","Presupuesto"],"В плюсе ≥":["In profit ≥","En ganancia ≥"],"Варить зелья и готовить еду на продажу.":["Brew potions and cook food to sell.","Prepara pociones y comida para vender."],"Вернуться к выбору раздела":["Back to section list","Volver a la lista de secciones"],"Взвешенно по всем качествам":["Weighted across all qualities","Ponderado por todas las calidades"],"Все":["All","Todo"],"Все города":["All cities","Todas las ciudades"],"Второй язык, подписью":["Second language, as subtitle","Segundo idioma, como subtítulo"],"Выставить ордер (дороже, но ждать)":["Place an order (more, but you wait)","Poner una orden (más, pero esperas)"],"Город":["City","Ciudad"],"Город крафта":["Crafting city","Ciudad de fabricación"],"Города маршрута":["Route cities","Ciudades de la ruta"],"Данные":["Data","Datos"],"Данные не старше":["Data no older than","Datos no más viejos de"],"Данные: Albion Online Data Project (краудсорсинг) · Иконки: официальный Render API":["Data: Albion Online Data Project (crowdsourced) · Icons: official Render API","Datos: Albion Online Data Project (colaborativo) · Iconos: Render API oficial"],"Дневной бонус":["Daily bonus","Bono diario"],"Дней":["Days","Días"],"Добавить в маршрут":["Add to route","Añadir a la ruta"],"Живые цены с рынков Albion, сервер Europe. Выбери, чем хочешь заняться.":["Live prices from Albion markets, Europe server. Pick what you want to do.","Precios en vivo de los mercados de Albion, servidor Europe. Elige qué quieres hacer."],"Зачар.":["Ench.","Encant."],"Как получится":["Whatever fits","Lo que encaje"],"Камни":["Runes","Runas"],"Канал":["Channel","Canal"],"Карлеон":["Caerleon","Caerleon"],"Категория":["Category","Categoría"],"Качество":["Quality","Calidad"],"Купить":["Buy","Comprar"],"Купить вещь на рынке и сдать дороже на чёрный рынок. Ничего делать не надо.":["Buy an item on the market and flip it to the Black Market. No crafting involved.","Compra un objeto en el mercado y véndelo más caro en el Mercado Negro. Sin fabricar nada."],"Купить дёшево в одном городе, продать дорого в другом. Везёшь сам.":["Buy cheap in one city, sell high in another. You carry it yourself.","Compra barato en una ciudad y vende caro en otra. Tú lo transportas."],"Купить шкуры или руду, переработать в кожу или бруски и продать. Никуда ехать не надо.":["Buy hides or ore, refine into leather or bars and sell. No travel needed.","Compra pieles o mineral, refínalos en cuero o lingotes y vende. Sin viajar."],"Купить шмотку":["Buy gear","Comprar equipo"],"Лайт":["Lite","Simple"],"Лайт показывает только главное. Про открывает все колонки и настройки.":["Lite shows only the essentials. Pro opens every column and setting.","Simple muestra solo lo esencial. Pro abre todas las columnas y ajustes."],"Лимхёрст":["Lymhurst","Lymhurst"],"Лучший маршрут":["Best route","Mejor ruta"],"Маржа %":["Margin %","Margen %"],"Маржа ≥":["Margin ≥","Margen ≥"],"Мартлок":["Martlock","Martlock"],"Маршрут":["Route","Ruta"],"Мне за день":["My daily take","Mi ganancia diaria"],"На главный экран":["To the home screen","A la pantalla principal"],"Названия":["Names","Nombres"],"Настройки":["Settings","Ajustes"],"Настройки: язык и стиль":["Settings: language and style","Ajustes: idioma y estilo"],"Объём ≥":["Volume ≥","Volumen ≥"],"Обычное (консервативно)":["Normal (conservative)","Normal (conservador)"],"Обычный":["Plain","Normal"],"Опасно ли сейчас везти товар в Карлеон.":["How risky it is to haul goods to Caerleon right now.","Qué tan arriesgado es llevar mercancía a Caerleon ahora."],"Пиксельный":["Pixel","Pixel"],"Поднять вещи зачарование камнями и продать дороже.":["Enchant gear with runes and sell it for more.","Encanta equipo con runas y véndelo más caro."],"Поиск предмета…":["Search for an item…","Buscar un objeto…"],"Пока не переведено":["Not translated yet","Aún sin traducir"],"Поменять города местами":["Swap the cities","Intercambiar las ciudades"],"Посмотреть, сколько стоит любая вещь во всех городах.":["See what any item costs in every city.","Mira cuánto cuesta cualquier objeto en cada ciudad."],"Предмет":["Item","Objeto"],"Премиум (4%)":["Premium (4%)","Premium (4%)"],"Про":["Pro","Pro"],"Продаж в день":["Sold per day","Ventas por día"],"Продажа":["Sale","Venta"],"Продажа на ЧР":["Selling on the BM","Venta en el MN"],"Продать":["Sell","Vender"],"Продать (ЧР)":["Sell (BM)","Vender (MN)"],"Профит/шт":["Profit each","Ganancia c/u"],"Пул/день":["Pool per day","Bolsa por día"],"Режим":["Mode","Modo"],"Режим переработки":["Refining mode","Modo de refinado"],"Ресурс":["Resource","Recurso"],"Русский":["Русский","Русский"],"Сбросить кэш и загрузить свежие цены":["Clear the cache and fetch fresh prices","Vaciar la caché y traer precios nuevos"],"Свежесть снимка данных":["How fresh the price snapshot is","Qué tan reciente es la instantánea de precios"],"Сдать сразу (гарантированно)":["Sell instantly (guaranteed)","Vender al instante (garantizado)"],"Сделать вещь и продать дороже, чем стоили материалы. Начни отсюда.":["Craft an item and sell it for more than the materials cost. Start here.","Fabrica un objeto y véndelo por más de lo que costaron los materiales. Empieza aquí."],"Себестоимость":["Cost","Coste"],"Снимок сервера ·":["Server snapshot ·","Instantánea del servidor ·"],"Снять отметки и снова считать по всем городам":["Clear the picks and count all cities again","Quitar la selección y volver a contar todas las ciudades"],"Стабильно в плюсе":["Days in profit","Días en ganancia"],"Станок/100 пит.":["Station/100 nutr.","Estación/100 nutr."],"Стиль":["Style","Estilo"],"Стукни по ней":["Give it a whack","Dale un golpe"],"Сырьё сам":["Refine raw myself","Refinar yo mismo"],"Тетфорд":["Thetford","Thetford"],"Тир":["Tier","Nivel"],"Увожу, кг":["I can carry, kg","Puedo llevar, kg"],"Ф-Стерлинг":["F. Sterling","F. Sterling"],"Фан-проект, никак не связан с Sandbox Interactive. Albion Online — торговая марка SBI.":["A fan project, not affiliated with Sandbox Interactive. Albion Online is a trademark of SBI.","Proyecto de fans, sin relación con Sandbox Interactive. Albion Online es marca registrada de SBI."],"Фокус":["Focus","Enfoque"],"Цена продажи":["Sale price","Precio de venta"],"Цены загружаются в фоне, выбирай раздел…":["Prices are loading in the background, pick a section…","Los precios se cargan en segundo plano, elige una sección…"],"Язык интерфейса":["Interface language","Idioma de la interfaz"],"Язык названий":["Item names language","Idioma de los nombres"],"без лимита":["no limit","sin límite"],"бета":["beta","beta"],"все":["all","todo"],"все тиры":["all tiers","todos los niveles"],"выкл":["off","apagado"],"куда: любой":["to: any","a: cualquiera"],"любое":["any","cualquiera"],"откуда: любой":["from: any","de: cualquiera"],"предметов":["items","objetos"],"с историей ЧР":["with BM history","con historial del MN"],"сбросить":["reset","reiniciar"],"устарело":["stale","obsoleto"],"← Разделы":["← Sections","← Secciones"],"♻️ Переработка":["♻️ Refining","♻️ Refinado"],"✎ своих цен:":["✎ own prices:","✎ precios propios:"],"⟳ Обновить":["⟳ Refresh","⟳ Actualizar"],"⭐ Золотая середина":["⭐ Sweet spot","⭐ Punto justo"],"🐂 Флиппинг между городами":["🐂 City-to-city flipping","🐂 Reventa entre ciudades"],"💎 Рунофикация":["💎 Enchanting","💎 Encantamiento"],"📍 На месте":["📍 On the spot","📍 En el sitio"],"📍 На месте (локальный цикл)":["📍 On the spot (local loop)","📍 En el sitio (ciclo local)"],"🔍 Цены предмета":["🔍 Item prices","🔍 Precios de objeto"],"🔒 своих цен:":["🔒 own prices:","🔒 precios propios:"],"🖤 Флиппинг → ЧР":["🖤 Flipping → BM","🖤 Reventa → MN"],"🖤 Флиппинг → Чёрный рынок":["🖤 Flipping → Black Market","🖤 Reventa → Mercado Negro"],"🛠 Крафт":["🛠 Crafting","🛠 Fabricación"],"🛡 Безопасный крафт":["🛡 Safe crafting","🛡 Fabricación segura"],"🛡 Дороги в Карлеон":["🛡 Roads to Caerleon","🛡 Caminos a Caerleon"],"🛡 Дороги в Карлеон · БЕТА":["🛡 Roads to Caerleon · BETA","🛡 Caminos a Caerleon · BETA"],"🧪 Зелья и еда":["🧪 Potions and food","🧪 Pociones y comida"],"🧭 Оптимальный маршрут (2 или 3 города по пути)":["🧭 Optimal route (2 or 3 cities on the way)","🧭 Ruta óptima (2 o 3 ciudades en el camino)"]};
+let UI = ['ru','en','es'].includes(ls('acp_ui','ru')) ? ls('acp_ui','ru') : 'ru';
+const UI_IDX = {en:0, es:1};
+function trStr(t){
+  if(UI==='ru') return null;
+  const k=t.trim(); if(!k) return null;
+  const row=T_UI[k]; if(!row) return null;
+  const v=row[UI_IDX[UI]]; if(!v || v===k) return null;
+  return t.replace(k, v);
+}
+let trBusy=false;
+function trDOM(root){
+  if(UI==='ru' || trBusy) return;
+  trBusy=true;
+  const w=document.createTreeWalker(root||document.body, NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT);
+  let n;
+  while((n=w.nextNode())){
+    if(n.nodeType===3){
+      const v=trStr(n.nodeValue);
+      if(v!=null) n.nodeValue=v;
+    } else if(n.nodeType===1){
+      for(const a of ['title','placeholder']){
+        const cur=n.getAttribute&&n.getAttribute(a);
+        if(!cur) continue;
+        const v=trStr(cur);
+        if(v!=null) n.setAttribute(a,v);
+      }
+    }
+  }
+  trBusy=false;
+}
+// Страница перерисовывается кусками, поэтому следим за изменениями и
+// переводим свежие узлы. Своё же изменение под флагом, чтобы не зациклиться.
+let trQueued=false;
+function trWatch(){
+  const obs=new MutationObserver(()=>{
+    if(UI==='ru' || trBusy || trQueued) return;
+    trQueued=true;
+    requestAnimationFrame(()=>{ trQueued=false; trDOM(document.body); });
+  });
+  obs.observe(document.body, {childList:true, subtree:true, characterData:true});
+}
+window.setUI = v => {
+  v = ['ru','en','es'].includes(v) ? v : 'ru';
+  if(v===UI) return;
+  lsSet('acp_ui', v);
+  // Перевод затирает русский текст на странице, поэтому переключаться между
+  // языками на лету нельзя: со второго раза подменять уже нечего. Перезагружаем,
+  // это дешевле и честнее любых полумер. Настройки лежат в браузере, ничего не теряется.
+  location.reload();
+};
+
 // ─── Настройки ───────────────────────────────────────────────────────
 function paintSettings(){
   const mark=(id,v)=>{ const w=$(id); if(!w) return;
     w.querySelectorAll('button[data-v]').forEach(b=>b.classList.toggle('on', b.dataset.v===v)); };
-  mark('optSkin', SKIN); mark('optLang', LANG); mark('optLang2', LANG2);
+  mark('optSkin', SKIN); mark('optLang', LANG); mark('optLang2', LANG2); mark('optUI', UI);
 }
 window.openSettings = ()=>{ paintSettings(); $('setBack').classList.add('on'); };
 window.closeSettings = ()=>{ $('setBack').classList.remove('on'); };
@@ -4033,6 +4090,8 @@ window.goHome=()=>{
     return;
   }
   document.body.classList.toggle('pix', SKIN==='pix');
+  document.documentElement.lang = UI;
+  trDOM(document.body); trWatch();
   paintSettings();
   logoStart();  // кролик оживает сразу, ещё до того как приедут цены
   fillCats();   // категории в фильтр, на выбранном языке
