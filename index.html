@@ -390,7 +390,7 @@ body.pix tbody tr:last-child td{background-image:none}
         <button data-v="es" onclick="setLang('es')">Español</button>
       </div></div>
 
-    <div class="setrow"><div class="setlab">Второй язык, подписью<span class="help" title="Мелкая строчка под названием. Она нужна не для красоты: поиск на рынке в игре ищет по языку клиента. Смотришь список по-русски, а искать и копировать надо английское имя — вот оно и стоит снизу.&#10;&#10;«Как получится» само подставит английский, если главный язык русский или испанский, и русский, если главный английский.">?</span></div>
+    <div class="setrow"><div class="setlab">Второй язык, подписью<span class="help" title="Мелкая строчка под названием. Она нужна не для красоты: поиск на рынке в игре ищет по языку клиента. Смотришь список по-русски, а искать и копировать надо английское имя — вот оно и стоит снизу.&#10;&#10;«Как получится» подставит английское имя, если главный язык русский или испанский. Если главный английский — подпишет твоим системным языком, а если система тоже английская, подписи не будет: она там не нужна.">?</span></div>
       <div class="setopts" id="optLang2">
         <button data-v="auto" onclick="setLang2('auto')">Как получится</button>
         <button data-v="en" onclick="setLang2('en')">English</button>
@@ -641,11 +641,28 @@ const lsSet = (k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
 // Главный язык названий и второй, который идёт мелкой подписью снизу.
 // Второй нужен потому, что поиск на рынке в игре ищет по языку клиента: смотришь
 // по-русски, а копировать и искать надо английское имя.
-let LANG  = LANGS.includes(ls('acp_lang','en')) ? ls('acp_lang','en') : 'en';
+// Язык системы. На первом заходе подстраиваемся под браузер, дальше уважаем ручной выбор:
+// как только человек нажал язык в настройках, он лежит в localStorage и перебивает систему.
+// navigator.languages отдаёт список в порядке предпочтения ('ru-RU','en-US',…) — берём первый,
+// который мы умеем; всем остальным английский.
+function sysLang(){
+  try{
+    const list = (navigator.languages && navigator.languages.length) ? navigator.languages
+               : [navigator.language || ''];
+    for(const l of list){
+      const code = String(l).toLowerCase().split('-')[0];
+      if(LANGS.includes(code)) return code;
+    }
+  }catch(e){}
+  return 'en';
+}
+const SYS = sysLang();
+let LANG  = LANGS.includes(ls('acp_lang',SYS)) ? ls('acp_lang',SYS) : SYS;
 let LANG2 = ['off',...LANGS].includes(ls('acp_lang2','auto')) ? ls('acp_lang2','auto') : 'auto';
-function lang2eff(){                       // auto: под русским и испанским показываем английский
-  if(LANG2==='auto') return LANG==='en' ? 'ru' : 'en';
-  return LANG2;
+function lang2eff(){
+  if(LANG2!=='auto') return LANG2;
+  if(LANG!=='en') return 'en';          // под русским и испанским снизу английское: по нему ищут в игре
+  return SYS==='en' ? 'off' : SYS;      // под английским — родной язык человека, если он нам знаком
 }
 const pick = (o,l) => !o ? '' : (o[l] || '');
 const nmA = o => !o ? '' : (pick(o,LANG) || o.en || o.ru || '');
@@ -1352,7 +1369,8 @@ function trRe(t){
   }
   return null;
 }
-let UI = ['ru','en','es'].includes(ls('acp_ui','ru')) ? ls('acp_ui','ru') : 'ru';
+// Язык интерфейса тоже с языка системы, пока человек не выбрал сам.
+let UI = LANGS.includes(ls('acp_ui',SYS)) ? ls('acp_ui',SYS) : SYS;
 const UI_IDX = {en:0, es:1};
 function trStr(t){
   if(UI==='ru') return null;
