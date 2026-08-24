@@ -7,6 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&display=swap" rel="stylesheet">
 <title>Albion Journal — крафт, рынки и чёрный рынок</title>
+<!-- Счётчик посетителей: Umami, без куков и без баннера про cookies. Собирает страну, раздел и
+     сколько людей на сайте прямо сейчас. Личных данных не пишет. -->
+<script defer src="https://cloud.umami.is/script.js" data-website-id="8aa89c23-eef0-4571-8c09-53268ccf1797"></script>
 <style>
 :root{
   --bg:#0b0d12; --bg2:#0f1219; --panel:#151924; --panel2:#1c2130; --panel3:#232a3d;
@@ -365,7 +368,7 @@ body.pix tbody tr:last-child td{background-image:none}
     <div class="dlt"><b>💾 Приложение для Mac</b>
       <span>Собирает цены прямо из игры на твоём компьютере: в таблицах появляются свежие цены и твои собственные ордера.</span>
       <span class="dlnote">Apple Silicon · macOS 13 и новее · 27 МБ. Фан-проект без подписи Apple: при первом запуске macOS попросит разрешить его вручную.</span></div>
-    <a class="dlb" href="https://github.com/VAnatoliyV/albion-craft-profit/releases/latest" target="_blank" rel="noopener" title="Страница загрузки на GitHub">Скачать для macOS</a>
+    <a class="dlb" href="https://github.com/VAnatoliyV/albion-craft-profit/releases/latest" target="_blank" rel="noopener" title="Страница загрузки на GitHub" onclick="try{if(window.umami)umami.track('download-mac')}catch(e){}">Скачать для macOS</a>
   </div>
   <div id="homeStatus">Загрузка цен начнётся при входе в раздел…</div>
   <div class="foot">Данные: Albion Online Data Project (краудсорсинг) · Иконки: официальный Render API<br>Фан-проект, никак не связан с Sandbox Interactive. Albion Online — торговая марка SBI.</div>
@@ -4064,7 +4067,18 @@ const TAB_CONTROLS={
   roads:   [],
 };
 const ALL_WRAPS=['wrapCity','wrapRoute','wrapFocus','wrapSafe','wrapSafeCraft','wrapLocal','wrapSelfRef','wrapQual','wrapFee','wrapCat','refModeWrap','routeCityWrap','wrapBmMode'];
+// ── счётчик разделов ──
+// Разделы переключаются без перезагрузки страницы, поэтому счётчик сам их не увидит:
+// отмечаем переход вручную. Названия английские, чтобы отчёт читался одинаково при любом
+// языке интерфейса. Если скрипт счётчика заблокирован (а у игроков блокировщики частые),
+// window.umami просто нет — тогда молча ничего не делаем, на работу сайта это не влияет.
+const TRACK_NAMES = {craft:'Crafting', ref:'Refining', flip:'Flipping to BM', cityflip:'City flipping',
+  ench:'Enchanting', cons:'Potions and food', item:'Item prices', roads:'Roads to Caerleon'};
+function trackSection(t){
+  try{ if(window.umami) umami.track(p=>({...p, url:'/'+t, title:TRACK_NAMES[t]||t})); }catch(e){}
+}
 function setTab(t){
+  if(S.tab!==t) trackSection(t);
   S.tab=t; S.open={}; S.lastOrder=null;
   fillRouteCities();
   const el=$('secName'); if(el) el.textContent=TAB_NAMES[t]||'';
@@ -4202,6 +4216,7 @@ window.enterApp=(tab)=>{
   $('appHeader').style.display='';
   $('appMain').style.display='';
   $('appFooter').style.display='';
+  if(S.tab===tab) trackSection(tab);   // setTab отметит только смену раздела
   setTab(tab);
 };
 window.goHome=()=>{
