@@ -4005,8 +4005,8 @@ function itemTabHTML(){
 }
 // Запоминаем, откуда пришли: иначе из карточки цены обратно в Крафт можно было выйти
 // только через «Разделы» и заново выбрать раздел, потеряв все настройки и раскрытые строки.
-window.openItem = (id)=>{ if(S.tab!=='item') S.itemFrom=S.tab; S.itemSel=id; setTab('item'); };
-window.backFromItem = ()=>{ const t=S.itemFrom; S.itemFrom=null; S.itemSel=null; setTab(t||'craft'); };
+window.openItem = (id)=>{ if(S.tab!=='item') S.itemFrom=S.tab; nav('item/'+encodeURIComponent(id)); };
+window.backFromItem = ()=>{ const t=S.itemFrom||'craft'; S.itemFrom=null; S.itemSel=null; nav(t); };
 window.clearItemFilters = ()=>{ S.itemTier=''; S.itemEnch=''; render(); };
 // Кнопка «назад в тот раздел, откуда пришёл». Пусто, если зашли в цены прямо из меню.
 function backBtnHTML(){
@@ -4210,21 +4210,59 @@ window.setSellOverride=(iid,val)=>{
 };
 saveOverrides(); // показать чип, если правки сохранились с прошлого раза
 // стартовый экран ↔ приложение
-window.enterApp=(tab)=>{
-  S.itemFrom=null;          // зашли в раздел из меню, возвращаться некуда
-  $('home').style.display='none';
-  $('appHeader').style.display='';
-  $('appMain').style.display='';
-  $('appFooter').style.display='';
-  if(S.tab===tab) trackSection(tab);   // setTab отметит только смену раздела
-  setTab(tab);
-};
-window.goHome=()=>{
+// ─── навигация и кнопка «назад» ───
+// Раньше разделы переключались без всякой записи в историю браузера, и кнопка «назад»
+// уводила человека с сайта целиком. Теперь каждый экран пишет в адрес свой якорь
+// (#craft, #item/T4_BAG), «назад» и «вперёд» ходят по разделам, а ссылкой на конкретный
+// раздел или карточку предмета можно поделиться и открыть её сразу.
+let ROUTING = false;   // пока применяем адрес — новую запись в историю не создаём
+
+function routeParse(){
+  const h = decodeURIComponent((location.hash||'').replace(/^#/,''));
+  if(!h) return {view:'home'};
+  const i = h.indexOf('/');
+  const tab = i<0 ? h : h.slice(0,i);
+  if(!TAB_NAMES[tab]) return {view:'home'};       // чужой или устаревший якорь — на главную
+  const id = i<0 ? '' : h.slice(i+1);
+  return id ? {view:'item', tab, id} : {view:'tab', tab};
+}
+function showHome(){
   $('home').style.display='flex';
   $('appHeader').style.display='none';
   $('appMain').style.display='none';
   $('appFooter').style.display='none';
-};
+}
+function showApp(){
+  $('home').style.display='none';
+  $('appHeader').style.display='';
+  $('appMain').style.display='';
+  $('appFooter').style.display='';
+}
+// Показать то, что написано в адресе. Историю не трогаем: сюда приходим и по popstate.
+function applyRoute(){
+  ROUTING = true;
+  try{
+    const r = routeParse();
+    if(r.view==='home'){ showHome(); return; }
+    showApp();
+    if(r.view==='item'){ S.itemSel = r.id; }              // S.itemFrom ставит openItem, здесь не трогаем
+    else { S.itemFrom = null; S.itemSel = null; }
+    if(S.tab===r.tab) trackSection(r.tab);                // setTab отметит только смену раздела
+    setTab(r.tab);
+  } finally { ROUTING = false; }
+}
+// Перейти на экран: hash без решётки, пустая строка — главная.
+function nav(hash){
+  if(ROUTING) return;
+  const want = hash ? '#'+hash : '';
+  if((location.hash||'') === want){ applyRoute(); return; }   // уже здесь, дубль в историю не пишем
+  history.pushState(null, '', want || location.pathname + location.search);
+  applyRoute();
+}
+window.addEventListener('popstate', applyRoute);
+
+window.enterApp = (tab)=>{ S.itemFrom=null; nav(tab); };   // зашли из меню, возвращаться внутри некуда
+window.goHome   = ()=> nav('');
 // ─── старт: сначала база рецептов, потом цены ───
 (async function boot(){
   try{ localStorage.removeItem('acp_snap'); }catch(e){} // старый кэш снимка больше не используется
@@ -4260,6 +4298,7 @@ window.goHome=()=>{
   logoStart();  // кролик оживает сразу, ещё до того как приедут цены
   fillCats();   // категории в фильтр, на выбранном языке
   fillDaily();   // списки дневного бонуса зависят от базы предметов, строим после её загрузки
+  applyRoute();  // если в адресе есть #раздел — открываем сразу его, а не главную
   if(hs) hs.textContent='Цены загружаются в фоне, выбирай раздел…';
   await loadAll(false);
   if(hs && !hs.textContent.includes('готовы')) hs.textContent='Цены загружены ✓';
