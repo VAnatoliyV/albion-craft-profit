@@ -94,6 +94,10 @@ jobs:
         run: |
           mkdir -p public
           cp index.html items.json public/
+          # Превью ссылки и индексация: без этой строки og-image.png, robots.txt
+          # и sitemap.xml лежат в репозитории, но на сайт не попадают — og:image
+          # отдаёт 404 и превью в Discord/Reddit выходит без картинки.
+          cp og-image.png robots.txt sitemap.xml public/
           [ -f data.json ] && cp data.json public/ || echo "data.json отсутствует — сайт уйдёт в режим прямого опроса API"
           [ -f data-stats.json ] && cp data-stats.json public/ || true
           touch public/.nojekyll
