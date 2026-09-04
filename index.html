@@ -711,7 +711,8 @@ window.setLang2 = v => {
   S.limit = 0; render();
 };
 // Стиль: пиксельная рама или обычный вид
-let SKIN = ls('acp_skin','pix')==='plain' ? 'plain' : 'pix';
+// По умолчанию обычный вид: пиксельный включается в настройках и запоминается.
+let SKIN = ls('acp_skin','plain')==='pix' ? 'pix' : 'plain';
 window.setSkin = v => {
   SKIN = (v==='plain' ? 'plain' : 'pix');
   lsSet('acp_skin', SKIN);
