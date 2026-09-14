@@ -371,7 +371,6 @@ body.pix #dl a.dlb{font-family:var(--pix);letter-spacing:.5px;border-radius:0}
 .islSide table{width:100%;margin-top:10px;font-size:12.5px}
 .islSide th,.islSide td{padding:6px;white-space:nowrap}
 .islSide th:first-child,.islSide td:first-child{text-align:left;white-space:normal}
-#islClose{text-decoration:none}
 .islSide table img{display:inline-block!important;width:22px!important;height:22px!important;aspect-ratio:auto!important;vertical-align:-6px;margin-right:4px}
 :root{--pix:'Pixelify Sans', ui-monospace, 'SF Mono', monospace}
 body.pix #home h1, body.pix h1.logo, body.pix .card b, body.pix th, body.pix button, body.pix .badge, body.pix .mchip, body.pix .viewbox button, body.pix #secName{
@@ -4536,7 +4535,7 @@ function islSideHTML(R,ico){
       <td class="${x.day>=0?'pos':'neg'}">${islK(x.day)}</td></tr>`).join('')+`</tbody></table>`
     : `<div class="fresh" style="margin-top:8px">Нет цен по этому городу.</div>`;
   return `<aside class="islSide">
-    <a href="#" class="ctl" id="islClose" style="display:inline-block;margin-bottom:10px">← ко всем островам</a>
+    <button type="button" class="ctl" id="islClose" style="cursor:pointer;margin-bottom:10px">← ко всем островам</button>
     <h2>${(CITY_SHORT[ci.k]||ci.k)}</h2>
     <div class="islSub">${c.plots} <span>грядок</span> · ${c.herd} <span>голов</span></div>
     ${b?`<div class="islLab">Всего в сутки</div>
@@ -4562,7 +4561,7 @@ function wireIslands(){
     const i=+el.dataset.isl; c.sel = (c.sel===i?null:i); render(); });
   document.querySelectorAll('[data-islrank]').forEach(el=>el.onclick=()=>{
     c.sel=+el.dataset.islrank; render(); });
-  const cl=$('islClose'); if(cl) cl.onclick=e=>{ e.preventDefault(); c.sel=null; render(); };
+  const cl=$('islClose'); if(cl) cl.onclick=()=>{ c.sel=null; render(); };
 }
 
 
