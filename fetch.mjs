@@ -3,6 +3,79 @@
 // Требует Node 18+ (глобальный fetch). Зависимостей нет.
 import { readFile, writeFile } from 'node:fs/promises';
 
+// ─── Дневной бонус производства ─────────────────────────────────────────────
+// Игра его наружу не отдаёт, и сборщик цен Albion Online Data Project тоже: он
+// читает только ордера, историю сделок и курс золота. Единственные, кто пишет
+// его каждый сброс, — AO-SAGE (ao-sage.com), там своё приложение-компаньон.
+// Публичного API у них нет, но страница «Today» подтягивает данные обычным
+// JSON-ом, и мы берём его раз в прогон, то есть не чаще раза в 15 минут.
+//
+// Из браузера так нельзя: на этом адресе нет заголовка CORS. Поэтому запрос
+// живёт здесь, в сборке, а сайт читает готовое поле из своего data.json.
+//
+// Адрес внутренний, а не обещанный API, и может пропасть при их обновлении.
+// Любая осечка — молча возвращаем null: на сайте останется ручной выбор.
+const SAGE_URL = 'https://ao-sage.com/today/__data.json';
+// Их ключи категорий совпадают с нашими один в один (оба из игровых данных),
+// поэтому переводить надо только пять линий переработки.
+const SAGE_CHAIN = new Set(['ore','hide','fiber','wood','rock']);
+
+// Формат SvelteKit: дерево, где КАЖДОЕ число — индекс в общем массиве, а
+// значение из массива уже окончательное. Разыменовывать его второй раз нельзя,
+// иначе tier:10 превращается в ссылку на десятый элемент и уходит в цикл.
+function sageHydrate(pool, node){
+  const walk = i => {
+    const v = pool[i];
+    if(Array.isArray(v)) return v.map(walk);
+    if(v && typeof v === 'object'){ const o={}; for(const k in v) o[k]=walk(v[k]); return o; }
+    return v;
+  };
+  return walk(node);
+}
+
+export function sageParse(raw, today){
+  const j = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const node = (j.nodes||[]).find(n => n && n.data && JSON.stringify(n.data).includes('entries'));
+  if(!node) return null;
+  const pool = node.data;
+  const root = pool[0];
+  if(!root || root.day == null) return null;
+  const day = sageHydrate(pool, root.day);
+  if(!day || day.region !== 'europe') return null;      // сайт считает по Европе
+  if(day.status !== 'published') return null;           // черновики не берём
+  if(today && day.date !== today) return null;          // вчерашний бонус хуже, чем никакого
+  const c = [];
+  for(const e of day.entries||[]){
+    if(!e || e.isHidden || !e.category) continue;
+    const pct = Number(e.tier);
+    if(!(pct === 10 || pct === 20)) continue;           // в игре бывает только так
+    const k = SAGE_CHAIN.has(e.category) ? 'chain:'+e.category : e.category;
+    if(!c.some(x => x.k === k)) c.push({ k, v: pct/100 });
+  }
+  if(!c.length) return null;
+  return { d: day.date, c, src: 'ao-sage' };
+}
+
+// Сутки бонуса начинаются в 10:00 UTC, вместе с обслуживанием серверов.
+export const bonusDay = (now=Date.now()) => new Date(now - 10*3600*1000).toISOString().slice(0,10);
+
+async function fetchDailyBonus(){
+  try{
+    const ctrl = new AbortController();
+    const kill = setTimeout(()=>ctrl.abort(), 15000);
+    const r = await fetch(SAGE_URL, { signal: ctrl.signal, headers:{ 'accept':'application/json' } });
+    clearTimeout(kill);
+    if(!r.ok){ console.log(`дневной бонус: HTTP ${r.status}, оставляем ручной выбор`); return null; }
+    const got = sageParse(await r.text(), bonusDay());
+    if(!got){ console.log('дневной бонус: в ответе нет сегодняшнего опубликованного дня'); return null; }
+    console.log(`дневной бонус ${got.d}: ${got.c.map(x=>x.k+' +'+Math.round(x.v*100)).join(', ')}`);
+    return got;
+  }catch(e){
+    console.log(`дневной бонус не получен (${e.message}), оставляем ручной выбор`);
+    return null;
+  }
+}
+
 const API = 'https://europe.albion-online-data.com/api/v2/stats';
 const CITIES = ['Martlock','Bridgewatch','Lymhurst','Fort Sterling','Thetford','Caerleon','Brecilien'];
 const CITY_IDX = Object.fromEntries(CITIES.map((c,i)=>[c,i]));
@@ -159,6 +232,7 @@ async function main(){
   const startedAt = Date.now();
   // t выставим в самом конце: сбор идёт несколько минут, и время старта делает снимок
   // на вид старше, чем он есть. Штамп ставим по факту готовности данных.
+
   const out = { t: 0, cities: CITIES, m:{}, c:{}, b:{}, h:{} };
 
   // 1) материалы, артефакты, полные журналы — обычное качество, все города
@@ -342,6 +416,8 @@ async function main(){
   for(const [id, byDay] of cityDays){ const s = trendSeries(byDay); if(s) out.ih[id] = s; }
   console.log(`месячная норма материалов: ${Object.keys(out.mb).length}`);
   console.log(`тренды: материалы ${Object.keys(out.mh).length}, ЧР ${Object.keys(out.bh).length}, города ${Object.keys(out.ih).length}`);
+
+  out.daily = await fetchDailyBonus();
 
   out.t = Math.round(Date.now()/1000);
   const json = JSON.stringify(out);
