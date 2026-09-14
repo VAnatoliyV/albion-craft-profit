@@ -325,6 +325,24 @@ body.pix #dl a.dlb{font-family:var(--pix);letter-spacing:.5px;border-radius:0}
    Правило одно: цифры не трогаем никогда. Пиксельный шрифт живёт только
    на коротких надписях, которые узнают формой слова, а не читают по буквам:
    заголовки, кнопки, шапки колонок, значки. Всё остальное как было. */
+
+/* острова */
+.islGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-top:14px}
+.islCard{position:relative;border-radius:18px;overflow:hidden;cursor:pointer;border:1px solid rgba(255,255,255,.08);
+  transition:transform .18s ease,box-shadow .18s ease,border-color .18s;display:flex;flex-direction:column;padding-top:6px}
+.islCard:hover{transform:translateY(-5px);box-shadow:0 16px 32px rgba(0,0,0,.55)}
+.islCard.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.islArt{display:block;width:100%;aspect-ratio:1/1;object-fit:contain;filter:drop-shadow(0 8px 14px rgba(0,0,0,.45))}
+.islCap{padding:2px 10px 13px;text-align:center}
+.islNm{font-size:11.5px;letter-spacing:3px;font-weight:600;color:#fff;text-transform:uppercase;text-shadow:0 1px 4px rgba(0,0,0,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.islBon{margin-top:5px;font-size:0;min-height:22px}
+.islBon img{display:inline-block!important;width:22px!important;height:22px!important;margin:0 1px!important;vertical-align:middle!important}
+.islPill{position:absolute;top:10px;right:10px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;
+  background:rgba(0,0,0,.58);border:1px solid rgba(255,255,255,.16);z-index:2}
+.islPill.pos{color:#8ff09a}.islPill.neg{color:#ff9d90}.islPill.na{color:#b9c0ce;font-weight:500}
+.islBest{position:absolute;top:10px;left:10px;padding:3px 8px;border-radius:8px;font-size:10.5px;
+  background:rgba(0,0,0,.52);color:#fff;border:1px solid rgba(255,255,255,.16);max-width:52%;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:2}
 :root{--pix:'Pixelify Sans', ui-monospace, 'SF Mono', monospace}
 body.pix #home h1, body.pix h1.logo, body.pix .card b, body.pix th, body.pix button, body.pix .badge, body.pix .mchip, body.pix .viewbox button, body.pix #secName{
   font-family:var(--pix); letter-spacing:.5px}
@@ -382,6 +400,10 @@ body.pix tbody tr:last-child td{background-image:none}
       <span class="proOnly">Купить шмотку, докинуть руны/души/реликты, поднять зачарование (например 4.2 → 4.3) и продать дороже на чёрном рынке. С объёмами продаж по каждому качеству.</span><span class="liteOnly">Поднять вещи зачарование камнями и продать дороже.</span></div>
     <div class="card" onclick="enterApp('cons')"><b>🧪 Зелья и еда</b>
       <span class="proOnly">Алхимия и кухня: зелья крафтятся партиями по 5, еда по 10. Бонус на зелья даёт Бресильен, на еду Карлеон. Чёрный рынок их не берёт, продажа на городские рынки, где решает оборот.</span><span class="liteOnly">Варить зелья и готовить еду на продажу.</span></div>
+    <div class="card" onclick="enterApp('isl')"><b>🏝 Острова</b>
+      <span class="proOnly">Грядки и пастбище на личном острове: что выгоднее сажать в каждом городе с учётом его бонуса урожая +10%, сколько даёт корова или гусь и во что обходится корм. Цифры механики из игрового дампа.</span><span class="liteOnly">Что выгоднее растить на острове и сколько это даёт в сутки.</span></div>
+    <div class="card" onclick="enterApp('calc')"><b>🧮 Калькулятор</b>
+      <span class="proOnly">Ручной расчёт одной позиции: свой процент возврата в убежище, своя плата за станок, свои цены материалов. Цена продажи подставляется с рынка города или с чёрного рынка, любую цифру можно перебить руками.</span><span class="liteOnly">Посчитать крафт вручную под свои условия.</span></div>
     <div class="card" onclick="enterApp('item')"><b>🔍 Цены предмета</b>
       <span class="proOnly">Сколько стоит любая вещь или ресурс: цены по всем семи городам и качествам, бай-ордера (за сколько сдать сразу) и средние сделок на чёрном рынке.</span><span class="liteOnly">Посмотреть, сколько стоит любая вещь во всех городах.</span></div>
     <div class="card" onclick="enterApp('roads')"><b>🛡 Дороги в Карлеон <span class="badge b-warn" style="vertical-align:2px">бета</span></b>
@@ -1263,7 +1285,7 @@ function logoStart(){
 // по всему коду. Поэтому переводим готовую страницу: проходим по текстовым
 // узлам и подсказкам и подменяем те, что нашлись в словаре. Чего в словаре
 // нет — остаётся по-русски, и это видно сразу, а не ломается молча.
-const T_UI = {"% дней":["% of days","% de días"],"/д":["/day","/día"],"10 мин":["10 min","10 min"],"12 ч":["12 h","12 h"],"24 ч":["24 h","24 h"],"3 ч":["3 h","3 h"],"30 мин":["30 min","30 min"],"5 мин":["5 min","5 min"],"6 ч":["6 h","6 h"],"English · скоро":["English","English"],"Español · скоро":["Español","Español"],"Europe · чёрный рынок и города":["Europe · Black Market and cities","Europe · Mercado Negro y ciudades"],"Europe-сервер · живые цены Albion Online Data Project · выбери раздел":["Europe server · live prices from Albion Online Data Project · pick a section","Servidor Europe · precios en vivo de Albion Online Data Project · elige una sección"],"Автообновление":["Auto-refresh","Auto-actualizar"],"Без подписи":["No subtitle","Sin subtítulo"],"Безопасные маршруты":["Safe routes","Rutas seguras"],"Бресильен":["Brecilien","Brecilien"],"Бриджуотч":["Bridgewatch","Bridgewatch"],"Бюджет":["Budget","Presupuesto"],"В плюсе ≥":["In profit ≥","En ganancia ≥"],"Варить зелья и готовить еду на продажу.":["Brew potions and cook food to sell.","Prepara pociones y comida para vender."],"Вернуться к выбору раздела":["Back to section list","Volver a la lista de secciones"],"Взвешенно по всем качествам":["Weighted across all qualities","Ponderado por todas las calidades"],"Все":["All","Todo"],"Все города":["All cities","Todas las ciudades"],"Второй язык, подписью":["Second language, as subtitle","Segundo idioma, como subtítulo"],"Выставить ордер (дороже, но ждать)":["Place an order (more, but you wait)","Poner una orden (más, pero esperas)"],"Город":["City","Ciudad"],"Город крафта":["Crafting city","Ciudad de fabricación"],"Города маршрута":["Route cities","Ciudades de la ruta"],"Данные":["Data","Datos"],"Данные не старше":["Data no older than","Datos no más viejos de"],"Данные: Albion Online Data Project (краудсорсинг) · Иконки: официальный Render API":["Data: Albion Online Data Project (crowdsourced) · Icons: official Render API","Datos: Albion Online Data Project (colaborativo) · Iconos: Render API oficial"],"Дневной бонус":["Daily bonus","Bono diario"],"Дней":["Days","Días"],"Добавить в маршрут":["Add to route","Añadir a la ruta"],"Живые цены с рынков Albion, сервер Europe. Выбери, чем хочешь заняться.":["Live prices from Albion markets, Europe server. Pick what you want to do.","Precios en vivo de los mercados de Albion, servidor Europe. Elige qué quieres hacer."],"Зачар.":["Ench.","Encant."],"Как получится":["Whatever fits","Lo que encaje"],"Камни":["Runes","Runas"],"Канал":["Channel","Canal"],"Карлеон":["Caerleon","Caerleon"],"Категория":["Category","Categoría"],"Качество":["Quality","Calidad"],"Купить":["Buy","Comprar"],"Купить вещь на рынке и сдать дороже на чёрный рынок. Ничего делать не надо.":["Buy an item on the market and flip it to the Black Market. No crafting involved.","Compra un objeto en el mercado y véndelo más caro en el Mercado Negro. Sin fabricar nada."],"Купить дёшево в одном городе, продать дорого в другом. Везёшь сам.":["Buy cheap in one city, sell high in another. You carry it yourself.","Compra barato en una ciudad y vende caro en otra. Tú lo transportas."],"Купить шкуры или руду, переработать в кожу или бруски и продать. Никуда ехать не надо.":["Buy hides or ore, refine into leather or bars and sell. No travel needed.","Compra pieles o mineral, refínalos en cuero o lingotes y vende. Sin viajar."],"Купить шмотку":["Buy gear","Comprar equipo"],"Лайт":["Lite","Simple"],"Лайт показывает только главное. Про открывает все колонки и настройки.":["Lite shows only the essentials. Pro opens every column and setting.","Simple muestra solo lo esencial. Pro abre todas las columnas y ajustes."],"Лимхёрст":["Lymhurst","Lymhurst"],"Лучший маршрут":["Best route","Mejor ruta"],"Маржа %":["Margin %","Margen %"],"Маржа ≥":["Margin ≥","Margen ≥"],"Мартлок":["Martlock","Martlock"],"Маршрут":["Route","Ruta"],"Мне за день":["My daily take","Mi ganancia diaria"],"На главный экран":["To the home screen","A la pantalla principal"],"Названия":["Names","Nombres"],"Настройки":["Settings","Ajustes"],"⚙ Настройки":["⚙ Settings","⚙ Ajustes"],"Настройки: язык и стиль":["Settings: language and style","Ajustes: idioma y estilo"],"Объём ≥":["Volume ≥","Volumen ≥"],"Обычное (консервативно)":["Normal (conservative)","Normal (conservador)"],"Обычный":["Plain","Normal"],"Опасно ли сейчас везти товар в Карлеон.":["How risky it is to haul goods to Caerleon right now.","Qué tan arriesgado es llevar mercancía a Caerleon ahora."],"Пиксельный":["Pixel","Pixel"],"Поднять вещи зачарование камнями и продать дороже.":["Enchant gear with runes and sell it for more.","Encanta equipo con runas y véndelo más caro."],"Поиск предмета…":["Search for an item…","Buscar un objeto…"],"Пока не переведено":["Not translated yet","Aún sin traducir"],"Чёрный рынок зелья и еду не принимает, продажа только на городские рынки.":["The Black Market does not take potions or food — they sell on city markets only.","El Mercado Negro no acepta pociones ni comida: solo se venden en los mercados de las ciudades."],"назад":["back","atrás"],"только что":["just now","ahora mismo"],"Цены живые, их собирают сами игроки через Albion Online Data Project. Нажми на строку, чтобы увидеть, из чего она сложилась. Переключись на «Про», если нужны все колонки и настройки.":["Prices are live — players collect them themselves through the Albion Online Data Project. Click a row to see how it adds up. Switch to Pro if you want every column and setting.","Los precios son en vivo: los recogen los propios jugadores mediante Albion Online Data Project. Pulsa una fila para ver cómo se forma. Cambia a Pro si quieres todas las columnas y ajustes."],"🔒 Пока карточка открыта, порядок строк не меняется, чтобы строка не убегала вниз при правке цены. Закрой карточку, и таблица пересортируется.":["🔒 While a card is open the rows stay put, so the one you are editing does not slide away. Close the card and the table sorts itself again.","🔒 Mientras una ficha está abierta las filas no se mueven, para que la que editas no se te escape. Cierra la ficha y la tabla vuelve a ordenarse."],"Введи хотя бы две буквы. Хватит и трёх первых от каждого слова: «мас пла» найдёт «Плащ (мастер)», а «und cap» найдёт «Undead Cape». Ищет по названию на двух языках и по коду предмета. Тир и зачарование сужают выдачу: «плащ» + тир 6 + зачар. 2 даст ровно то, что нужно.":["Type at least two letters. The first three of each word are enough: “mas cap” finds “Master's Cape”, “und cap” finds “Undead Cape”. It searches names in both languages and the item code. Tier and enchantment narrow the list: “cape” + tier 6 + ench. 2 gives exactly what you want.","Escribe al menos dos letras. Bastan las tres primeras de cada palabra: “mae cap” encuentra “Capa del maestro” y “und cap” encuentra “Undead Cape”. Busca por el nombre en dos idiomas y por el código del objeto. El nivel y el encantamiento afinan la lista: “capa” + nivel 6 + encant. 2 da justo lo que quieres."],"сбросить тир и зачарование":["clear tier and enchantment","quitar nivel y encantamiento"],"← к поиску":["← to search","← a la búsqueda"],"ресурс/материал":["resource / material","recurso / material"],"🛒 дешевле купить:":["🛒 cheapest to buy:","🛒 más barato para comprar:"],"💰 дороже сдать:":["💰 best instant sale:","💰 mejor venta instantánea:"],"🖤 ЧР даёт сейчас:":["🖤 BM pays now:","🖤 El MN paga ahora:"],"🖤 ЧР сделки:":["🖤 BM trades:","🖤 Operaciones del MN:"],"🖤 ЧР средняя 7д:":["🖤 BM 7-day average:","🖤 Media de 7 días del MN:"],"🖤 ЧР мой ордер:":["🖤 BM my order:","🖤 MN mi orden:"],"🖤 ЧР ордера на продажу:":["🖤 BM sell orders:","🖤 MN órdenes de venta:"],"Продаж/д":["Sold/day","Ventas/día"],"лучший сбыт":["best outlet","mejor salida"],"🖤 Чёрный рынок":["🖤 Black Market","🖤 Mercado Negro"],"Даёт сейчас":["Pays now","Paga ahora"],"Посл. сделки":["Last trades","Últimas ventas"],"Объём/день":["Volume/day","Volumen/día"],"Цена":["Price","Precio"],"На чёрном рынке сделок по этому предмету за неделю не зафиксировано.":["No Black Market trades were recorded for this item over the past week.","No se registraron operaciones en el Mercado Negro para este objeto en la última semana."],"Верхнее число это самый дешёвый селл-ордер, за сколько купить.":["The top number is the cheapest sell order — what you pay to buy it.","El número de arriba es la orden de venta más barata: lo que pagas por comprarlo."],"Синее":["Blue","Azul"],"это максимальный бай-ордер (за сколько сдать мгновенно). Рядом возраст цены. Если он":["is the highest buy order — what you get for an instant sale. Next to it is the age of the price. If it is","es la orden de compra más alta: lo que recibes por una venta instantánea. Al lado va la antigüedad del precio. Si está"],"красный":["red","en rojo"],", цене больше суток: её никто не обновлял, показываем как есть, но в игре она наверняка уже другая. По чёрному рынку в расчёт профита идёт «даёт сейчас», но не выше «обычной за месяц»: заявка НПС скачет по часам и регулярно висит вдвое выше того, за сколько предмет реально уходит. Число рядом с обычной ценой, сколько дней из тридцати по этому качеству вообще были сделки; если их мало, доверия к строке меньше.":[", the price is over a day old: nobody has refreshed it. We show it as it is, but in game it is almost certainly different by now. For the Black Market the profit uses “pays now”, but never above the “monthly normal”: the NPC bid jumps around by the hour and regularly sits at twice what the item actually sells for. The number next to the normal price is how many days out of thirty this quality traded at all; if it is low, trust the row less.",", el precio tiene más de un día: nadie lo ha actualizado. Lo mostramos tal cual, pero en el juego seguro que ya es otro. Para el Mercado Negro la ganancia se calcula con “paga ahora”, pero nunca por encima de lo “normal del mes”: la oferta del NPC salta de hora en hora y a menudo se queda al doble de lo que el objeto realmente vale. El número junto al precio normal indica cuántos días de treinta hubo operaciones de esa calidad; si son pocos, fíate menos de la fila."],"💾 Приложение для Mac":["💾 Mac app","💾 App para Mac"],"Собирает цены прямо из игры на твоём компьютере: в таблицах появляются свежие цены и твои собственные ордера.":["It reads prices straight from the game on your own computer, so the tables show fresh prices and your own orders.","Lee los precios directamente del juego en tu propio ordenador, así las tablas muestran precios frescos y tus propias órdenes."],"Apple Silicon · macOS 13 и новее · 27 МБ. Фан-проект без подписи Apple: при первом запуске macOS попросит разрешить его вручную.":["Apple Silicon · macOS 13 or newer · 27 MB. A fan project, not signed by Apple: on first launch macOS will ask you to allow it by hand.","Apple Silicon · macOS 13 o superior · 27 MB. Proyecto de fans, sin firma de Apple: al abrirlo por primera vez macOS te pedirá permitirlo a mano."],"Скачать для macOS":["Download for macOS","Descargar para macOS"],"Страница загрузки на GitHub":["Download page on GitHub","Página de descarga en GitHub"],"Поменять города местами":["Swap the cities","Intercambiar las ciudades"],"Посмотреть, сколько стоит любая вещь во всех городах.":["See what any item costs in every city.","Mira cuánto cuesta cualquier objeto en cada ciudad."],"Предмет":["Item","Objeto"],"Премиум (4%)":["Premium (4%)","Premium (4%)"],"Про":["Pro","Pro"],"Продаж в день":["Sold per day","Ventas por día"],"Продажа":["Sale","Venta"],"Продажа на ЧР":["Selling on the BM","Venta en el MN"],"Продать":["Sell","Vender"],"Продать (ЧР)":["Sell (BM)","Vender (MN)"],"Профит/шт":["Profit each","Ganancia c/u"],"Пул/день":["Pool per day","Bolsa por día"],"Режим":["Mode","Modo"],"Режим переработки":["Refining mode","Modo de refinado"],"Ресурс":["Resource","Recurso"],"Русский":["Русский","Русский"],"Сбросить кэш и загрузить свежие цены":["Clear the cache and fetch fresh prices","Vaciar la caché y traer precios nuevos"],"Свежесть снимка данных":["How fresh the price snapshot is","Qué tan reciente es la instantánea de precios"],"Сдать сразу (гарантированно)":["Sell instantly (guaranteed)","Vender al instante (garantizado)"],"Сделать вещь и продать дороже, чем стоили материалы. Начни отсюда.":["Craft an item and sell it for more than the materials cost. Start here.","Fabrica un objeto y véndelo por más de lo que costaron los materiales. Empieza aquí."],"Себестоимость":["Cost","Coste"],"Снимок сервера ·":["Server snapshot ·","Instantánea del servidor ·"],"Снять отметки и снова считать по всем городам":["Clear the picks and count all cities again","Quitar la selección y volver a contar todas las ciudades"],"Стабильно в плюсе":["Days in profit","Días en ganancia"],"Станок/100 пит.":["Station/100 nutr.","Estación/100 nutr."],"Стиль":["Style","Estilo"],"Стукни по ней":["Give it a whack","Dale un golpe"],"Сырьё сам":["Refine raw myself","Refinar yo mismo"],"Тетфорд":["Thetford","Thetford"],"Тир":["Tier","Nivel"],"Увожу, кг":["I can carry, kg","Puedo llevar, kg"],"Ф-Стерлинг":["F. Sterling","F. Sterling"],"Фан-проект, никак не связан с Sandbox Interactive. Albion Online — торговая марка SBI.":["A fan project, not affiliated with Sandbox Interactive. Albion Online is a trademark of SBI.","Proyecto de fans, sin relación con Sandbox Interactive. Albion Online es marca registrada de SBI."],"Фокус":["Focus","Enfoque"],"Цена продажи":["Sale price","Precio de venta"],"Цены загружаются в фоне, выбирай раздел…":["Prices are loading in the background, pick a section…","Los precios se cargan en segundo plano, elige una sección…"],"Язык интерфейса":["Interface language","Idioma de la interfaz"],"Язык названий":["Item names language","Idioma de los nombres"],"без лимита":["no limit","sin límite"],"бета":["beta","beta"],"все":["all","todo"],"все тиры":["all tiers","todos los niveles"],"выкл":["off","apagado"],"куда: любой":["to: any","a: cualquiera"],"любое":["any","cualquiera"],"откуда: любой":["from: any","de: cualquiera"],"предметов":["items","objetos"],"с историей ЧР":["with BM history","con historial del MN"],"сбросить":["reset","reiniciar"],"устарело":["stale","obsoleto"],"← Разделы":["← Sections","← Secciones"],"♻️ Переработка":["♻️ Refining","♻️ Refinado"],"✎ своих цен:":["✎ own prices:","✎ precios propios:"],"⟳ Обновить":["⟳ Refresh","⟳ Actualizar"],"⭐ Золотая середина":["⭐ Sweet spot","⭐ Punto justo"],"🐂 Флиппинг между городами":["🐂 City-to-city flipping","🐂 Reventa entre ciudades"],"💎 Рунофикация":["💎 Enchanting","💎 Encantamiento"],"📍 На месте":["📍 On the spot","📍 En el sitio"],"📍 На месте (локальный цикл)":["📍 On the spot (local loop)","📍 En el sitio (ciclo local)"],"🔍 Цены предмета":["🔍 Item prices","🔍 Precios de objeto"],"🔒 своих цен:":["🔒 own prices:","🔒 precios propios:"],"🖤 Флиппинг → ЧР":["🖤 Flipping → BM","🖤 Reventa → MN"],"🖤 Флиппинг → Чёрный рынок":["🖤 Flipping → Black Market","🖤 Reventa → Mercado Negro"],"🛠 Крафт":["🛠 Crafting","🛠 Fabricación"],"🛡 Безопасный крафт":["🛡 Safe crafting","🛡 Fabricación segura"],"🛡 Дороги в Карлеон":["🛡 Roads to Caerleon","🛡 Caminos a Caerleon"],"🛡 Дороги в Карлеон · БЕТА":["🛡 Roads to Caerleon · BETA","🛡 Caminos a Caerleon · BETA"],"🧪 Зелья и еда":["🧪 Potions and food","🧪 Pociones y comida"],"🧭 Оптимальный маршрут (2 или 3 города по пути)":["🧭 Optimal route (2 or 3 cities on the way)","🧭 Ruta óptima (2 o 3 ciudades en el camino)"],"ТОП":["TOP","TOP"],"бонус":["bonus","bono"],"дн":["d","d"],"обычно":["usually","normal"],"шт.":["pcs","uds"],"шт":["pcs","uds"],"нет":["none","ninguno"],"Всего":["Total","Total"],"Итого сырья":["Materials total","Total de materiales"],"На 1 шт":["Per 1","Por 1"],"На шт":["Per pc","Por ud"],"На партию":["Per batch","Por lote"],"Цена (ред.)":["Price (edit)","Precio (edit.)"],"Купить всего":["Buy in total","Comprar en total"],"Сумма":["Sum","Suma"],"Стоимость":["Cost","Coste"],"Кол-во":["Qty","Cant."],"Что":["What","Qué"],"Хочу":["I want","Quiero"],"берём":["we take","tomamos"],"крафтим":["we craft","fabricamos"],"перерабатываем":["we refine","refinamos"],"Закупка":["Buying","Compra"],"впритык, с возвратом":["just enough, with returns","lo justo, con devolución"],"на всё количество":["full recipe, no returns","receta completa"],"Маржа по дням":["Margin by day","Margen por día"],"(три недели, наведи на столбик)":["(three weeks, hover a bar)","(tres semanas, pasa sobre una barra)"],"🧮 Расчёт партии:":["🧮 Batch calculator:","🧮 Calculadora de lote:"],"🧮 Калькулятор партии:":["🧮 Batch calculator:","🧮 Calculadora de lote:"],"📓 Журналы:":["📓 Journals:","📓 Diarios:"],"Журналы":["Journals","Diarios"],"к профиту партии":["to the batch profit","a la ganancia del lote"],"Купить пустых:":["Buy empty ones:","Comprar vacíos:"],"Заполнится целиком:":["Will fill completely:","Se llenarán del todo:"],"вложение":["invested","invertido"],"→ выручка":["→ revenue","→ ingresos"],"профит":["profit","ganancia"],"Профит:":["Profit:","Ganancia:"],"Профит партии:":["Batch profit:","Ganancia del lote:"],"профит/день":["profit per day","ganancia por día"],"Себестоимость штуки:":["Cost per piece:","Coste por unidad:"],"Возврат ресурсов:":["Resource return:","Devolución de recursos:"],"Станок за партию:":["Station per batch:","Estación por lote:"],"Вложить:":["Invest:","Invertir:"],"→ нетто":["→ net","→ neto"],"→ на руки":["→ in hand","→ en mano"],"Сдать сразу:":["Sell instantly:","Vender al instante:"],"ЧР, ордером":["BM, by order","MN, con orden"],"ЧР · сразу":["BM · instant","MN · al instante"],"ЧР по качествам":["BM by quality","MN por calidad"],"Бай-ордер":["Buy order","Orden de compra"],"Ордер на продажу":["Sell order","Orden de venta"],"Обычная за месяц":["Monthly normal","Normal del mes"],"Обычная цена за месяц:":["Monthly normal price:","Precio normal del mes:"],"За месяц сделки на ЧР закрывались по":["Over the month BM deals closed at","Durante el mes las ventas en el MN cerraron a"],"твой ордер выше нормы на":["your order is above normal by","tu orden está por encima de lo normal en"],", он может простоять":[", it may just sit there",", puede quedarse sin venderse"],"Средняя 7д":["7-day average","Media de 7 días"],"Объём/д":["Volume/day","Volumen/día"],"Обычное":["Normal","Normal"],"Хорошее":["Good","Bueno"],"руны":["runes","runas"],"Ингредиент":["Ingredient","Ingrediente"],"Где купить":["Where to buy","Dónde comprar"],"Обычное сырьё:":["Plain materials:","Materiales normales:"],"без возврата":["no returns","sin devolución"],"▸ разбор":["▸ breakdown","▸ desglose"],"любой":["any","cualquiera"],"по":["at","a"],"Ничего не найдено. Ослабь фильтры или подожди, пока загрузятся данные.":["Nothing found. Loosen the filters or wait for the data to load.","No se encontró nada. Afloja los filtros o espera a que carguen los datos."],"🔍 Поиск цены предмета или ресурса":["🔍 Look up the price of an item or resource","🔍 Busca el precio de un objeto o recurso"],"упор в закупку":["capped by buying","limitado por la compra"],"купить сырьё, переработать и продать, всё в одном городе":["buy raw, refine and sell, all in one city","compra materia prima, refina y vende, todo en una ciudad"]};
+const T_UI = {"🏝 Острова":["🏝 Islands", "🏝 Islas"],"Что выгоднее растить на острове и сколько это даёт в сутки.":["What pays best to grow on your island, and how much a day it makes.", "Qué conviene cultivar en tu isla y cuánto rinde al día."],"Грядки и пастбище на личном острове: что выгоднее сажать в каждом городе с учётом его бонуса урожая +10%, сколько даёт корова или гусь и во что обходится корм. Цифры механики из игрового дампа.":["Plots and pasture on your private island: what pays best to plant in each city given its +10% yield bonus, what a cow or a goose brings in, and what the feed costs. Mechanics taken from the game data dump.", "Parcelas y pastos en tu isla privada: qué conviene plantar en cada ciudad según su bono de rendimiento del +10%, cuánto da una vaca o un ganso y cuánto cuesta el pienso. Mecánicas tomadas del volcado de datos del juego."],"грядок":["plots", "parcelas"],"голов":["head", "cabezas"],"любимый корм":["favourite feed", "pienso favorito"],"закрыть":["close", "cerrar"],"Всего в сутки":["Total per day", "Total por día"],"культура":["crop", "cultivo"],"животное":["animal", "animal"],"грядка":["per plot", "por parcela"],"голова":["per head", "por cabeza"],"сутки":["per day", "por día"],"🌱 Грядки":["🌱 Plots", "🌱 Parcelas"],"🐄 Пастбище":["🐄 Pasture", "🐄 Pastos"],"нет цен":["no prices", "sin precios"],"Нет цен по этому городу.":["No prices for this city.", "Sin precios para esta ciudad."],"Цен по семенам пока нет в снимке: они добавлены в сбор, ближайшее обновление data.json их подтянет.":["Seed prices are not in the snapshot yet: they have been added to the collector, the next data.json update will pull them in.", "Los precios de las semillas aún no están en la instantánea: ya se añadieron al recolector y la próxima actualización de data.json los traerá."],"🧮 Калькулятор":["🧮 Calculator", "🧮 Calculadora"],"Посчитать крафт вручную под свои условия.":["Work out a craft by hand, on your own terms.", "Calcula una fabricación a mano, con tus condiciones."],"Ручной расчёт одной позиции: свой процент возврата в убежище, своя плата за станок, свои цены материалов. Цена продажи подставляется с рынка города или с чёрного рынка, любую цифру можно перебить руками.":["Work out a single item by hand: your own return rate in a hideout, your own station fee, your own material prices. The sale price is pulled from a city market or the Black Market, and every number can be overridden.", "Calcula un objeto a mano: tu propia tasa de devolución en el refugio, tu tarifa de estación y tus precios de materiales. El precio de venta se toma del mercado de la ciudad o del Mercado Negro, y cualquier cifra puede sobrescribirse."],"🧮 Что считаем":["🧮 What are we working out", "🧮 Qué calculamos"],"Где крафчу":["Where I craft", "Dónde fabrico"],"город":["city", "ciudad"],"убежище":["hideout", "refugio"],"Материалы беру в":["Materials from", "Materiales de"],"фокус":["focus", "enfoque"],"Возврат":["Return", "Devolución"],"Станок":["Station", "Estación"],"материал":["material", "material"],"цена":["price", "precio"],"сумма":["sum", "suma"],"Продаю":["I sell", "Vendo"],"на чёрный рынок":["to the Black Market", "al Mercado Negro"],"на рынок города":["on a city market", "en el mercado de una ciudad"],"даёт сейчас":["pays now", "paga ahora"],"средняя 7 дней":["7-day average", "media de 7 días"],"обычная за месяц":["monthly normal", "normal del mes"],"Вложить":["Invest", "Invertir"],"Выручка на руки":["Net revenue", "Ingresos netos"],"Профит":["Profit", "Ganancia"],"Маржа":["Margin", "Margen"],"Профит со штуки":["Profit per piece", "Ganancia por unidad"],"← к поиску":["← to search", "← a la búsqueda"],"артефакт":["artifact", "artefacto"],"своя":["own", "propio"],"нет цены":["no price", "sin precio"],"авто":["auto", "auto"],"% дней":["% of days","% de días"],"/д":["/day","/día"],"10 мин":["10 min","10 min"],"12 ч":["12 h","12 h"],"24 ч":["24 h","24 h"],"3 ч":["3 h","3 h"],"30 мин":["30 min","30 min"],"5 мин":["5 min","5 min"],"6 ч":["6 h","6 h"],"English · скоро":["English","English"],"Español · скоро":["Español","Español"],"Europe · чёрный рынок и города":["Europe · Black Market and cities","Europe · Mercado Negro y ciudades"],"Europe-сервер · живые цены Albion Online Data Project · выбери раздел":["Europe server · live prices from Albion Online Data Project · pick a section","Servidor Europe · precios en vivo de Albion Online Data Project · elige una sección"],"Автообновление":["Auto-refresh","Auto-actualizar"],"Без подписи":["No subtitle","Sin subtítulo"],"Безопасные маршруты":["Safe routes","Rutas seguras"],"Бресильен":["Brecilien","Brecilien"],"Бриджуотч":["Bridgewatch","Bridgewatch"],"Бюджет":["Budget","Presupuesto"],"В плюсе ≥":["In profit ≥","En ganancia ≥"],"Варить зелья и готовить еду на продажу.":["Brew potions and cook food to sell.","Prepara pociones y comida para vender."],"Вернуться к выбору раздела":["Back to section list","Volver a la lista de secciones"],"Взвешенно по всем качествам":["Weighted across all qualities","Ponderado por todas las calidades"],"Все":["All","Todo"],"Все города":["All cities","Todas las ciudades"],"Второй язык, подписью":["Second language, as subtitle","Segundo idioma, como subtítulo"],"Выставить ордер (дороже, но ждать)":["Place an order (more, but you wait)","Poner una orden (más, pero esperas)"],"Город":["City","Ciudad"],"Город крафта":["Crafting city","Ciudad de fabricación"],"Города маршрута":["Route cities","Ciudades de la ruta"],"Данные":["Data","Datos"],"Данные не старше":["Data no older than","Datos no más viejos de"],"Данные: Albion Online Data Project (краудсорсинг) · Иконки: официальный Render API":["Data: Albion Online Data Project (crowdsourced) · Icons: official Render API","Datos: Albion Online Data Project (colaborativo) · Iconos: Render API oficial"],"Дневной бонус":["Daily bonus","Bono diario"],"Дней":["Days","Días"],"Добавить в маршрут":["Add to route","Añadir a la ruta"],"Живые цены с рынков Albion, сервер Europe. Выбери, чем хочешь заняться.":["Live prices from Albion markets, Europe server. Pick what you want to do.","Precios en vivo de los mercados de Albion, servidor Europe. Elige qué quieres hacer."],"Зачар.":["Ench.","Encant."],"Как получится":["Whatever fits","Lo que encaje"],"Камни":["Runes","Runas"],"Канал":["Channel","Canal"],"Карлеон":["Caerleon","Caerleon"],"Категория":["Category","Categoría"],"Качество":["Quality","Calidad"],"Купить":["Buy","Comprar"],"Купить вещь на рынке и сдать дороже на чёрный рынок. Ничего делать не надо.":["Buy an item on the market and flip it to the Black Market. No crafting involved.","Compra un objeto en el mercado y véndelo más caro en el Mercado Negro. Sin fabricar nada."],"Купить дёшево в одном городе, продать дорого в другом. Везёшь сам.":["Buy cheap in one city, sell high in another. You carry it yourself.","Compra barato en una ciudad y vende caro en otra. Tú lo transportas."],"Купить шкуры или руду, переработать в кожу или бруски и продать. Никуда ехать не надо.":["Buy hides or ore, refine into leather or bars and sell. No travel needed.","Compra pieles o mineral, refínalos en cuero o lingotes y vende. Sin viajar."],"Купить шмотку":["Buy gear","Comprar equipo"],"Лайт":["Lite","Simple"],"Лайт показывает только главное. Про открывает все колонки и настройки.":["Lite shows only the essentials. Pro opens every column and setting.","Simple muestra solo lo esencial. Pro abre todas las columnas y ajustes."],"Лимхёрст":["Lymhurst","Lymhurst"],"Лучший маршрут":["Best route","Mejor ruta"],"Маржа %":["Margin %","Margen %"],"Маржа ≥":["Margin ≥","Margen ≥"],"Мартлок":["Martlock","Martlock"],"Маршрут":["Route","Ruta"],"Мне за день":["My daily take","Mi ganancia diaria"],"На главный экран":["To the home screen","A la pantalla principal"],"Названия":["Names","Nombres"],"Настройки":["Settings","Ajustes"],"⚙ Настройки":["⚙ Settings","⚙ Ajustes"],"Настройки: язык и стиль":["Settings: language and style","Ajustes: idioma y estilo"],"Объём ≥":["Volume ≥","Volumen ≥"],"Обычное (консервативно)":["Normal (conservative)","Normal (conservador)"],"Обычный":["Plain","Normal"],"Опасно ли сейчас везти товар в Карлеон.":["How risky it is to haul goods to Caerleon right now.","Qué tan arriesgado es llevar mercancía a Caerleon ahora."],"Пиксельный":["Pixel","Pixel"],"Поднять вещи зачарование камнями и продать дороже.":["Enchant gear with runes and sell it for more.","Encanta equipo con runas y véndelo más caro."],"Поиск предмета…":["Search for an item…","Buscar un objeto…"],"Пока не переведено":["Not translated yet","Aún sin traducir"],"Чёрный рынок зелья и еду не принимает, продажа только на городские рынки.":["The Black Market does not take potions or food — they sell on city markets only.","El Mercado Negro no acepta pociones ni comida: solo se venden en los mercados de las ciudades."],"назад":["back","atrás"],"только что":["just now","ahora mismo"],"Цены живые, их собирают сами игроки через Albion Online Data Project. Нажми на строку, чтобы увидеть, из чего она сложилась. Переключись на «Про», если нужны все колонки и настройки.":["Prices are live — players collect them themselves through the Albion Online Data Project. Click a row to see how it adds up. Switch to Pro if you want every column and setting.","Los precios son en vivo: los recogen los propios jugadores mediante Albion Online Data Project. Pulsa una fila para ver cómo se forma. Cambia a Pro si quieres todas las columnas y ajustes."],"🔒 Пока карточка открыта, порядок строк не меняется, чтобы строка не убегала вниз при правке цены. Закрой карточку, и таблица пересортируется.":["🔒 While a card is open the rows stay put, so the one you are editing does not slide away. Close the card and the table sorts itself again.","🔒 Mientras una ficha está abierta las filas no se mueven, para que la que editas no se te escape. Cierra la ficha y la tabla vuelve a ordenarse."],"Введи хотя бы две буквы. Хватит и трёх первых от каждого слова: «мас пла» найдёт «Плащ (мастер)», а «und cap» найдёт «Undead Cape». Ищет по названию на двух языках и по коду предмета. Тир и зачарование сужают выдачу: «плащ» + тир 6 + зачар. 2 даст ровно то, что нужно.":["Type at least two letters. The first three of each word are enough: “mas cap” finds “Master's Cape”, “und cap” finds “Undead Cape”. It searches names in both languages and the item code. Tier and enchantment narrow the list: “cape” + tier 6 + ench. 2 gives exactly what you want.","Escribe al menos dos letras. Bastan las tres primeras de cada palabra: “mae cap” encuentra “Capa del maestro” y “und cap” encuentra “Undead Cape”. Busca por el nombre en dos idiomas y por el código del objeto. El nivel y el encantamiento afinan la lista: “capa” + nivel 6 + encant. 2 da justo lo que quieres."],"сбросить тир и зачарование":["clear tier and enchantment","quitar nivel y encantamiento"],"← к поиску":["← to search","← a la búsqueda"],"ресурс/материал":["resource / material","recurso / material"],"🛒 дешевле купить:":["🛒 cheapest to buy:","🛒 más barato para comprar:"],"💰 дороже сдать:":["💰 best instant sale:","💰 mejor venta instantánea:"],"🖤 ЧР даёт сейчас:":["🖤 BM pays now:","🖤 El MN paga ahora:"],"🖤 ЧР сделки:":["🖤 BM trades:","🖤 Operaciones del MN:"],"🖤 ЧР средняя 7д:":["🖤 BM 7-day average:","🖤 Media de 7 días del MN:"],"🖤 ЧР мой ордер:":["🖤 BM my order:","🖤 MN mi orden:"],"🖤 ЧР ордера на продажу:":["🖤 BM sell orders:","🖤 MN órdenes de venta:"],"Продаж/д":["Sold/day","Ventas/día"],"лучший сбыт":["best outlet","mejor salida"],"🖤 Чёрный рынок":["🖤 Black Market","🖤 Mercado Negro"],"Даёт сейчас":["Pays now","Paga ahora"],"Посл. сделки":["Last trades","Últimas ventas"],"Объём/день":["Volume/day","Volumen/día"],"Цена":["Price","Precio"],"На чёрном рынке сделок по этому предмету за неделю не зафиксировано.":["No Black Market trades were recorded for this item over the past week.","No se registraron operaciones en el Mercado Negro para este objeto en la última semana."],"Верхнее число это самый дешёвый селл-ордер, за сколько купить.":["The top number is the cheapest sell order — what you pay to buy it.","El número de arriba es la orden de venta más barata: lo que pagas por comprarlo."],"Синее":["Blue","Azul"],"это максимальный бай-ордер (за сколько сдать мгновенно). Рядом возраст цены. Если он":["is the highest buy order — what you get for an instant sale. Next to it is the age of the price. If it is","es la orden de compra más alta: lo que recibes por una venta instantánea. Al lado va la antigüedad del precio. Si está"],"красный":["red","en rojo"],", цене больше суток: её никто не обновлял, показываем как есть, но в игре она наверняка уже другая. По чёрному рынку в расчёт профита идёт «даёт сейчас», но не выше «обычной за месяц»: заявка НПС скачет по часам и регулярно висит вдвое выше того, за сколько предмет реально уходит. Число рядом с обычной ценой, сколько дней из тридцати по этому качеству вообще были сделки; если их мало, доверия к строке меньше.":[", the price is over a day old: nobody has refreshed it. We show it as it is, but in game it is almost certainly different by now. For the Black Market the profit uses “pays now”, but never above the “monthly normal”: the NPC bid jumps around by the hour and regularly sits at twice what the item actually sells for. The number next to the normal price is how many days out of thirty this quality traded at all; if it is low, trust the row less.",", el precio tiene más de un día: nadie lo ha actualizado. Lo mostramos tal cual, pero en el juego seguro que ya es otro. Para el Mercado Negro la ganancia se calcula con “paga ahora”, pero nunca por encima de lo “normal del mes”: la oferta del NPC salta de hora en hora y a menudo se queda al doble de lo que el objeto realmente vale. El número junto al precio normal indica cuántos días de treinta hubo operaciones de esa calidad; si son pocos, fíate menos de la fila."],"💾 Приложение для Mac":["💾 Mac app","💾 App para Mac"],"Собирает цены прямо из игры на твоём компьютере: в таблицах появляются свежие цены и твои собственные ордера.":["It reads prices straight from the game on your own computer, so the tables show fresh prices and your own orders.","Lee los precios directamente del juego en tu propio ordenador, así las tablas muestran precios frescos y tus propias órdenes."],"Apple Silicon · macOS 13 и новее · 27 МБ. Фан-проект без подписи Apple: при первом запуске macOS попросит разрешить его вручную.":["Apple Silicon · macOS 13 or newer · 27 MB. A fan project, not signed by Apple: on first launch macOS will ask you to allow it by hand.","Apple Silicon · macOS 13 o superior · 27 MB. Proyecto de fans, sin firma de Apple: al abrirlo por primera vez macOS te pedirá permitirlo a mano."],"Скачать для macOS":["Download for macOS","Descargar para macOS"],"Страница загрузки на GitHub":["Download page on GitHub","Página de descarga en GitHub"],"Поменять города местами":["Swap the cities","Intercambiar las ciudades"],"Посмотреть, сколько стоит любая вещь во всех городах.":["See what any item costs in every city.","Mira cuánto cuesta cualquier objeto en cada ciudad."],"Предмет":["Item","Objeto"],"Премиум (4%)":["Premium (4%)","Premium (4%)"],"Про":["Pro","Pro"],"Продаж в день":["Sold per day","Ventas por día"],"Продажа":["Sale","Venta"],"Продажа на ЧР":["Selling on the BM","Venta en el MN"],"Продать":["Sell","Vender"],"Продать (ЧР)":["Sell (BM)","Vender (MN)"],"Профит/шт":["Profit each","Ganancia c/u"],"Пул/день":["Pool per day","Bolsa por día"],"Режим":["Mode","Modo"],"Режим переработки":["Refining mode","Modo de refinado"],"Ресурс":["Resource","Recurso"],"Русский":["Русский","Русский"],"Сбросить кэш и загрузить свежие цены":["Clear the cache and fetch fresh prices","Vaciar la caché y traer precios nuevos"],"Свежесть снимка данных":["How fresh the price snapshot is","Qué tan reciente es la instantánea de precios"],"Сдать сразу (гарантированно)":["Sell instantly (guaranteed)","Vender al instante (garantizado)"],"Сделать вещь и продать дороже, чем стоили материалы. Начни отсюда.":["Craft an item and sell it for more than the materials cost. Start here.","Fabrica un objeto y véndelo por más de lo que costaron los materiales. Empieza aquí."],"Себестоимость":["Cost","Coste"],"Снимок сервера ·":["Server snapshot ·","Instantánea del servidor ·"],"Снять отметки и снова считать по всем городам":["Clear the picks and count all cities again","Quitar la selección y volver a contar todas las ciudades"],"Стабильно в плюсе":["Days in profit","Días en ganancia"],"Станок/100 пит.":["Station/100 nutr.","Estación/100 nutr."],"Стиль":["Style","Estilo"],"Стукни по ней":["Give it a whack","Dale un golpe"],"Сырьё сам":["Refine raw myself","Refinar yo mismo"],"Тетфорд":["Thetford","Thetford"],"Тир":["Tier","Nivel"],"Увожу, кг":["I can carry, kg","Puedo llevar, kg"],"Ф-Стерлинг":["F. Sterling","F. Sterling"],"Фан-проект, никак не связан с Sandbox Interactive. Albion Online — торговая марка SBI.":["A fan project, not affiliated with Sandbox Interactive. Albion Online is a trademark of SBI.","Proyecto de fans, sin relación con Sandbox Interactive. Albion Online es marca registrada de SBI."],"Фокус":["Focus","Enfoque"],"Цена продажи":["Sale price","Precio de venta"],"Цены загружаются в фоне, выбирай раздел…":["Prices are loading in the background, pick a section…","Los precios se cargan en segundo plano, elige una sección…"],"Язык интерфейса":["Interface language","Idioma de la interfaz"],"Язык названий":["Item names language","Idioma de los nombres"],"без лимита":["no limit","sin límite"],"бета":["beta","beta"],"все":["all","todo"],"все тиры":["all tiers","todos los niveles"],"выкл":["off","apagado"],"куда: любой":["to: any","a: cualquiera"],"любое":["any","cualquiera"],"откуда: любой":["from: any","de: cualquiera"],"предметов":["items","objetos"],"с историей ЧР":["with BM history","con historial del MN"],"сбросить":["reset","reiniciar"],"устарело":["stale","obsoleto"],"← Разделы":["← Sections","← Secciones"],"♻️ Переработка":["♻️ Refining","♻️ Refinado"],"✎ своих цен:":["✎ own prices:","✎ precios propios:"],"⟳ Обновить":["⟳ Refresh","⟳ Actualizar"],"⭐ Золотая середина":["⭐ Sweet spot","⭐ Punto justo"],"🐂 Флиппинг между городами":["🐂 City-to-city flipping","🐂 Reventa entre ciudades"],"💎 Рунофикация":["💎 Enchanting","💎 Encantamiento"],"📍 На месте":["📍 On the spot","📍 En el sitio"],"📍 На месте (локальный цикл)":["📍 On the spot (local loop)","📍 En el sitio (ciclo local)"],"🔍 Цены предмета":["🔍 Item prices","🔍 Precios de objeto"],"🔒 своих цен:":["🔒 own prices:","🔒 precios propios:"],"🖤 Флиппинг → ЧР":["🖤 Flipping → BM","🖤 Reventa → MN"],"🖤 Флиппинг → Чёрный рынок":["🖤 Flipping → Black Market","🖤 Reventa → Mercado Negro"],"🛠 Крафт":["🛠 Crafting","🛠 Fabricación"],"🛡 Безопасный крафт":["🛡 Safe crafting","🛡 Fabricación segura"],"🛡 Дороги в Карлеон":["🛡 Roads to Caerleon","🛡 Caminos a Caerleon"],"🛡 Дороги в Карлеон · БЕТА":["🛡 Roads to Caerleon · BETA","🛡 Caminos a Caerleon · BETA"],"🧪 Зелья и еда":["🧪 Potions and food","🧪 Pociones y comida"],"🧭 Оптимальный маршрут (2 или 3 города по пути)":["🧭 Optimal route (2 or 3 cities on the way)","🧭 Ruta óptima (2 o 3 ciudades en el camino)"],"ТОП":["TOP","TOP"],"бонус":["bonus","bono"],"дн":["d","d"],"обычно":["usually","normal"],"шт.":["pcs","uds"],"шт":["pcs","uds"],"нет":["none","ninguno"],"Всего":["Total","Total"],"Итого сырья":["Materials total","Total de materiales"],"На 1 шт":["Per 1","Por 1"],"На шт":["Per pc","Por ud"],"На партию":["Per batch","Por lote"],"Цена (ред.)":["Price (edit)","Precio (edit.)"],"Купить всего":["Buy in total","Comprar en total"],"Сумма":["Sum","Suma"],"Стоимость":["Cost","Coste"],"Кол-во":["Qty","Cant."],"Что":["What","Qué"],"Хочу":["I want","Quiero"],"берём":["we take","tomamos"],"крафтим":["we craft","fabricamos"],"перерабатываем":["we refine","refinamos"],"Закупка":["Buying","Compra"],"впритык, с возвратом":["just enough, with returns","lo justo, con devolución"],"на всё количество":["full recipe, no returns","receta completa"],"Маржа по дням":["Margin by day","Margen por día"],"(три недели, наведи на столбик)":["(three weeks, hover a bar)","(tres semanas, pasa sobre una barra)"],"🧮 Расчёт партии:":["🧮 Batch calculator:","🧮 Calculadora de lote:"],"🧮 Калькулятор партии:":["🧮 Batch calculator:","🧮 Calculadora de lote:"],"📓 Журналы:":["📓 Journals:","📓 Diarios:"],"Журналы":["Journals","Diarios"],"к профиту партии":["to the batch profit","a la ganancia del lote"],"Купить пустых:":["Buy empty ones:","Comprar vacíos:"],"Заполнится целиком:":["Will fill completely:","Se llenarán del todo:"],"вложение":["invested","invertido"],"→ выручка":["→ revenue","→ ingresos"],"профит":["profit","ganancia"],"Профит:":["Profit:","Ganancia:"],"Профит партии:":["Batch profit:","Ganancia del lote:"],"профит/день":["profit per day","ganancia por día"],"Себестоимость штуки:":["Cost per piece:","Coste por unidad:"],"Возврат ресурсов:":["Resource return:","Devolución de recursos:"],"Станок за партию:":["Station per batch:","Estación por lote:"],"Вложить:":["Invest:","Invertir:"],"→ нетто":["→ net","→ neto"],"→ на руки":["→ in hand","→ en mano"],"Сдать сразу:":["Sell instantly:","Vender al instante:"],"ЧР, ордером":["BM, by order","MN, con orden"],"ЧР · сразу":["BM · instant","MN · al instante"],"ЧР по качествам":["BM by quality","MN por calidad"],"Бай-ордер":["Buy order","Orden de compra"],"Ордер на продажу":["Sell order","Orden de venta"],"Обычная за месяц":["Monthly normal","Normal del mes"],"Обычная цена за месяц:":["Monthly normal price:","Precio normal del mes:"],"За месяц сделки на ЧР закрывались по":["Over the month BM deals closed at","Durante el mes las ventas en el MN cerraron a"],"твой ордер выше нормы на":["your order is above normal by","tu orden está por encima de lo normal en"],", он может простоять":[", it may just sit there",", puede quedarse sin venderse"],"Средняя 7д":["7-day average","Media de 7 días"],"Объём/д":["Volume/day","Volumen/día"],"Обычное":["Normal","Normal"],"Хорошее":["Good","Bueno"],"руны":["runes","runas"],"Ингредиент":["Ingredient","Ingrediente"],"Где купить":["Where to buy","Dónde comprar"],"Обычное сырьё:":["Plain materials:","Materiales normales:"],"без возврата":["no returns","sin devolución"],"▸ разбор":["▸ breakdown","▸ desglose"],"любой":["any","cualquiera"],"по":["at","a"],"Ничего не найдено. Ослабь фильтры или подожди, пока загрузятся данные.":["Nothing found. Loosen the filters or wait for the data to load.","No se encontró nada. Afloja los filtros o espera a que carguen los datos."],"🔍 Поиск цены предмета или ресурса":["🔍 Look up the price of an item or resource","🔍 Busca el precio de un objeto o recurso"],"упор в закупку":["capped by buying","limitado por la compra"],"купить сырьё, переработать и продать, всё в одном городе":["buy raw, refine and sell, all in one city","compra materia prima, refina y vende, todo en una ciudad"]};
 
 // Фразы, внутри которых стоят числа: точным совпадением их не поймать,
 // поэтому для них правила с подстановкой. Числа переносятся как есть.
@@ -1533,7 +1555,10 @@ function matPrice(mid, city){
 // ─── Утилиты ───
 const $ = id => document.getElementById(id);
 const fmt = n => n==null?'нет':Math.round(n).toLocaleString('ru-RU');
-const enc = s => encodeURIComponent(s);
+// Рендер иконок не принимает @ в процентной форме: T4_HEAD_CLOTH_SET1%401 отдаёт 404,
+// а T4_HEAD_CLOTH_SET1@1 отдаёт картинку. Кодируем всё, кроме @, иначе у каждой
+// зачарованной вещи, зелья и материала иконка не грузится.
+const enc = s => encodeURIComponent(s).replace(/%40/g,'@');
 const hoursAgo = ts => ts==null||ts===0 ? 1e9 : (typeof ts==='number' ? (Date.now()-ts*6e4)/3.6e6 : (Date.now()-new Date(ts+'Z').getTime())/3.6e6);
 // возраст по метке времени в миллисекундах, коротко, для подписей рядом с ценой
 const ageTxt = ts => { if(!ts) return ''; const h=(Date.now()-ts)/3.6e6;
@@ -2796,6 +2821,16 @@ function render(){
     wrap.querySelectorAll('tr.row[data-open]').forEach(tr=>tr.onclick=()=>{ S.itemSel=tr.dataset.open; render(); });
     return;
   }
+  if(S.tab==='isl'){
+    wrap.innerHTML = islandsHTML();
+    wireIslands();
+    return;
+  }
+  if(S.tab==='calc'){
+    wrap.innerHTML = calcTabHTML();
+    wireCalc();
+    return;
+  }
   if(S.tab==='roads'){
     wrap.innerHTML = roadsHTML();
     const rb=$('roadsReload'); if(rb) rb.onclick=()=>{ S.roads.loaded=false; loadRoads(); };
@@ -4043,6 +4078,410 @@ function itemCardHTML(id){
   out += `<div class="fresh" style="margin-top:12px">Верхнее число это самый дешёвый селл-ордер, за сколько купить. <span style="color:var(--blue)">Синее</span> это максимальный бай-ордер (за сколько сдать мгновенно). Рядом возраст цены. Если он <span class="aold">красный</span>, цене больше суток: её никто не обновлял, показываем как есть, но в игре она наверняка уже другая. По чёрному рынку в расчёт профита идёт «даёт сейчас», но не выше «обычной за месяц»: заявка НПС скачет по часам и регулярно висит вдвое выше того, за сколько предмет реально уходит. Число рядом с обычной ценой, сколько дней из тридцати по этому качеству вообще были сделки; если их мало, доверия к строке меньше.</div></div>`;
   return out;
 }
+// ─── 🧮 Калькулятор: ручной расчёт одной позиции ───────────────────────────
+// Отличие от раздела «Крафт»: там перебор всего подряд по городским станкам,
+// здесь одна позиция и все допущения открыты для правки. Нужно для убежищ,
+// где процент возврата и плата за станок свои, и для прикидок «а если».
+const CALC_ICO = (id,sz) => 'https://render.albiononline.com/v1/item/'+enc(id)+'.png?size='+(sz||40);
+function calcInit(){
+  if(S.calc) return;
+  S.calc = {q:'', tier:'', ench:'', sel:null, qty:1,
+            place:'city', city:'Caerleon', ret:null, fee:null, focus:false,
+            sell:'bm', bmSrc:'now', sellCity:'Caerleon', qual:1, px:{}, sellPx:null};
+}
+function calcItem(){
+  const id=S.calc.sel; if(!id) return null;
+  return (DATA.items||[]).find(x=>x.id===id) || (DATA.cons||[]).find(x=>x.id===id) || null;
+}
+// Возврат ресурсов. В городе считаем как обычно (база + специализация + фокус),
+// в убежище специализации нет, поэтому только база и фокус. Поле всё равно
+// редактируемое: у гильдий станки настроены по-своему, пусть вбивают факт.
+function calcAutoRet(){
+  const c=S.calc, it=calcItem(); if(!it) return CFG.cityBase;
+  if(c.place==='hide') return Math.min(0.95, rr(CFG.cityBase + (c.focus?CFG.focus:0)));
+  const bonus = BONUS_CITY_OF[it.cat]===c.city;
+  return returnRate(bonus, c.focus, 0);
+}
+function calcRet(){ const c=S.calc; return c.ret==null ? calcAutoRet() : Math.max(0,Math.min(.95,c.ret/100)); }
+function calcFee(){ const c=S.calc; return c.fee==null ? (+$('feeInp').value||0) : c.fee; }
+// Цена материала: сначала ручная правка, потом рынок города закупки.
+function calcMatPx(mid){
+  const c=S.calc;
+  if(c.px[mid]!=null) return {price:c.px[mid], own:true};
+  const p = effMatPrice(mid, c.city) || matPrice(mid, c.city);
+  return p ? {price:p.price, age:p.age} : null;
+}
+function calcCost(){
+  const it=calcItem(); if(!it) return null;
+  const noRet = it.noRet ? new Set(it.noRet) : null;
+  let raw=0, rawNoRet=0, miss=[];
+  const rows=[];
+  for(const [m,n] of Object.entries(it.mats||{})){
+    const p=calcMatPx(m);
+    if(!p){ miss.push(m); rows.push({id:m,n,price:null,sum:null}); continue; }
+    const sum=p.price*n;
+    if(noRet && noRet.has(m)) rawNoRet+=sum; else raw+=sum;
+    rows.push({id:m,n,price:p.price,sum,own:p.own});
+  }
+  let artCost=0, artId=null;
+  if(it.art){
+    artId=it.art.id;
+    const px = S.calc.px[artId]!=null ? {price:S.calc.px[artId], own:true} : artBest(artId, S.calc.city);
+    if(px){ artCost=px.price*it.art.n; rows.push({id:artId,n:it.art.n,price:px.price,sum:artCost,own:px.own,art:true}); }
+    else { miss.push(artId); rows.push({id:artId,n:it.art.n,price:null,sum:null,art:true}); }
+  }
+  const ret=calcRet();
+  const fee=(it.iv||0)*CFG.nutritionFactor*calcFee()/100;
+  const batch=it.batch||1;
+  const total = raw*(1-ret)+rawNoRet+artCost+fee;
+  return {rows, raw, rawNoRet, artCost, ret, fee, batch, miss,
+          perCraft: total, perOne: total/batch,
+          cashPerCraft: raw+rawNoRet+artCost+fee};
+}
+// Цена продажи. Для ЧР даём выбор источника: заявка сейчас, средняя за неделю,
+// обычная за месяц. Последняя самая консервативная, на ней и строим по умолчанию.
+function calcSellAuto(){
+  const c=S.calc, it=calcItem(); if(!it) return null;
+  if(c.sell==='bm'){
+    const bm=S.bm && S.bm[it.id]; if(!bm) return null;
+    const q=bm.qs && bm.qs[c.qual]; if(!q) return null;
+    if(c.bmSrc==='avg')  return q.last||null;
+    if(c.bmSrc==='base') return q.base||null;
+    const r=bmQ(bm, c.qual, false);
+    return r ? r.price : (q.price||null);
+  }
+  const cp = S.cityPrices && S.cityPrices[it.id] && S.cityPrices[it.id][c.sellCity];
+  const q = cp && cp[c.qual];
+  return q && q.sell ? q.sell : null;
+}
+function calcSell(){ const c=S.calc; return c.sellPx!=null ? c.sellPx : calcSellAuto(); }
+function calcTotals(){
+  const cost=calcCost(); if(!cost) return null;
+  const px=calcSell();
+  const c=S.calc, qty=Math.max(1, +c.qty||1);
+  const tax = ($('premChk') && $('premChk').checked) ? 0.04 : 0.08;
+  const order = c.sell==='bm' ? 0 : CFG.setupFee;   // на ЧР сдаём заявке НПС, сбора нет
+  const net = px==null ? null : px*(1-tax-order);
+  const crafts = Math.ceil(qty/cost.batch);
+  const invest = cost.perCraft*crafts;
+  const revenue = net==null ? null : net*qty;
+  return {cost, px, net, tax, order, qty, crafts, invest, revenue,
+          profit: revenue==null?null:revenue-invest,
+          margin: (revenue==null||!invest)?null:(revenue-invest)/invest*100,
+          perOne: net==null?null:net-cost.perOne};
+}
+function calcSearchList(){
+  const q=(S.calc.q||'').trim().toLowerCase();
+  if(q.length<2) return [];
+  const t=S.calc.tier, e=S.calc.ench;
+  const pool=[...(DATA.items||[]), ...(DATA.cons||[])];
+  const hit=o=>{
+    if(t!=='' && +o.tier!==+t) return false;
+    if(e!=='' && +o.ench!==+e) return false;
+    const hay=((o.en||'')+' '+(o.ru||'')+' '+o.id).toLowerCase();
+    return q.split(/\s+/).every(w=>hay.includes(w));
+  };
+  return pool.filter(hit).slice(0,60);
+}
+function calcTabHTML(){
+  calcInit();
+  const c=S.calc;
+  if(!c.sel){
+    const opts=(vals,cur,any)=>`<option value="">${any}</option>`+vals.map(v=>`<option value="${v}"${String(cur)===String(v)?' selected':''}>${v}</option>`).join('');
+    let out=`<div class="panel"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <b>🧮 Что считаем</b>${backBtnHTML()}</div>
+      <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <input type="text" id="calcQ" value="${(c.q||'').replace(/"/g,'&quot;')}"
+          placeholder="Название на английском или русском: bow, посох, кольчуга…" style="flex:1 1 320px;max-width:460px;font-size:14px;padding:9px 12px">
+        <label class="ctl">Тир <select id="calcTier">${opts([1,2,3,4,5,6,7,8],c.tier,'любой')}</select></label>
+        <label class="ctl">Зачар. <select id="calcEnch">${opts([0,1,2,3,4],c.ench,'любое')}</select></label>
+      </div>`;
+    const list=calcSearchList();
+    if((c.q||'').trim().length<2) out+=`<div class="fresh" style="margin-top:12px">Введи хотя бы две буквы. Тир и зачарование сужают выдачу.</div>`;
+    else if(!list.length) out+=`<div class="fresh" style="margin-top:12px">Ничего не найдено.</div>`;
+    else out+=`<table style="margin-top:12px"><tbody>`+list.map(o=>
+      `<tr class="row" data-pick="${o.id}"><td style="width:46px"><img src="${CALC_ICO(o.id,40)}" style="width:36px;height:36px;vertical-align:middle" loading="lazy"></td>
+       <td><b>${nmA(o)}</b><div class="fresh">T${o.tier}${o.ench?'.'+o.ench:''} · ${o.id}</div></td></tr>`).join('')+`</tbody></table>`;
+    return out+`</div>`;
+  }
+  const it=calcItem();
+  if(!it) return `<div class="panel">Предмет не найден. <button id="calcBack">← к поиску</button></div>`;
+  const T=calcTotals(), cost=T&&T.cost;
+  const ret=calcRet(), autoRet=calcAutoRet();
+  const px=calcSell(), auto=calcSellAuto();
+  const cityOpts=cur=>CITIES.map(x=>`<option${x===cur?' selected':''}>${x}</option>`).join('');
+  const money=v=>v==null?'—':fmt(v);
+  const sign=v=>v==null?'':(v>=0?'pos':'neg');
+
+  let out=`<div class="panel"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <button id="calcBack" class="ctl" style="cursor:pointer">← к поиску</button>
+      <img src="${CALC_ICO(it.id,64)}" style="width:44px;height:44px;vertical-align:middle">
+      <b style="font-size:16px">${nmA(it)}</b>
+      <span class="badge">T${it.tier}${it.ench?'.'+it.ench:''}</span>
+      ${it.batch>1?`<span class="badge">партия ${it.batch} шт</span>`:''}
+    </div>`;
+
+  // ── где крафчу ──
+  out+=`<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <label class="ctl">Где крафчу
+      <select id="calcPlace">
+        <option value="city"${c.place==='city'?' selected':''}>город</option>
+        <option value="hide"${c.place==='hide'?' selected':''}>убежище</option>
+      </select></label>
+    <label class="ctl">Материалы беру в <select id="calcCity">${cityOpts(c.city)}</select></label>
+    <label class="ctl"><input type="checkbox" id="calcFocus"${c.focus?' checked':''}> фокус</label>
+    <label class="ctl">Возврат <input type="number" id="calcRet" step="0.1" min="0" max="95" value="${(ret*100).toFixed(1)}" style="width:74px"> %</label>
+    <label class="ctl">Станок <input type="number" id="calcFee" min="0" value="${calcFee()}" style="width:80px"> /100 пит.</label>
+    ${c.ret!=null?`<button id="calcRetAuto" class="ctl" style="cursor:pointer">авто ${(autoRet*100).toFixed(1)}%</button>`:''}
+  </div>
+  <div class="fresh" style="margin-top:6px">${c.place==='hide'
+      ? 'В убежище городской специализации нет: база плюс фокус. Если у вашей гильдии станок настроен иначе, впиши процент руками.'
+      : 'Город даёт специализацию, если предмет его профиля. Процент можно перебить руками.'}</div>`;
+
+  // ── материалы ──
+  out+=`<table style="margin-top:14px"><thead><tr><th></th><th>материал</th><th>шт</th><th>цена</th><th>сумма</th></tr></thead><tbody>`;
+  for(const r of (cost?cost.rows:[])){
+    const nmo=(DATA.matNames&&DATA.matNames[r.id])||{};
+    const label=nmA(nmo)||r.id;
+    out+=`<tr><td style="width:40px"><img src="${CALC_ICO(r.id,32)}" style="width:28px;height:28px;vertical-align:middle" loading="lazy"></td>
+      <td>${label}${r.art?' <span class="badge">артефакт</span>':''}<div class="fresh">${r.id}</div></td>
+      <td>${r.n}</td>
+      <td><input type="number" class="calcPx" data-m="${r.id}" min="0" value="${r.price!=null?Math.round(r.price):''}" placeholder="нет цены" style="width:96px">${r.own?' <span class="badge">своя</span>':''}</td>
+      <td class="num">${money(r.sum)}</td></tr>`;
+  }
+  out+=`</tbody></table>`;
+  if(cost) out+=`<div style="margin-top:10px" class="fresh">
+      Сырьё ${money(cost.raw+cost.rawNoRet+cost.artCost)} · возврат ${(cost.ret*100).toFixed(1)}% снимает ${money(cost.raw*cost.ret)} · станок ${money(cost.fee)}
+      <br><b style="color:var(--text)">Себестоимость штуки: ${money(cost.perOne)}</b>${cost.batch>1?` (за партию ${money(cost.perCraft)})`:''}
+      ${cost.miss.length?`<br><span style="color:var(--red)">Нет рыночной цены: ${cost.miss.join(', ')} — впиши руками.</span>`:''}
+    </div>`;
+
+  // ── продажа ──
+  out+=`<div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <label class="ctl">Продаю
+      <select id="calcSell">
+        <option value="bm"${c.sell==='bm'?' selected':''}>на чёрный рынок</option>
+        <option value="city"${c.sell==='city'?' selected':''}>на рынок города</option>
+      </select></label>
+    ${c.sell==='city'?`<label class="ctl">в <select id="calcSellCity">${cityOpts(c.sellCity)}</select></label>`:''}
+    <label class="ctl">Качество <select id="calcQual">${[1,2,3,4,5].map(q=>`<option value="${q}"${+c.qual===q?' selected':''}>${QUAL_RU?QUAL_RU[q]:q}</option>`).join('')}</select></label>
+    ${c.sell==='bm'?`<label class="ctl">Цена
+      <select id="calcBmSrc">
+        <option value="now"${c.bmSrc==='now'?' selected':''}>даёт сейчас</option>
+        <option value="avg"${c.bmSrc==='avg'?' selected':''}>средняя 7 дней</option>
+        <option value="base"${c.bmSrc==='base'?' selected':''}>обычная за месяц</option>
+      </select></label>`:''}
+    <label class="ctl">Цена продажи <input type="number" id="calcSellPx" min="0" value="${px!=null?Math.round(px):''}" placeholder="нет цены" style="width:110px"></label>
+    ${c.sellPx!=null&&auto!=null?`<button id="calcPxAuto" class="ctl" style="cursor:pointer">вернуть ${fmt(auto)}</button>`:''}
+    <label class="ctl">Кол-во <input type="number" id="calcQty" min="1" value="${c.qty}" style="width:80px"></label>
+  </div>
+  <div class="fresh" style="margin-top:6px">${c.sell==='bm'
+      ? 'Чёрный рынок берёт заявкой НПС, сбора за выставление нет. «Обычная за месяц» — самая честная: заявка сейчас регулярно висит вдвое выше реальных сделок.'
+      : 'На городском рынке считаем продажу своим ордером: минус налог и минус 2,5% за выставление.'}</div>`;
+
+  // ── итог ──
+  out+=`<div id="calcOut">${calcOutHTML(T)}</div></div>`;
+  return out;
+}
+function calcOutHTML(T){
+  if(!T) return '';
+  const money=v=>v==null?'—':fmt(v);
+  const cls=v=>v==null?'':(v>=0?'pos':'neg');
+  return `<div class="panel" style="margin-top:16px;background:var(--panel2)">
+    <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end">
+      <div><div class="fresh">Вложить</div><div style="font-size:20px;font-weight:700">${money(T.invest)}</div></div>
+      <div><div class="fresh">Выручка на руки</div><div style="font-size:20px;font-weight:700">${money(T.revenue)}</div></div>
+      <div><div class="fresh">Профит</div><div style="font-size:26px;font-weight:700" class="${cls(T.profit)}">${money(T.profit)}</div></div>
+      <div><div class="fresh">Маржа</div><div style="font-size:20px;font-weight:700" class="${cls(T.margin)}">${T.margin==null?'—':T.margin.toFixed(1)+'%'}</div></div>
+      <div><div class="fresh">Профит со штуки</div><div style="font-size:16px;font-weight:600" class="${cls(T.perOne)}">${money(T.perOne)}</div></div>
+    </div>
+    <div class="fresh" style="margin-top:10px">
+      ${T.qty} шт${T.cost.batch>1?` = ${T.crafts} крафтов по ${T.cost.batch}`:''} ·
+      себестоимость ${money(T.cost.perOne)} за штуку ·
+      цена продажи ${money(T.px)} минус налог ${(T.tax*100)}%${T.order?` и сбор ${(T.order*100)}%`:''} = ${money(T.net)} на руки
+    </div></div>`;
+}
+function wireCalc(){
+  const c=S.calc; if(!c) return;
+  const q=$('calcQ');
+  if(q) q.oninput=()=>{ c.q=q.value; const p=q.selectionStart; render(); const q2=$('calcQ'); if(q2){q2.focus();q2.setSelectionRange(p,p);} };
+  const t=$('calcTier'); if(t) t.onchange=()=>{ c.tier=t.value; render(); };
+  const e=$('calcEnch'); if(e) e.onchange=()=>{ c.ench=e.value; render(); };
+  document.querySelectorAll('tr[data-pick]').forEach(tr=>tr.onclick=()=>{
+    c.sel=tr.dataset.pick; c.px={}; c.sellPx=null; c.ret=null; render(); });
+  const b=$('calcBack'); if(b) b.onclick=()=>{ c.sel=null; render(); };
+  const set=(id,fn,ev)=>{ const el=$(id); if(el) el[ev||'onchange']=()=>{ fn(el); render(); }; };
+  set('calcPlace', el=>{ c.place=el.value; c.ret=null; });
+  set('calcCity',  el=>{ c.city=el.value; c.px={}; });
+  set('calcFocus', el=>{ c.focus=el.checked; c.ret=null; });
+  set('calcSell',  el=>{ c.sell=el.value; c.sellPx=null; });
+  set('calcSellCity', el=>{ c.sellCity=el.value; c.sellPx=null; });
+  set('calcBmSrc', el=>{ c.bmSrc=el.value; c.sellPx=null; });
+  set('calcQual',  el=>{ c.qual=+el.value; c.sellPx=null; });
+  const ra=$('calcRetAuto'); if(ra) ra.onclick=()=>{ c.ret=null; render(); };
+  const pa=$('calcPxAuto');  if(pa) pa.onclick=()=>{ c.sellPx=null; render(); };
+  // числовые поля: пересчитываем итог на лету, полную перерисовку — по blur
+  const live=()=>{ const o=$('calcOut'); if(o) o.innerHTML=calcOutHTML(calcTotals()); };
+  const soon=()=>setTimeout(()=>{ if(S.tab==='calc') render(); },0);
+  const num=(id,fn)=>{ const el=$(id); if(!el) return;
+    el.oninput=()=>{ fn(el.value===''?null:+el.value); live(); };
+    el.onchange=()=>{ fn(el.value===''?null:+el.value); soon(); }; };
+  num('calcRet',   v=>{ c.ret=v; });
+  num('calcFee',   v=>{ c.fee=v; });
+  num('calcSellPx',v=>{ c.sellPx=v; });
+  num('calcQty',   v=>{ c.qty=Math.max(1,v||1); });
+  document.querySelectorAll('input.calcPx').forEach(el=>{
+    const m=el.dataset.m;
+    el.oninput=()=>{ if(el.value==='') delete c.px[m]; else c.px[m]=+el.value; live(); };
+    el.onchange=()=>{ if(el.value==='') delete c.px[m]; else c.px[m]=+el.value; soon(); };
+  });
+}
+
+// ─── 🏝 Острова: грядки и пастбище на личном острове ───────────────────────
+// Цифры механики взяты из игрового дампа, а не на глаз:
+//   цикл 79200 с = 22 ч; грядка отдаёт 3–6 штук (в среднем 4,5);
+//   взрослое животное 7–11 (в среднем 9) и съедает 864/48 = 18 овощей за цикл;
+//   шанс вернуть семя зависит от тира, с фокусом прибавляется activefarmbonus.
+// Бонус острова +10% на свои культуры лежит в farmingmodifiers.xml, город к городу.
+const ISL_CITY=[
+ {k:'Fort Sterling',img:'fortsterling',bg:['#1a3356','#0b1728'],dot:'#cfe0f2'},
+ {k:'Martlock',     img:'martlock',    bg:['#152b4f','#0a1322'],dot:'#a9c3e0'},
+ {k:'Bridgewatch',  img:'bridgewatch', bg:['#4b3613','#1d1507'],dot:'#f0d094'},
+ {k:'Lymhurst',     img:'lymhurst',    bg:['#14361e','#08180e'],dot:'#8fd0a0'},
+ {k:'Thetford',     img:'thetford',    bg:['#2d1a48','#140b22'],dot:'#a88ecb'},
+ {k:'Caerleon',     img:'caerleon',    bg:['#3f1313','#1a0808'],dot:'#e0705c'},
+ {k:'Brecilien',    img:'brecilien',   bg:['#12303f','#08161f'],dot:'#8fc4dd'},
+];
+const ISL_BONUS={
+ 'Thetford':['T2_FARM_AGARIC_SEED','T5_FARM_CABBAGE_SEED','T7_FARM_MULLEIN_SEED'],
+ 'Lymhurst':['T1_FARM_CARROT_SEED','T4_FARM_BURDOCK_SEED','T5_FARM_GOOSE_GROWN','T8_FARM_PUMPKIN_SEED'],
+ 'Bridgewatch':['T2_FARM_BEAN_SEED','T4_FARM_GOAT_GROWN','T5_FARM_TEASEL_SEED','T7_FARM_CORN_SEED'],
+ 'Martlock':['T3_FARM_WHEAT_SEED','T6_FARM_POTATO_SEED','T6_FARM_FOXGLOVE_SEED','T8_FARM_COW_GROWN'],
+ 'Fort Sterling':['T3_FARM_CHICKEN_GROWN','T4_FARM_TURNIP_SEED','T6_FARM_SHEEP_GROWN','T8_FARM_YARROW_SEED'],
+ 'Caerleon':['T3_FARM_COMFREY_SEED','T5_FARM_TEASEL_SEED','T7_FARM_MULLEIN_SEED'],
+ 'Brecilien':['T1_FARM_CARROT_SEED','T2_FARM_BEAN_SEED','T3_FARM_WHEAT_SEED','T4_FARM_TURNIP_SEED',
+              'T5_FARM_CABBAGE_SEED','T6_FARM_POTATO_SEED','T7_FARM_CORN_SEED','T8_FARM_PUMPKIN_SEED']};
+const ISL_CROPS=[
+ {seed:'T1_FARM_CARROT_SEED',out:'T1_CARROT',t:1,ret:0,bon:2.0},
+ {seed:'T2_FARM_BEAN_SEED',out:'T2_BEAN',t:2,ret:.3333,bon:1.3333},
+ {seed:'T3_FARM_WHEAT_SEED',out:'T3_WHEAT',t:3,ret:.6,bon:.8},
+ {seed:'T4_FARM_TURNIP_SEED',out:'T4_TURNIP',t:4,ret:.7333,bon:.5333},
+ {seed:'T5_FARM_CABBAGE_SEED',out:'T5_CABBAGE',t:5,ret:.8,bon:.4},
+ {seed:'T6_FARM_POTATO_SEED',out:'T6_POTATO',t:6,ret:.8667,bon:.2667},
+ {seed:'T7_FARM_CORN_SEED',out:'T7_CORN',t:7,ret:.9111,bon:.1778},
+ {seed:'T8_FARM_PUMPKIN_SEED',out:'T8_PUMPKIN',t:8,ret:.9333,bon:.1333},
+ {seed:'T2_FARM_AGARIC_SEED',out:'T2_AGARIC',t:2,ret:.3333,bon:1.3333},
+ {seed:'T3_FARM_COMFREY_SEED',out:'T3_COMFREY',t:3,ret:.6,bon:.8},
+ {seed:'T4_FARM_BURDOCK_SEED',out:'T4_BURDOCK',t:4,ret:.7333,bon:.5333},
+ {seed:'T5_FARM_TEASEL_SEED',out:'T5_TEASEL',t:5,ret:.8,bon:.4},
+ {seed:'T6_FARM_FOXGLOVE_SEED',out:'T6_FOXGLOVE',t:6,ret:.8667,bon:.2667},
+ {seed:'T7_FARM_MULLEIN_SEED',out:'T7_MULLEIN',t:7,ret:.9111,bon:.1778},
+ {seed:'T8_FARM_YARROW_SEED',out:'T8_YARROW',t:8,ret:.9333,bon:.1333}];
+const ISL_ANIMALS=[
+ {baby:'T3_FARM_CHICKEN_BABY',grown:'T3_FARM_CHICKEN_GROWN',out:'T3_EGG', t:3,fav:'T3_WHEAT'},
+ {baby:'T4_FARM_GOAT_BABY',   grown:'T4_FARM_GOAT_GROWN',   out:'T4_MILK',t:4,fav:'T4_TURNIP'},
+ {baby:'T5_FARM_GOOSE_BABY',  grown:'T5_FARM_GOOSE_GROWN',  out:'T5_EGG', t:5,fav:'T5_CABBAGE'},
+ {baby:'T6_FARM_SHEEP_BABY',  grown:'T6_FARM_SHEEP_GROWN',  out:'T6_MILK',t:6,fav:'T6_POTATO'},
+ {baby:'T8_FARM_COW_BABY',    grown:'T8_FARM_COW_GROWN',    out:'T8_MILK',t:8,fav:'T8_PUMPKIN'}];
+const ISL_VEG=['T1_CARROT','T2_BEAN','T3_WHEAT','T4_TURNIP','T5_CABBAGE','T6_POTATO','T7_CORN','T8_PUMPKIN'];
+const ISL_YIELD=4.5, ISL_AYIELD=9, ISL_CYCLE_H=22, ISL_FEED=18, ISL_FEED_FAV=9, ISL_BONUS_PCT=0.10;
+const islOutOf={}; ISL_CROPS.forEach(c=>islOutOf[c.seed]=c.out); ISL_ANIMALS.forEach(a=>islOutOf[a.grown]=a.out);
+
+function islInit(){ if(!S.isl) S.isl={sel:null, plots:27, herd:9, fav:false, sortK:'day', sortD:-1}; }
+function islName(id){ const o=(DATA.matNames&&DATA.matNames[id]); return o?nmA(o):id; }
+function islPx(id, city){ const p=matPrice(id, city); return p?p.price:0; }
+function islCalc(){
+  islInit();
+  const c=S.isl, tax=$('premChk').checked?0.04:0.08;
+  const net = x => x*(1-tax-CFG.setupFee);
+  const R={};
+  for(const ci of ISL_CITY){
+    const bon=ISL_BONUS[ci.k]||[], crops=[], animals=[];
+    for(const q of ISL_CROPS){
+      const sp=islPx(q.seed, ci.k), cp=islPx(q.out, ci.k);
+      if(!sp||!cp) continue;
+      const ret=$('focusChk').checked ? (q.ret+q.bon) : q.ret;
+      const yb=bon.includes(q.seed)?ISL_BONUS_PCT:0;
+      const plot=net(ISL_YIELD*(1+yb)*cp)-sp*Math.max(0,1-ret);
+      crops.push({id:q.out,t:q.t,n:islName(q.out),seed$:sp,crop$:cp,ret,yb,plot,day:plot*c.plots*(24/ISL_CYCLE_H)});
+    }
+    let cheap=null;
+    for(const v of ISL_VEG){ const p=islPx(v,ci.k); if(p&&(!cheap||p<cheap.p)) cheap={id:v,p}; }
+    for(const a of ISL_ANIMALS){
+      const op=islPx(a.out, ci.k); if(!op||!cheap) continue;
+      const yb=bon.includes(a.grown)?ISL_BONUS_PCT:0;
+      const feedId=c.fav?a.fav:cheap.id, feedP=islPx(feedId,ci.k)||cheap.p;
+      const units=c.fav?ISL_FEED_FAV:ISL_FEED;
+      const head=net(ISL_AYIELD*(1+yb)*op)-units*feedP;
+      animals.push({id:a.out,t:a.t,n:islName(a.out),feedId,feedP,units,yb,head,day:head*c.herd*(24/ISL_CYCLE_H)});
+    }
+    crops.sort((x,y)=>y.plot-x.plot); animals.sort((x,y)=>y.head-x.head);
+    const bc=crops[0]||null, ba=animals[0]||null;
+    R[ci.k]={crops,animals,best:(!ba||(bc&&bc.day>=ba.day))?bc:ba,
+             total:(bc?bc.day:0)+(ba?ba.day:0), has:crops.length||animals.length};
+  }
+  return R;
+}
+function islandsHTML(){
+  islInit();
+  const c=S.isl, R=islCalc();
+  const ico=(id,sz)=>`<img loading="lazy" src="https://render.albiononline.com/v1/item/${enc(id)}.png?size=${sz||32}" style="width:${(sz||32)/1.6}px;height:${(sz||32)/1.6}px;vertical-align:-5px;margin-right:4px" onerror="this.style.display='none'">`;
+  const any=Object.values(R).some(x=>x.has);
+  let out=`<div class="panel"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <b>🏝 Острова</b>${backBtnHTML()}
+      <label class="ctl">грядок <input type="number" id="islPlots" min="1" max="500" value="${c.plots}" style="width:64px"></label>
+      <label class="ctl">голов <input type="number" id="islHerd" min="0" max="500" value="${c.herd}" style="width:60px"></label>
+      <label class="ctl"><input type="checkbox" id="islFav"${c.fav?' checked':''}> любимый корм</label>
+    </div>`;
+  if(!any) out+=`<div class="fresh" style="margin-top:12px">Цен по семенам пока нет в снимке: они добавлены в сбор, ближайшее обновление data.json их подтянет.</div>`;
+  out+=`<div class="islGrid">`;
+  ISL_CITY.forEach((ci,i)=>{
+    const r=R[ci.k], b=r&&r.best;
+    out+=`<div class="islCard${c.sel===i?' sel':''}" data-isl="${i}" style="background:linear-gradient(165deg,${ci.bg[0]},${ci.bg[1]})">
+      ${b?`<div class="islBest">${b.n}${b.yb?' <b>+10%</b>':''}</div>`:''}
+      <div class="islPill ${b?(r.total>=0?'pos':'neg'):'na'}">${b?fmt(r.total)+'/сут':'нет цен'}</div>
+      <img class="islArt" src="img/${ci.img}.webp" alt="${(CITY_SHORT[ci.k]||ci.k)}" loading="lazy">
+      <div class="islCap"><div class="islNm">${(CITY_SHORT[ci.k]||ci.k)}</div>
+        <div class="islBon">${(ISL_BONUS[ci.k]||[]).map(id=>islOutOf[id]?ico(islOutOf[id],40):'').join('')}</div></div>
+    </div>`;
+  });
+  out+=`</div>`;
+  // подробности выбранного острова
+  if(c.sel!=null && R[ISL_CITY[c.sel].k]){
+    const ci=ISL_CITY[c.sel], r=R[ci.k];
+    const srt=rows=>[...rows].sort((a,b)=>{const k=c.sortK==='day'?'day':(rows===r.crops?'plot':'head');
+      return c.sortD*((a[k]||0)-(b[k]||0))});
+    const tbl=(rows,head,val)=>rows.length?`<table style="margin-top:8px"><thead><tr><th>${head}</th><th>${val==='plot'?'грядка':'голова'}</th><th>сутки</th></tr></thead><tbody>`+
+      srt(rows).map(x=>`<tr><td>${ico(x.id,36)}${x.n}${x.yb?' <b class="pos">+10%</b>':''}</td>
+        <td class="${x[val]>=0?'pos':'neg'}">${fmt(x[val])}</td>
+        <td class="${x.day>=0?'pos':'neg'}">${fmt(x.day)}</td></tr>`).join('')+`</tbody></table>`
+      : `<div class="fresh" style="margin-top:8px">Нет цен по этому городу.</div>`;
+    out+=`<div class="panel" style="margin-top:16px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <b>${(CITY_SHORT[ci.k]||ci.k)}</b><span class="fresh">${c.plots} грядок · ${c.herd} голов</span>
+        <button id="islClose" class="ctl" style="cursor:pointer;margin-left:auto">закрыть</button></div>
+      ${r.best?`<div style="margin-top:8px"><span class="fresh">Всего в сутки</span>
+        <div style="font-size:24px;font-weight:700" class="${r.total>=0?'pos':'neg'}">${fmt(r.total)}</div></div>`:''}
+      <div class="fresh" style="margin-top:10px">Бонус острова +10%: ${(ISL_BONUS[ci.k]||[]).map(id=>islOutOf[id]?ico(islOutOf[id],32)+islName(islOutOf[id]):'').join(' · ')}</div>
+      <div class="fresh" style="margin-top:14px"><b>🌱 Грядки</b></div>${tbl(r.crops,'культура','plot')}
+      <div class="fresh" style="margin-top:14px"><b>🐄 Пастбище</b></div>${tbl(r.animals,'животное','head')}
+      <div class="fresh" style="margin-top:10px">Цикл 22 часа. Грядка даёт 3–6 штук, в среднем 4,5. Животное даёт 7–11, в среднем 9, и съедает ${c.fav?ISL_FEED_FAV+' любимых овощей':ISL_FEED+' любых овощей'} за цикл. Цифры из игрового дампа.</div>
+    </div>`;
+  }
+  return out+`</div>`;
+}
+function wireIslands(){
+  islInit();
+  const c=S.isl;
+  const n=(id,fn)=>{ const el=$(id); if(el) el.onchange=()=>{ fn(el); render(); }; };
+  n('islPlots', el=>c.plots=Math.max(1,+el.value||1));
+  n('islHerd',  el=>c.herd=Math.max(0,+el.value||0));
+  n('islFav',   el=>c.fav=el.checked);
+  document.querySelectorAll('[data-isl]').forEach(el=>el.onclick=()=>{
+    const i=+el.dataset.isl; c.sel = (c.sel===i?null:i); render(); });
+  const cl=$('islClose'); if(cl) cl.onclick=()=>{ c.sel=null; render(); };
+}
+
 function itemTabHTML(){
   if(S.itemSel) return itemCardHTML(S.itemSel);
   const q = (S.itemQ||'').trim().toLowerCase();
@@ -4141,7 +4580,7 @@ checkSnapshot();
 $('goldBtn').onclick=()=>{ S.gold=!S.gold; $('goldBtn').classList.toggle('active',S.gold); S.limit=0; render(); };
 $('goldBtn').classList.toggle('active', S.gold); // включена по умолчанию, подсветить кнопку сразу
 $('reloadBtn').onclick=async ()=>{ lastCheck=Date.now(); await loadAll(true); S.builtAt=null; checkSnapshot(); };
-const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', cons:'🧪 Зелья и еда', item:'🔍 Цены предмета', roads:'🛡 Дороги в Карлеон · БЕТА'};
+const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', cons:'🧪 Зелья и еда', isl:'🏝 Острова', calc:'🧮 Калькулятор', item:'🔍 Цены предмета', roads:'🛡 Дороги в Карлеон · БЕТА'};
 // какие контролы нужны на каждой вкладке (премиум, возраст данных, обновление и поиск, всегда)
 const TAB_CONTROLS={
   craft:   ['wrapCity','wrapFocus','wrapSelfRef','wrapQual','wrapFee','wrapCat','wrapSafeCraft','wrapLocal','wrapBmMode'],
@@ -4150,6 +4589,8 @@ const TAB_CONTROLS={
   cityflip:['wrapRoute','wrapSafe','wrapCat','routeCityWrap'],
   ench:    ['wrapCity','wrapSafe','wrapCat','wrapLocal','routeCityWrap','wrapBmMode'],
   cons:    ['wrapCity','wrapFocus','wrapFee','wrapSafeCraft','wrapLocal','wrapBmMode'],
+  isl:     [],
+  calc:    [],
   item:    [],
   roads:   [],
 };
@@ -4172,7 +4613,7 @@ function setTab(t){
   const vis=TAB_CONTROLS[t]||[];
   for(const id of ALL_WRAPS){ const w=$(id); if(w) w.style.display = vis.includes(id)?'':'none'; }
   syncBmMode();
-  const flt=$('filters'); if(flt) flt.style.display = (t==='roads'||t==='item')?'none':'';
+  const flt=$('filters'); if(flt) flt.style.display = (t==='roads'||t==='item'||t==='calc'||t==='isl')?'none':'';
   // в Переработке города маршрута нужны только когда включён сам маршрут
   const rcw=$('routeCityWrap');
   if(rcw && t==='ref' && refMode()!=='route') rcw.style.display='none';
@@ -4181,7 +4622,7 @@ function setTab(t){
   if(gr) gr.style.display = ((TAB_CONTROLS[t]||[]).includes('wrapCat') || TAB_GROUPS[t]) ? 'flex' : 'none';
   if(t==='roads' && !S.roads.loaded && !S.roads.loading) loadRoads(); // ленивая загрузка при входе
   S.limit = 0; // сбросить порцию строк
-  if(S.loaded && t!=='roads') compute();
+  if(S.loaded && t!=='roads' && t!=='calc' && t!=='isl') compute();
   render();
 }
 $('refModeSel').onchange=()=>{ setTab(S.tab); compute(); render(); };
