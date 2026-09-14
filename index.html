@@ -4494,7 +4494,7 @@ function islandsHTML(){
       ${b?`<div class="islBest">${b.n}${b.yb?' <b style="color:#8ff09a">+10%</b>':''}</div>`:''}
       <div class="islPill ${b?(r.total>=0?'pos':'neg'):'na'}">${b?islK(r.total)+'<span>/сут</span>':'нет цен'}</div>
       <div class="islBon">${(ISL_BONUS[ci.k]||[]).map(id=>islOutOf[id]?ico(islOutOf[id],40):'').join('')}</div>
-      <img class="islArt" src="img/${ci.img}.webp" alt="${(CITY_SHORT[ci.k]||ci.k)}" loading="lazy">
+      <img class="islArt" src="img/${ci.img}.webp" alt="${(CITY_SHORT[ci.k]||ci.k)}" decoding="async">
       <div class="islCap"><div class="islNm">${(CITY_SHORT[ci.k]||ci.k)}</div>
         <div class="islRule"><i></i><svg viewBox="0 0 16 16">${ISL_EM[ci.em]||''}</svg><i></i></div></div>
     </div>`;
