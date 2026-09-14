@@ -98,6 +98,10 @@ jobs:
           # и sitemap.xml лежат в репозитории, но на сайт не попадают — og:image
           # отдаёт 404 и превью в Discord/Reddit выходит без картинки.
           cp og-image.png robots.txt sitemap.xml public/
+          # Арты островов: раздел «Острова» тянет img/<город>.webp. Публикуется
+          # только то, что скопировано сюда, поэтому без этой строки все семь
+          # картинок отдают 404, а карточки городов выходят пустыми.
+          cp -r img public/
           [ -f data.json ] && cp data.json public/ || echo "data.json отсутствует — сайт уйдёт в режим прямого опроса API"
           [ -f data-stats.json ] && cp data-stats.json public/ || true
           touch public/.nojekyll
