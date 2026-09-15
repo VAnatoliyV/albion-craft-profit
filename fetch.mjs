@@ -33,7 +33,20 @@ function sageHydrate(pool, node){
   return walk(node);
 }
 
-export function sageParse(raw, today){
+// Ключи категорий у них и у нас совпадают почти везде, но не всюду: сегодня
+// прилетело "tools", а у нас категория называется "tool", и второй бонус дня
+// молча потерялся. Поэтому сначала пробуем как есть, потом без окончания -s,
+// потом с ним, а что не легло — возвращаем отдельным списком, чтобы сайт
+// честно сказал «подставлен частично», а не делал вид, что всё на месте.
+const SAGE_ALIAS = { tools:'tool', mounts:'mount', potions:'potion', meals:'meal', foods:'meal', capes:'cape', bags:'bag' };
+function sageMap(cat, valid){
+  if(SAGE_CHAIN.has(cat)) return 'chain:'+cat;
+  const tries = [cat, SAGE_ALIAS[cat], cat.replace(/s$/,''), cat+'s'];
+  for(const t of tries) if(t && valid.has(t)) return t;
+  return null;
+}
+
+export function sageParse(raw, today, valid){
   const j = typeof raw === 'string' ? JSON.parse(raw) : raw;
   const node = (j.nodes||[]).find(n => n && n.data && JSON.stringify(n.data).includes('entries'));
   if(!node) return null;
@@ -44,31 +57,38 @@ export function sageParse(raw, today){
   if(!day || day.region !== 'europe') return null;      // сайт считает по Европе
   if(day.status !== 'published') return null;           // черновики не берём
   if(today && day.date !== today) return null;          // вчерашний бонус хуже, чем никакого
-  const c = [];
+  const c = [], miss = [];
   for(const e of day.entries||[]){
     if(!e || e.isHidden || !e.category) continue;
     const pct = Number(e.tier);
     if(!(pct === 10 || pct === 20)) continue;           // в игре бывает только так
-    const k = SAGE_CHAIN.has(e.category) ? 'chain:'+e.category : e.category;
+    const k = sageMap(e.category, valid || new Set());
+    if(!k){ miss.push(e.category); continue; }
     if(!c.some(x => x.k === k)) c.push({ k, v: pct/100 });
   }
-  if(!c.length) return null;
-  return { d: day.date, c, src: 'ao-sage' };
+  if(!c.length && !miss.length) return null;
+  const out = { d: day.date, c, src: 'ao-sage' };
+  if(miss.length) out.miss = miss;
+  return out;
 }
 
 // Сутки бонуса начинаются в 10:00 UTC, вместе с обслуживанием серверов.
 export const bonusDay = (now=Date.now()) => new Date(now - 10*3600*1000).toISOString().slice(0,10);
 
-async function fetchDailyBonus(){
+async function fetchDailyBonus(items){
   try{
     const ctrl = new AbortController();
     const kill = setTimeout(()=>ctrl.abort(), 15000);
     const r = await fetch(SAGE_URL, { signal: ctrl.signal, headers:{ 'accept':'application/json' } });
     clearTimeout(kill);
     if(!r.ok){ console.log(`дневной бонус: HTTP ${r.status}, оставляем ручной выбор`); return null; }
-    const got = sageParse(await r.text(), bonusDay());
+    // чем считаем «нашей» категорию: всё, что реально встречается в предметах,
+    // плюс зелья с едой и пять линий переработки
+    const valid = new Set([...(items.items||[]).map(i=>i.cat), 'potion','meal']);
+    const got = sageParse(await r.text(), bonusDay(), valid);
     if(!got){ console.log('дневной бонус: в ответе нет сегодняшнего опубликованного дня'); return null; }
-    console.log(`дневной бонус ${got.d}: ${got.c.map(x=>x.k+' +'+Math.round(x.v*100)).join(', ')}`);
+    console.log(`дневной бонус ${got.d}: ${got.c.map(x=>x.k+' +'+Math.round(x.v*100)).join(', ')||'ничего не легло'}`);
+    if(got.miss) console.log(`  не совпало с нашими категориями: ${got.miss.join(', ')}`);
     return got;
   }catch(e){
     console.log(`дневной бонус не получен (${e.message}), оставляем ручной выбор`);
@@ -417,7 +437,7 @@ async function main(){
   console.log(`месячная норма материалов: ${Object.keys(out.mb).length}`);
   console.log(`тренды: материалы ${Object.keys(out.mh).length}, ЧР ${Object.keys(out.bh).length}, города ${Object.keys(out.ih).length}`);
 
-  out.daily = await fetchDailyBonus();
+  out.daily = await fetchDailyBonus(items);
 
   out.t = Math.round(Date.now()/1000);
   const json = JSON.stringify(out);
