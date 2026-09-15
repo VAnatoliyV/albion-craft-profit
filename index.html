@@ -187,6 +187,14 @@ footer{padding:16px 22px;color:var(--muted);font-size:11.5px;border-top:1px soli
   select,input[type=number],input[type=text]{font-size:12px;padding:5px 6px}
   input[type=number]{width:64px}
   label.ctl{font-size:11.5px}
+  /* «Дневной бонус» держит четыре списка в одну строку и на 390 px вылезал
+     за экран на 88 px, давая горизонтальный скролл во всех разделах. Разрешаем
+     переносить и сжимать. */
+  label.ctl{flex-wrap:wrap;white-space:normal;max-width:100%;min-width:0}
+  .controls select{min-width:0;max-width:100%}
+  /* Островные таблицы узкие сами по себе, общий минимум в 880 px им не нужен:
+     из-за него расклад острова на телефоне ехал вбок. */
+  #tableWrap .islSide table,#tableWrap .islRecTbl{min-width:0}
   button{padding:6px 9px;font-size:12px}
   main{padding:10px 8px}
   .filters{gap:6px;padding:8px}
@@ -330,6 +338,21 @@ body.pix #dl a.dlb{font-family:var(--pix);letter-spacing:.5px;border-radius:0}
 .dsrc{margin-left:6px;font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:1px 6px;cursor:help}
 .islWrap{display:grid;grid-template-columns:1fr 330px;gap:18px;align-items:start;margin-top:14px}
 @media(max-width:1000px){.islWrap{grid-template-columns:1fr}}
+.islCol{display:flex;flex-direction:column;gap:16px;min-width:0}
+.islCol>.panel{margin-top:0}
+.islRecScroll{overflow-x:auto;max-width:100%}
+/* На телефоне колонка одна. Схлопываем обёртку, чтобы разложить блоки по
+   смыслу: карточки, под ними расклад выбранного острова, и уже потом рецепт.
+   Иначе панель острова, которую только что открыли тапом, уезжает под рецепт. */
+@media(max-width:1000px){
+  .islCol{display:contents}
+  /* без min-width:0 элемент грида меряется по min-content, и сетка карточек
+     отказывается складываться в одну колонку — на 390 px она распирала
+     страницу до 918 и давала горизонтальный скролл */
+  .islGrid{order:1;min-width:0}
+  .islSide{order:2;min-width:0}
+  .islCol>.panel{order:3;margin-top:16px;min-width:0}
+}
 .islGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
 .islCard{position:relative;border-radius:20px;overflow:hidden;cursor:pointer;border:1px solid rgba(255,255,255,.08);
   transition:transform .18s ease,box-shadow .18s ease,border-color .18s;display:flex;flex-direction:column;padding-top:6px}
@@ -4458,11 +4481,6 @@ function islPx(id, city){ const p=matPrice(id, city); return p?p.price:0; }
 // у Ф-Стерлинга остаётся 2 культуры из 15 и заголовок карточки считается по
 // случайному огрызку. Семена лёгкие, их возят: берём, где дешевле, и подписываем
 // город. Урожай и продукты, наоборот, всегда по своему городу — их продают на месте.
-function islBuy(id){ const b=bestBuy(id, CITIES); return b?{p:b.price, city:b.city}:null; }
-// Продаём не там, где вырастили. Выращивать в бонусном городе и там же сдавать —
-// самая дорогая ошибка на островах: урожай в бонусном городе как раз дешевле
-// всего, его туда свозят все. Берём город с лучшей ценой и подписываем какой,
-// чтобы было видно, что за эту цифру придётся проехаться.
 // Кольцо королевского континента, снято с карты зон: пять городов стоят по
 // кругу вокруг Карлеона, и у каждого ровно два соседа по жёлтым зонам.
 // Тетфорд — Ф-Стерлинг — Лимхёрст — Бриджуотч — Мартлок — и обратно в Тетфорд.
@@ -4478,16 +4496,24 @@ const ISL_NEAR = {
   'Caerleon':     ['Thetford','Fort Sterling','Lymhurst','Bridgewatch','Martlock'],
   'Brecilien':    [],
 };
+// Список городов, с которыми вообще работаем, — один и тот же для продажи и
+// для закупки. Раньше семена искались по всем семи даже в режиме «на месте»:
+// выходило, что урожай сдаём у себя, а за семечком едем на другой конец карты.
+function islPool(city){
+  const mode = S.isl ? S.isl.sellMode : 'any';
+  if(mode==='here') return city ? [city] : CITIES;
+  if(mode==='near' && city) return [city, ...(ISL_NEAR[city]||[])];
+  return CITIES;
+}
+function islBuy(id, city){ const b=bestBuy(id, islPool(city)); return b?{p:b.price, city:b.city}:null; }
+// Продаём не там, где вырастили. Выращивать в бонусном городе и там же сдавать —
+// самая дорогая ошибка на островах: урожай в бонусном городе как раз дешевле
+// всего, его туда свозят все. Берём город с лучшей ценой и подписываем какой,
+// чтобы было видно, что за эту цифру придётся проехаться.
 function islSell(id, city){
   // «на месте» — честный нижний край: вырастил и сдал, никуда не поехал.
   // «где выгодно» — верхний: лучшая цена среди всех городов, но за ней ехать.
-  const mode = S.isl ? S.isl.sellMode : 'any';
-  if(mode==='here'){
-    const p=matPrice(id, city);
-    return p ? {p:p.price, city} : null;
-  }
-  // «рядом» — свой город и два соседа по кольцу: везти недалеко и по жёлтым зонам
-  const pool = mode==='near' ? [city, ...(ISL_NEAR[city]||[])] : CITIES;
+  const pool = islPool(city);
   let ovr=null, mkt=null;
   for(const c of pool){
     const p=matPrice(id, c);
@@ -4507,7 +4533,7 @@ function islCalc(){
   for(const ci of ISL_CITY){
     const bon=ISL_BONUS[ci.k]||[], crops=[], animals=[];
     for(const q of ISL_CROPS){
-      const sb=islBuy(q.seed), cb=islSell(q.out, ci.k);
+      const sb=islBuy(q.seed, ci.k), cb=islSell(q.out, ci.k);
       if(!sb||!cb) continue;
       const sp=sb.p, cp=cb.p;
       const ret=c.focus ? (q.ret+q.bon) : q.ret;
@@ -4517,12 +4543,12 @@ function islCalc(){
                   crop$:cp,sellCity:cb.city,ret,yb,plot,day:plot*c.plots*(24/ISL_CYCLE_H)});
     }
     let cheap=null;
-    for(const v of ISL_VEG){ const b=islBuy(v); if(b&&(!cheap||b.p<cheap.p)) cheap={id:v,p:b.p,city:b.city}; }
+    for(const v of ISL_VEG){ const b=islBuy(v, ci.k); if(b&&(!cheap||b.p<cheap.p)) cheap={id:v,p:b.p,city:b.city}; }
     for(const a of ISL_ANIMALS){
       const ob=islSell(a.out, ci.k); if(!ob||!cheap) continue;
       const op=ob.p;
       const yb=bon.includes(a.grown)?ISL_BONUS_PCT:0;
-      const fb=c.fav?islBuy(a.fav):null;
+      const fb=c.fav?islBuy(a.fav, ci.k):null;
       const feedId=fb?a.fav:cheap.id, feedP=fb?fb.p:cheap.p, feedCity=fb?fb.city:cheap.city;
       const units=c.fav?ISL_FEED_FAV:ISL_FEED;
       const head=net(ISL_AYIELD*(1+yb)*op)-units*feedP;
@@ -4567,7 +4593,7 @@ function islandsHTML(){
       <label class="ctl"><input type="checkbox" id="islFav"${c.fav?' checked':''}> любимый корм</label>
     </div>`;
   if(!any) out+=`<div class="fresh" style="margin-top:12px">Цен по семенам пока нет в снимке: они добавлены в сбор, ближайшее обновление data.json их подтянет.</div>`;
-  out+=`<div class="islWrap"><div class="islGrid">`;
+  out+=`<div class="islWrap"><div class="islCol"><div class="islGrid">`;
   ISL_CITY.forEach((ci,i)=>{
     const r=R[ci.k], b=r&&r.best;
     out+=`<div class="islCard${c.sel===i?' sel':''}" data-isl="${i}" style="background:linear-gradient(165deg,${ci.bg[0]},${ci.bg[1]})">
@@ -4579,8 +4605,11 @@ function islandsHTML(){
         <div class="islRule"><i></i><svg viewBox="0 0 16 16">${ISL_EM[ci.em]||''}</svg><i></i></div></div>
     </div>`;
   });
-  out+=`</div>${islSideHTML(R,ico)}</div>`;
-  out+=islRecipeHTML(ico);
+  // Блок рецепта кладём в ту же колонку, что и карточки: при выбранном острове
+  // правая панель вырастает на всю таблицу культур, и полноширинный блок уезжал
+  // под неё далеко вниз. Теперь оба на экране рядом, а на узком телефоне
+  // колонка одна и они просто идут друг за другом.
+  out+=`</div>${islRecipeHTML(ico)}</div>${islSideHTML(R,ico)}</div>`;
   return out+`</div>`;
 }
 // ── Под рецепт: что посадить, чтобы сварить ─────────────────────────────────
@@ -4665,7 +4694,7 @@ function islRecipeHTML(ico){
         <span class="fresh">T${sel.tier}${sel.ench?'.'+sel.ench:''} · ${n} <span>партий</span> · ${n*(sel.batch||1)} <span>шт.</span></span>
         <button class="ctl" id="islRecClear" style="cursor:pointer;margin-left:auto">выбрать другое</button>
       </div>
-      <table class="islRecTbl" style="margin-top:8px"><thead><tr><th>ингредиент</th><th>нужно</th><th>где брать</th><th>сколько</th></tr></thead><tbody>`
+      <div class="islRecScroll"><table class="islRecTbl" style="margin-top:8px"><thead><tr><th>ингредиент</th><th>нужно</th><th>где брать</th><th>сколько</th></tr></thead><tbody>`
       + rows.map(r=>`<tr>
           <td style="text-align:left">${ico(r.mid,36)}${islName(r.mid)}</td>
           <td>${fmt(r.need)}</td>
@@ -4674,7 +4703,7 @@ function islRecipeHTML(ico){
               : (r.px!=null ? `<span>купить</span> <b>${fmt(r.px)}</b> · <span>${CITY_SHORT[r.city]||r.city}</span>` : `<span class="fresh">нет цены</span>`)}</td>
           <td>${r.grow? fmt(r.cnt)+' <span>'+r.unit+'</span>' : (r.cost!=null? fmt(r.cost) : '—')}</td>
         </tr>`).join('')
-      + `</tbody></table>
+      + `</tbody></table></div>
       <div class="fresh" style="margin-top:10px"><span>Итого за цикл:</span> <b>${fmt(plots)}</b> <span>грядок</span>${heads?`, <b>${fmt(heads)}</b> <span>голов</span>`:''}${seedCost?`, <span>семян на</span> <b>${fmt(seedCost)}</b>`:''}${buy?`, <span>докупить на</span> <b>${fmt(buy)}</b>`:''}.</div>`;
     if(plots>c.plots) out += `<div class="fresh" style="margin-top:4px"><span>На твои</span> <b>${c.plots}</b> <span>грядок это</span> <b>${Math.ceil(plots/c.plots)}</b> <span>циклов подряд</span>, <span>то есть</span> <b>${Math.ceil(plots/c.plots*ISL_CYCLE_H/24*10)/10}</b> <span>суток</span>.</div>`;
     out += `<div class="fresh" style="margin-top:6px">Цикл грядки 22 часа, так что сажать надо заранее. Ингредиенты одного рецепта обычно растут в разных городах — их и возят раз в неделю в тот город, где выгоднее варить.</div>`;
@@ -4717,10 +4746,10 @@ function islSideHTML(R,ico){
     return `<div class="fresh" style="font-size:11px">${cost}</div>`
          + `<div class="fresh" style="font-size:11px"><span>продать</span> <b>${fmt(px)}</b> · <span>${CITY_SHORT[x.sellCity]||x.sellCity}</span></div>`;
   };
-  const tbl=(rows,head,val)=>rows.length?`<table><thead><tr><th>${head}</th><th>${val==='plot'?'грядка':'голова'}</th><th>сутки</th></tr></thead><tbody>`+
+  const tbl=(rows,head,val)=>rows.length?`<div class="islRecScroll"><table><thead><tr><th>${head}</th><th>${val==='plot'?'грядка':'голова'}</th><th>сутки</th></tr></thead><tbody>`+
     srt(rows).map(x=>`<tr><td>${ico(x.id,36)}${x.n}${x.yb?' <b class="pos">+10%</b>':''}${sub(x)}</td>
       <td class="${x[val]>=0?'pos':'neg'}">${islK(x[val])}</td>
-      <td class="${x.day>=0?'pos':'neg'}">${islK(x.day)}</td></tr>`).join('')+`</tbody></table>`
+      <td class="${x.day>=0?'pos':'neg'}">${islK(x.day)}</td></tr>`).join('')+`</tbody></table></div>`
     : `<div class="fresh" style="margin-top:8px">Нет цен по этому городу.</div>`;
   return `<aside class="islSide">
     <button type="button" class="ctl" id="islClose" style="cursor:pointer;margin-bottom:10px">← ко всем островам</button>
