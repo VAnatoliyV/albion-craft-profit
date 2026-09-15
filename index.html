@@ -407,10 +407,10 @@ img[data-ico]:not([src]),img.icoFail{background:rgba(255,255,255,.05);border-rad
 .islSide table img{display:inline-block!important;width:22px!important;height:22px!important;aspect-ratio:auto!important;vertical-align:-6px;margin-right:4px}
 /* Экран одного острова: то же, что в узкой панели, но во всю ширину и нормальным
    шрифтом. Узкая панель рядом с карточками осталась как быстрая сводка. */
-.islHero{position:relative;border-radius:20px;overflow:hidden;min-height:200px;display:flex;align-items:flex-end;margin-top:14px}
-.islHero>img.islHeroArt{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5}
+.islHero{position:relative;border-radius:20px;overflow:hidden;height:clamp(200px,21vw,330px);display:flex;align-items:flex-end;margin-top:14px}
+.islHero>img.islHeroArt{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.78}
 .islHeroIn{position:relative;padding:18px 20px;width:100%;
-  background:linear-gradient(to top,rgba(0,0,0,.85),rgba(0,0,0,.3) 60%,rgba(0,0,0,.05))}
+  background:linear-gradient(to top,rgba(0,0,0,.9),rgba(0,0,0,.62) 45%,rgba(0,0,0,.18) 80%,transparent)}
 .islHeroIn h2{margin:0;font-size:28px;letter-spacing:.4px;display:flex;align-items:center;gap:10px}
 .islHeroIn h2 svg{width:22px;height:22px;opacity:.92;flex:none}
 .islHeroIn .islBig{font-size:30px;font-weight:700;margin-top:4px;line-height:1.15}
@@ -429,7 +429,11 @@ img[data-ico]:not([src]),img.icoFail{background:rgba(255,255,255,.05);border-rad
 .islFullTbl .islPx.best{color:var(--green);font-weight:700}
 .islFullTbl .islPx.used{box-shadow:inset 0 0 0 1px var(--accent);border-radius:6px}
 @media(max-width:768px){
-  .islHero{min-height:150px}
+  /* На телефоне у шапки не фиксированная высота: заголовок, сумма и список
+     бонусных культур переносятся в три строки и при жёсткой высоте обрезались. */
+  .islHero{height:auto;min-height:170px}
+  .islBon2{font-size:11.5px;gap:6px;margin-top:8px}
+  .islBon2 img{width:22px!important;height:22px!important;vertical-align:-6px}
   .islHeroIn{padding:14px}
   .islHeroIn h2{font-size:21px}
   .islHeroIn .islBig{font-size:24px}
@@ -4900,7 +4904,7 @@ function islCityHTML(R, ico, idx){
   const bon = (ISL_BONUS[ci.k]||[]).map(id=>islOutOf[id]?ico(islOutOf[id],36)+islName(islOutOf[id]):'').filter(Boolean).join(' · ');
   return `<div class="panel">${islCtlHTML()}
     <div class="islHero" style="background:linear-gradient(165deg,${ci.bg[0]},${ci.bg[1]})">
-      <img class="islHeroArt" src="img/${ci.img}.webp" alt="${nm}" decoding="async">
+      <img class="islHeroArt" src="img/${ci.img}-hero.webp" alt="${nm}" decoding="async">
       <div class="islHeroIn">
         <button type="button" class="ctl" id="islBackAll" style="cursor:pointer;margin-bottom:10px">← ко всем островам</button>
         <h2><svg viewBox="0 0 16 16">${ISL_EM[ci.em]||''}</svg>${nm}</h2>
