@@ -1677,8 +1677,28 @@ function icoPump(){
     j.el.src=icoSrc(j.id,j.sz);
   }
 }
+// Наблюдатель видимости даёт приоритет тому, что на экране, но полагаться
+// только на него нельзя: он молчит, пока вкладка не перерисовывается, и часть
+// иконок может остаться без адреса навсегда — ровно та «пустота через раз».
+// Поэтому сзади идёт медленный добор: когда очередь опустела, подсыпаем
+// оставшиеся, ближние к экрану вперёд. Иконки мелкие, лимит в пять штук
+// сохраняется, зато пустых мест не остаётся вовсе.
+let icoSweep=null;
+function icoDrain(){
+  if(icoBusy || icoQ.length) return;
+  const left=[...document.querySelectorAll('img[data-ico]:not([src])')];
+  if(!left.length){ clearInterval(icoSweep); icoSweep=null; return; }
+  const mid=innerHeight/2;
+  left.sort((a,b)=>Math.abs(a.getBoundingClientRect().top-mid)-Math.abs(b.getBoundingClientRect().top-mid));
+  for(const el of left.slice(0,12)){
+    if(icoObs) icoObs.unobserve(el);
+    icoQ.push({el, id:el.dataset.ico, sz:+el.dataset.sz||40, n:1});
+  }
+  icoPump();
+}
 let icoObs=null;
 function icoWatch(root){
+  if(!icoSweep) icoSweep=setInterval(icoDrain, 1200);
   if(!('IntersectionObserver' in window)){                       // очень старый браузер
     (root||document).querySelectorAll('img[data-ico]:not([src])').forEach(el=>{
       icoQ.push({el, id:el.dataset.ico, sz:+el.dataset.sz||40, n:1}); });
