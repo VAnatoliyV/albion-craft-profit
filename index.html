@@ -1657,7 +1657,25 @@ const enc = s => encodeURIComponent(s).replace(/%40/g,'@');
 // очередь, иначе браузер стартует все запросы сразу и лимит бьёт опять.
 const ICO_MAX=5, ICO_TRIES=4, ICO_WAIT=[400,1200,3000];
 const icoQ=[]; let icoBusy=0;
+// Что уже успешно грузилось. Таблица перерисовывается от любого клика, и все
+// <img> создаются заново пустыми. Без этой памяти даже лежащая в кэше иконка
+// ждала своей очереди — выглядело так, будто по клику всё перезагружается,
+// а картинки пропадают на несколько секунд. Знакомым ставим адрес сразу:
+// браузер достаёт их из кэша мгновенно, очередь остаётся только для новых.
+const icoOk=new Set();
 const icoSrc=(id,sz)=>'https://render.albiononline.com/v1/item/'+enc(id)+'.png?size='+(sz||40);
+function icoFast(root){
+  (root||document).querySelectorAll('img[data-ico]:not([src])').forEach(el=>{
+    const id=el.dataset.ico, sz=+el.dataset.sz||40;
+    if(!icoOk.has(id)) return;
+    // Быстрый путь идёт мимо очереди, и если браузер всё-таки промахнётся мимо
+    // кэша и упрётся в лимит, подхватить такую иконку будет некому. Поэтому на
+    // осечке роняем её обратно в очередь, где есть повторы.
+    el.onerror=()=>{ el.onerror=null; el.removeAttribute('src');
+                     icoQ.push({el, id, sz, n:1}); icoPump(); };
+    el.src=icoSrc(id, sz);
+  });
+}
 function icoPump(){
   while(icoBusy<ICO_MAX && icoQ.length){
     const j=icoQ.shift();
@@ -1665,6 +1683,7 @@ function icoPump(){
     icoBusy++;
     const fin=ok=>{
       icoBusy--;
+      if(ok) icoOk.add(j.id);
       if(!ok){
         if(j.n<ICO_TRIES){
           j.el.removeAttribute('src');
@@ -1698,6 +1717,7 @@ function icoDrain(){
 }
 let icoObs=null;
 function icoWatch(root){
+  icoFast(root);
   if(!icoSweep) icoSweep=setInterval(icoDrain, 1200);
   if(!('IntersectionObserver' in window)){                       // очень старый браузер
     (root||document).querySelectorAll('img[data-ico]:not([src])').forEach(el=>{
@@ -1719,7 +1739,8 @@ function icoWatch(root){
 let icoTick=null;
 function icoStart(){
   icoWatch();
-  new MutationObserver(()=>{ clearTimeout(icoTick); icoTick=setTimeout(()=>icoWatch(),60); })
+  // знакомые ставим тут же, без задержки — иначе при перерисовке видно мигание
+  new MutationObserver(()=>{ icoFast(); clearTimeout(icoTick); icoTick=setTimeout(()=>icoWatch(),60); })
     .observe(document.body,{childList:true,subtree:true});
 }
 if(document.readyState!=='loading') setTimeout(icoStart,0);
