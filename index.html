@@ -341,6 +341,9 @@ body.pix #dl a.dlb{font-family:var(--pix);letter-spacing:.5px;border-radius:0}
 .islCol{display:flex;flex-direction:column;gap:16px;min-width:0}
 .islCol>.panel{margin-top:0}
 .islRecScroll{overflow-x:auto;max-width:100%}
+/* пока иконка в очереди и если сервер её так и не отдал — тихий квадратик,
+   чтобы на месте картинки не было дыры и строка не прыгала */
+img[data-ico]:not([src]),img.icoFail{background:rgba(255,255,255,.05);border-radius:5px}
 /* На телефоне колонка одна. Схлопываем обёртку, чтобы разложить блоки по
    смыслу: карточки, под ними расклад выбранного острова, и уже потом рецепт.
    Иначе панель острова, которую только что открыли тапом, уезжает под рецепт. */
@@ -1643,6 +1646,67 @@ const fmt = n => n==null?'нет':Math.round(n).toLocaleString('ru-RU');
 // а T4_HEAD_CLOTH_SET1@1 отдаёт картинку. Кодируем всё, кроме @, иначе у каждой
 // зачарованной вещи, зелья и материала иконка не грузится.
 const enc = s => encodeURIComponent(s).replace(/%40/g,'@');
+
+// ── Очередь загрузки иконок ─────────────────────────────────────────────────
+// Рендер-API Albion ограничивает частоту. Когда таблица разом выбрасывает
+// полторы сотни <img>, первые проходят, а дальше сервер отказывает мгновенно —
+// за 50–70 мс, и это не 404: тот же самый адрес через секунду отдаётся нормально.
+// Браузер показывает пустоту, и выглядит это как «иконки иногда не грузятся».
+// Поэтому грузим сами: не больше пяти зараз, только то, что подъехало к экрану,
+// и с повторами по нарастающей паузе. Адрес в разметку не пишем — его ставит
+// очередь, иначе браузер стартует все запросы сразу и лимит бьёт опять.
+const ICO_MAX=5, ICO_TRIES=4, ICO_WAIT=[400,1200,3000];
+const icoQ=[]; let icoBusy=0;
+const icoSrc=(id,sz)=>'https://render.albiononline.com/v1/item/'+enc(id)+'.png?size='+(sz||40);
+function icoPump(){
+  while(icoBusy<ICO_MAX && icoQ.length){
+    const j=icoQ.shift();
+    if(!j.el.isConnected || j.el.getAttribute('src')) continue;   // строку перерисовали
+    icoBusy++;
+    const fin=ok=>{
+      icoBusy--;
+      if(!ok){
+        if(j.n<ICO_TRIES){
+          j.el.removeAttribute('src');
+          setTimeout(()=>{ j.n++; icoQ.push(j); icoPump(); }, ICO_WAIT[Math.min(j.n-1,ICO_WAIT.length-1)]);
+        } else j.el.classList.add('icoFail');
+      }
+      icoPump();
+    };
+    j.el.onload=()=>fin(true); j.el.onerror=()=>fin(false);
+    j.el.src=icoSrc(j.id,j.sz);
+  }
+}
+let icoObs=null;
+function icoWatch(root){
+  if(!('IntersectionObserver' in window)){                       // очень старый браузер
+    (root||document).querySelectorAll('img[data-ico]:not([src])').forEach(el=>{
+      icoQ.push({el, id:el.dataset.ico, sz:+el.dataset.sz||40, n:1}); });
+    icoPump(); return;
+  }
+  if(!icoObs) icoObs=new IntersectionObserver(es=>{
+    for(const e of es){
+      if(!e.isIntersecting) continue;
+      icoObs.unobserve(e.target);
+      icoQ.push({el:e.target, id:e.target.dataset.ico, sz:+e.target.dataset.sz||40, n:1});
+    }
+    icoPump();
+  },{rootMargin:'400px'});
+  (root||document).querySelectorAll('img[data-ico]:not([src])').forEach(el=>icoObs.observe(el));
+}
+// Перерисовок на сайте много и все разные, поэтому ловим появление иконок в DOM,
+// а не дописываем вызов в каждую ветку render().
+let icoTick=null;
+function icoStart(){
+  icoWatch();
+  new MutationObserver(()=>{ clearTimeout(icoTick); icoTick=setTimeout(()=>icoWatch(),60); })
+    .observe(document.body,{childList:true,subtree:true});
+}
+if(document.readyState!=='loading') setTimeout(icoStart,0);
+else document.addEventListener('DOMContentLoaded',icoStart);
+// разметка: размер в data-sz, адрес поставит очередь
+const icoAttr=(id,sz)=>`data-ico="${id}" data-sz="${sz||40}"`;
+
 const hoursAgo = ts => ts==null||ts===0 ? 1e9 : (typeof ts==='number' ? (Date.now()-ts*6e4)/3.6e6 : (Date.now()-new Date(ts+'Z').getTime())/3.6e6);
 // возраст по метке времени в миллисекундах, коротко, для подписей рядом с ценой
 const ageTxt = ts => { if(!ts) return ''; const h=(Date.now()-ts)/3.6e6;
@@ -2867,7 +2931,7 @@ function ageMark(h){
 }
 const WARN_TIP = 'Подозрительные цифры: аномальная маржа или крупная маржа при крошечном объёме. Обычно это один жирный ордер или кривые данные, проверь в игре перед закупкой.';
 const QUAL_RU = {1:'Обычное',2:'Хорошее',3:'Выдающееся',4:'Отличное',5:'Шедевр'};
-function icon(id,q){ return `<img loading="lazy" src="https://render.albiononline.com/v1/item/${enc(id)}.png?size=64${q?`&quality=${q}`:''}" alt="">`; }
+function icon(id,q){ return `<img ${icoAttr(id,64)}${q?` data-q="${q}"`:''} alt="">`; }
 function nameCell(it, extra, qualText){
   return `<td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${nmA(it)}</b>${extra||''}`+`
     <span>${nmB(it)} · T${it.tier}${it.ench?'.'+it.ench:''}${isLite()?'':' · '+catName(it.cat)+(qualText?' · '+qualText:'')}</span></div></td>`;
@@ -3998,7 +4062,7 @@ function roadsHTML(){
     const top=Object.entries(g).sort((a,b)=>b[1]-a[1]).slice(0,5);
     if(top.length) out+='<b>Активные охотники:</b> '+top.map(([n,c])=>`${n} (${c})`).join(' · ');
     // последние килы: с иконками маунта и оружия (как на киллбордах)
-    const gearIcon = (t,title) => t?`<img loading="lazy" onerror="this.style.display='none'" src="https://render.albiononline.com/v1/item/${enc(t)}.png?size=32" title="${title||t}" style="width:30px;height:30px;vertical-align:middle;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))">`:'';
+    const gearIcon = (t,title) => t?`<img ${icoAttr(t,32)} title="${title||t}" style="width:30px;height:30px;vertical-align:middle;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))">`:'';
     if(list.length){
       out+='<table style="margin-top:10px"><tr><th>Когда</th><th class="item" style="text-align:left">Жертва (гир · маунт)</th><th class="item" style="text-align:left">Груз (что везли)</th><th>Ганкеров</th><th>Фейм</th><th class="item" style="text-align:left">Убийца (оружие)</th></tr>';
       list.slice(0,25).forEach(k=>{
@@ -4035,7 +4099,7 @@ function roadsHTML(){
   }
   out+='</div>';
   // мета-сетапы перевозчика
-  const bi = t => `<img loading="lazy" onerror="this.style.display='none'" src="https://render.albiononline.com/v1/item/${enc(t)}.png?size=48" style="width:40px;height:40px;vertical-align:middle" title="${t}">`;
+  const bi = t => `<img ${icoAttr(t,48)} style="width:40px;height:40px;vertical-align:middle" title="${t}">`;
   out+=`<details class="panel" style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">🎒 Во что одеться перевозчику перед выездом</summary>
     <div style="margin-top:12px;display:grid;gap:12px">
       <div><b>1. Спидраннер</b>, дорогое и лёгкое, на 10 или 15 миллионов в зачаровке и артефактах:<br>
@@ -4098,7 +4162,7 @@ function itemCardHTML(id){
   const isMat = kind==='mat';
   const bm = S.bm[id];
   let out = `<div class="panel"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <img src="https://render.albiononline.com/v1/item/${enc(id)}.png?size=76" style="width:64px;height:64px" onerror="this.style.display='none'">
+      <img ${icoAttr(id,76)} style="width:64px;height:64px">
       <div><div style="font-size:17px;font-weight:700">${nmA(nm)}${cpBtn(id)}</div>
         <div class="fresh">${nmB(nm)} ${nm.tier?'· T'+nm.tier+(nm.ench?'.'+nm.ench:''):''} · ${isMat?'ресурс/материал':catName(nm.cat)} · <code>${id}</code></div></div>
       <span style="margin-left:auto;display:flex;gap:8px">${backBtnHTML()}<button id="itemBack">← к поиску</button></span></div>`;
@@ -4167,7 +4231,6 @@ function itemCardHTML(id){
 // Отличие от раздела «Крафт»: там перебор всего подряд по городским станкам,
 // здесь одна позиция и все допущения открыты для правки. Нужно для убежищ,
 // где процент возврата и плата за станок свои, и для прикидок «а если».
-const CALC_ICO = (id,sz) => 'https://render.albiononline.com/v1/item/'+enc(id)+'.png?size='+(sz||40);
 function calcInit(){
   if(S.calc) return;
   S.calc = {q:'', tier:'', ench:'', sel:null, qty:1,
@@ -4285,7 +4348,7 @@ function calcTabHTML(){
     if((c.q||'').trim().length<2) out+=`<div class="fresh" style="margin-top:12px">Введи хотя бы две буквы. Тир и зачарование сужают выдачу.</div>`;
     else if(!list.length) out+=`<div class="fresh" style="margin-top:12px">Ничего не найдено.</div>`;
     else out+=`<table style="margin-top:12px"><tbody>`+list.map(o=>
-      `<tr class="row" data-pick="${o.id}"><td style="width:46px"><img src="${CALC_ICO(o.id,40)}" style="width:36px;height:36px;vertical-align:middle" loading="lazy"></td>
+      `<tr class="row" data-pick="${o.id}"><td style="width:46px"><img ${icoAttr(o.id,40)} style="width:36px;height:36px;vertical-align:middle"></td>
        <td><b>${nmA(o)}</b><div class="fresh">T${o.tier}${o.ench?'.'+o.ench:''} · ${o.id}</div></td></tr>`).join('')+`</tbody></table>`;
     return out+`</div>`;
   }
@@ -4300,7 +4363,7 @@ function calcTabHTML(){
 
   let out=`<div class="panel"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <button id="calcBack" class="ctl" style="cursor:pointer">← к поиску</button>
-      <img src="${CALC_ICO(it.id,64)}" style="width:44px;height:44px;vertical-align:middle">
+      <img ${icoAttr(it.id,64)} style="width:44px;height:44px;vertical-align:middle">
       <b style="font-size:16px">${nmA(it)}</b>
       <span class="badge">T${it.tier}${it.ench?'.'+it.ench:''}</span>
       ${it.batch>1?`<span class="badge">партия ${it.batch} шт</span>`:''}
@@ -4328,7 +4391,7 @@ function calcTabHTML(){
   for(const r of (cost?cost.rows:[])){
     const nmo=(DATA.matNames&&DATA.matNames[r.id])||{};
     const label=nmA(nmo)||r.id;
-    out+=`<tr><td style="width:40px"><img src="${CALC_ICO(r.id,32)}" style="width:28px;height:28px;vertical-align:middle" loading="lazy"></td>
+    out+=`<tr><td style="width:40px"><img ${icoAttr(r.id,32)} style="width:28px;height:28px;vertical-align:middle"></td>
       <td>${label}${r.art?' <span class="badge">артефакт</span>':''}<div class="fresh">${r.id}</div></td>
       <td>${r.n}</td>
       <td><input type="number" class="calcPx" data-m="${r.id}" min="0" value="${r.price!=null?Math.round(r.price):''}" placeholder="нет цены" style="width:96px">${r.own?' <span class="badge">своя</span>':''}</td>
@@ -4578,7 +4641,7 @@ const islK=n=>{const a=Math.abs(n); const s=n<0?'-':'';
 function islandsHTML(){
   islInit();
   const c=S.isl, R=islCalc();
-  const ico=(id,sz)=>`<img loading="lazy" src="https://render.albiononline.com/v1/item/${enc(id)}.png?size=${sz||32}" onerror="this.style.display='none'">`;
+  const ico=(id,sz)=>`<img ${icoAttr(id,sz||32)}>`;
   const any=Object.values(R).some(x=>x.has);
   let out=`<div class="panel"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <b>🏝 Острова</b>${backBtnHTML()}
@@ -4830,7 +4893,7 @@ function itemTabHTML(){
   out += '<table><tbody>';
   for(const h of hits.slice(0,60)){
     out += `<tr class="row" data-open="${h.id}"><td class="item">
-      <img loading="lazy" src="https://render.albiononline.com/v1/item/${enc(h.id)}.png?size=48" style="width:38px;height:38px" onerror="this.style.display='none'">
+      <img ${icoAttr(h.id,48)} style="width:38px;height:38px">
       <div class="iname"><b>${nmA(h)}</b><span>${nmB(h)} ${h.tier?'· T'+h.tier+(h.ench?'.'+h.ench:''):''} · ${h.kind==='mat'?'ресурс':catName(h.cat)}</span></div></td></tr>`;
   }
   out += '</tbody></table></div>';
