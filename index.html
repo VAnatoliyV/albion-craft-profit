@@ -388,12 +388,14 @@ img[data-ico]:not([src]),img.icoFail{background:rgba(255,255,255,.05);border-rad
 .islMoreBtn:hover{background:rgba(238,188,78,.3)}
 .islCard.sel .islSwap>.islMoreBtn:active{transform:translateY(1px)}
 @media (prefers-reduced-motion:reduce){.islSwap>.islRule,.islSwap>.islMoreBtn{transition:none}}
-/* полоска бонусных иконок отмеряется от низа карточки; слот выше прежнего герба */
-.islBon{bottom:62px}
-/* полоска бонусных иконок висит над подписью, а не толкает её вниз:
-   иначе у Бресильена с восемью культурами карточка выше остальных и сетка едет */
-.islBon{position:absolute;bottom:62px;left:0;right:0;text-align:center;font-size:0;z-index:2}
-.islBon img{display:inline-block!important;width:24px!important;height:24px!important;aspect-ratio:auto!important;margin:0 1px!important;vertical-align:middle!important;filter:drop-shadow(0 2px 3px rgba(0,0,0,.8))}
+
+/* Полоска бонусных иконок висит над подписью, а не толкает её вниз: иначе у
+   Бресильена с восемью культурами карточка выше остальных и сетка едет.
+   Раньше она отмерялась от низа карточки, и стоило подписи подрасти — иконки
+   наезжали на название. Теперь у полоски нулевая высота и своё место сразу
+   под артом: что бы ни стояло в подписи, герб или кнопка, наезда не будет. */
+.islBon{position:relative;height:0;z-index:2;text-align:center;font-size:0;white-space:nowrap}
+.islBon img{display:inline-block!important;width:24px!important;height:24px!important;aspect-ratio:auto!important;margin:0 1px!important;vertical-align:middle!important;transform:translateY(calc(-100% - 3px));filter:drop-shadow(0 2px 3px rgba(0,0,0,.8))}
 .islPill{position:absolute;top:11px;right:11px;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:700;
   background:rgba(0,0,0,.58);border:1px solid rgba(255,255,255,.16);z-index:2;font-variant-numeric:tabular-nums}
 .islPill.pos{color:#8ff09a}.islPill.neg{color:#ff9d90}.islPill.na{color:#b9c0ce;font-weight:500}
@@ -4779,8 +4781,8 @@ function islandsHTML(){
     out+=`<div class="islCard${c.sel===i?' sel':''}" data-isl="${i}" style="background:linear-gradient(165deg,${ci.bg[0]},${ci.bg[1]})">
       ${b?`<div class="islBest">${b.n}${b.yb?' <b style="color:#8ff09a">+10%</b>':''}</div>`:''}
       <div class="islPill ${b?(r.total>=0?'pos':'neg'):'na'}">${b?islK(r.total)+'<span>/сут</span>':'нет цен'}</div>
-      <div class="islBon">${(ISL_BONUS[ci.k]||[]).map(id=>islOutOf[id]?ico(islOutOf[id],40):'').join('')}</div>
       <img class="islArt" src="img/${ci.img}.webp" alt="${(CITY_SHORT[ci.k]||ci.k)}" decoding="async">
+      <div class="islBon">${(ISL_BONUS[ci.k]||[]).map(id=>islOutOf[id]?ico(islOutOf[id],40):'').join('')}</div>
       <div class="islCap"><div class="islNm">${(CITY_SHORT[ci.k]||ci.k)}</div>
         <div class="islSwap">
           <div class="islRule"><i></i><svg viewBox="0 0 16 16">${ISL_EM[ci.em]||''}</svg><i></i></div>
