@@ -1236,7 +1236,7 @@ const LOGO={}; let logoRAF=null, LOGO_T0=0;
 function logoHash(i,k){ let n=(i*374761393+k*668265263)&0x7fffffff; n=(n^(n>>13))*1274126177&0x7fffffff; return ((n^(n>>16))&0xffff)/0xffff; }
 const logoBell = p => p<=0||p>=1 ? 0 : Math.sin(p*Math.PI);
 function logoEv(t,at,dur,period){ const p=((t-at)%period+period)%period; return p<dur ? logoBell(p/dur) : 0; }
-function logoDraw(t, ctx, g, sad){
+function logoDraw(t, ctx, g){
   // Рисуем не полутора тысячами вызовов fillRect, а одним куском памяти: складываем
   // кадр в буфер и отдаём его целиком. На пиксельной картинке это в разы дешевле,
   // а на глаз результат тот же.
@@ -1263,8 +1263,7 @@ function logoDraw(t, ctx, g, sad){
   const noise = Math.floor(t/90);
   for(let i=0;i<g.px.length;i++){
     const q=g.px[i];
-    if(sad){ if(q.part==='eyeL'||q.part==='eyeR') continue; }   // на пустой странице глаз нет, там крестики
-    else if((q.part==='eyeL'&&closedL)||(q.part==='eyeR'&&closedR)) continue;
+    if((q.part==='eyeL'&&closedL)||(q.part==='eyeR'&&closedR)) continue;
     let a=1;
     if(q.v===1){ const r=logoHash(i,noise); if(r>0.62) continue; a=0.30+r*0.75; }
     let dx=shear(q.y);
@@ -1277,24 +1276,8 @@ function logoDraw(t, ctx, g, sad){
   const lid = e => { const y=Math.round(e.y+bob), dx=shear(e.y), u=Math.max(1,Math.round(k));
     for(let x=e.x0+1;x<e.x1;x++) for(let j=0;j<u;j++) set(x+dx, y+j, 1);
     for(let j=0;j<u;j++){ set(e.x0+dx, y-u+j, 1); set(e.x1+dx, y-u+j, 1); } };
-  // Крестики едут вместе с головой: тот же наклон и то же покачивание, что у пикселей,
-  // иначе они «отклеиваются» от морды, когда он ведёт головой.
-  const cross = e => { const cx=Math.round((e.x0+e.x1)/2), cy=Math.round(e.y), dx=shear(e.y);
-    const r=Math.max(2, Math.round(4*k));
-    for(let i=-r;i<=r;i++){ set(cx+i+dx, cy+i+bob, 1); set(cx+i+dx, cy-i+bob, 1); } };
-  if(sad){
-    cross(g.eyeL); cross(g.eyeR);
-    // Дождь: из-под капюшона всё время срываются пиксели и падают вниз. Капель шесть,
-    // а не девять как в наброске: так спокойнее на глаз и дешевле по работе.
-    for(let i=0;i<6;i++){
-      const period=1500+((i*457)%1300), p=((t+i*611)%period)/period;
-      const x=Math.round(g.w*(0.20+0.12*i));
-      const y0=Math.round(g.h*(0.72+logoHash(i,3)*0.12));
-      const y=Math.round(y0+p*(g.h-y0));
-      if(y<g.h){ set(x, y, 0.85); if(y>0) set(x, y-1, 0.32); }
-    }
-  }
-  else { if(closedL) lid(g.eyeL); if(closedR) lid(g.eyeR); }
+  if(closedL) lid(g.eyeL);
+  if(closedR) lid(g.eyeR);
   ctx.putImageData(buf, 0, 0);
 }
 // ─── Заяц пустого результата ─────────────────────────────────────────
@@ -1307,6 +1290,46 @@ function sadBunHTML(title, hint){
     <div class="emptyTtl">${title}</div>
     ${hint ? `<div class="fresh emptyHint">${hint}</div>` : ''}
   </div>`;
+}
+const SAD_INK = 0x00E9EFF2;
+// Тело зайца для пустой страницы считается один раз и лежит готовым: крестики
+// вместо глаз, полутон ровный, без ряби. Каждый кадр остаётся скопировать эту
+// картинку и подрисовать капли — это вся работа.
+function sadBody(g){
+  if(g._sadBody) return g._sadBody;
+  const buf=new Uint32Array(g.w*g.h);
+  const set=(x,y,a)=>{ x=x|0; y=y|0; if(x<0||y<0||x>=g.w||y>=g.h) return;
+    const v=(Math.min(255,a*255|0)<<24)|SAD_INK, i=y*g.w+x;
+    if((buf[i]>>>24)<(v>>>24)) buf[i]=v; };
+  for(const q of g.px){
+    if(q.part==='eyeL'||q.part==='eyeR') continue;
+    set(q.x, q.y, q.v===1 ? 0.34 : 1);
+  }
+  const r=Math.max(2, Math.round(4*g.k));
+  for(const e of [g.eyeL, g.eyeR]){
+    const cx=Math.round((e.x0+e.x1)/2), cy=Math.round(e.y);
+    for(let i=-r;i<=r;i++){ set(cx+i, cy+i, 1); set(cx+i, cy-i, 1); }
+  }
+  return (g._sadBody=buf);
+}
+// Дождь: из-под капюшона срываются пиксели и падают вниз. Характер взят из
+// наброска живого лого, только капель шесть вместо девяти.
+function sadDraw(t, ctx, g){
+  const body=sadBody(g);
+  const img = g._sadImg || (g._sadImg = ctx.createImageData(g.w, g.h));
+  const u32 = g._sadU32 || (g._sadU32 = new Uint32Array(img.data.buffer));
+  u32.set(body);
+  const put=(x,y,a)=>{ if(x<0||y<0||x>=g.w||y>=g.h) return;
+    const i=y*g.w+x, v=(Math.min(255,a*255|0)<<24)|SAD_INK;
+    if((u32[i]>>>24)<(v>>>24)) u32[i]=v; };
+  for(let i=0;i<6;i++){
+    const period=1500+((i*457)%1300), p=((t+i*611)%period)/period;
+    const x=Math.round(g.w*(0.20+0.12*i));
+    const y0=Math.round(g.h*(0.72+logoHash(i,3)*0.12));
+    const y=Math.round(y0+p*(g.h-y0));
+    if(y<g.h){ put(x,y,0.85); if(y>0) put(x,y-1,0.32); }
+  }
+  ctx.putImageData(img, 0, 0);
 }
 let SAD_BUN=null;   // холст пустой страницы; ищем его при перерисовке, а не каждый кадр
 function paintSadBun(){
@@ -1448,13 +1471,12 @@ function logoStart(){
     const a=$('logoHome'), b=$('logoHdr');
     if(a && a.offsetParent!==null) anvilDraw(t, a.getContext('2d'), ANVIL);
     if(b && b.offsetParent!==null) logoDraw(t, b.getContext('2d'), LOGO.small);
-    // Заяц пустой страницы: та же картинка и та же жизнь, только с крестиками и
-    // дождём. Холст запомнен при перерисовке, чтобы не искать его в DOM тридцать раз
-    // в секунду, и рисуем через кадр: пятнадцати в секунду дождю хватает с запасом,
-    // а работы вдвое меньше.
+    // Заяц пустой страницы. Холст запомнен при перерисовке, чтобы не искать его
+    // в DOM тридцать раз в секунду, и рисуем через кадр: пятнадцати в секунду
+    // дождю хватает с запасом.
     sadTick=!sadTick;
     if(sadTick && SAD_BUN && SAD_BUN.isConnected && SAD_BUN.offsetParent!==null)
-      logoDraw(t, SAD_BUN.getContext('2d'), LOGO.small, true);
+      sadDraw(t, SAD_BUN.getContext('2d'), LOGO.small);
   })(t0);
 }
 
