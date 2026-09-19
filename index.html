@@ -1895,20 +1895,25 @@ function cache_get(k){ try{ const v=JSON.parse(localStorage.getItem('acp_'+k)||'
 function cache_set(k,d){ try{ localStorage.setItem('acp_'+k, JSON.stringify({t:Date.now(),d})); }catch(e){} }
 function chunks(a,n){ const o=[]; for(let i=0;i<a.length;i+=n) o.push(a.slice(i,i+n)); return o; }
 
-// обход блокировок: если прямой доступ к API не работает (например, из РФ),
-// пробуем публичные прокси-зеркала. Рабочий путь запоминается.
+// Обход блокировок: если прямой доступ к API не работает (например, из РФ),
+// идём через зеркало. Рабочий путь запоминается.
+//
+// Прежние два зеркала умерли, и вместе с ними умер раздел дорог: allorigins.win
+// перестал отвечать вовсе, а corsproxy.io перешёл на ключи и теперь отдаёт 401
+// чужим доменам. Проверено вживую в браузере, не на глаз. Взамен r.jina.ai:
+// с заголовком x-return-format он отдаёт тело как есть, без своей обёртки.
 const API_ROUTES = [
-  u => u,                                                          // напрямую
-  u => 'https://api.allorigins.win/raw?url='+encodeURIComponent(u), // прокси 1
-  u => 'https://corsproxy.io/?url='+encodeURIComponent(u),          // прокси 2
+  { mk: u => u },                                                       // напрямую
+  { mk: u => 'https://r.jina.ai/'+u, h: {'x-return-format':'text'} },   // зеркало
 ];
 let apiRoute = +( (()=>{ try{return localStorage.getItem('acp_route')}catch(e){return 0} })() || 0 );
 if(!(apiRoute>=0 && apiRoute<API_ROUTES.length)) apiRoute=0;
-function fetchTO(url, ms, noCache){
+function fetchTO(url, ms, noCache, headers){
   const ctl = new AbortController();
   const t = setTimeout(()=>ctl.abort(), ms);
   const opt = {signal: ctl.signal};
   if(noCache) opt.cache = 'reload'; // «Обновить» обязан сходить в сеть, а не в кэш
+  if(headers) opt.headers = headers;
   return fetch(url, opt).finally(()=>clearTimeout(t));
 }
 // У Albion Data Project лимит на IP: 180 запросов в минуту и 300 за пять минут.
@@ -1934,17 +1939,23 @@ async function rateGate(){
 async function fetchJSON(url){
   const c = cache_get(url); if(c) return c;
   await rateGate();
+  // Киллборд не отдаёт заголовков CORS: браузер не прочитает его напрямую ни из
+  // какой сети и ни под каким VPN — это политика их API. Прямую попытку для него
+  // пропускаем, иначе каждый заход в раздел начинался бы с десяти секунд впустую.
+  const kill = url.includes('/gameinfo/');
+  const order = kill ? [1] : API_ROUTES.map((_,i)=>(apiRoute+i)%API_ROUTES.length);
   let lastErr;
-  for(let k=0;k<API_ROUTES.length;k++){
-    const idx=(apiRoute+k)%API_ROUTES.length;
+  for(const idx of order){
     try{
-      const r = await fetchTO(API_ROUTES[idx](url), idx===0?10000:20000);
+      const rt = API_ROUTES[idx];
+      const r = await fetchTO(rt.mk(url), idx===0?10000:20000, false, rt.h);
       if(!r.ok) throw new Error('API '+r.status);
       const d = await r.json();
-      if(idx!==apiRoute){ apiRoute=idx; try{localStorage.setItem('acp_route',String(idx))}catch(e){}
+      if(!kill && idx!==apiRoute){ apiRoute=idx; try{localStorage.setItem('acp_route',String(idx))}catch(e){}
         if(idx>0){ S.viaProxy=true; if(typeof renderStatus==='function') renderStatus(); } }
-      // историю в per-URL кэш не пишем: ответы огромные и выбивают квоту localStorage
-      if(!url.includes('/stats/history/')) cache_set(url,d);
+      // историю и киллборд в per-URL кэш не пишем: ответы огромные (у киллборда
+      // под мегабайту на страницу) и выбивают квоту localStorage
+      if(!url.includes('/stats/history/') && !url.includes('/gameinfo/')) cache_set(url,d);
       return d;
     }catch(e){ lastErr=e; }
   }
