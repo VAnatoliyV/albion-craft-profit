@@ -484,6 +484,23 @@ body.light td.item{min-width:230px}
 #tableWrap > table > tbody > tr.det > td{padding-left:0;padding-right:0}
 #tableWrap > table > tbody > tr.det > td > .detIn{position:sticky;left:0;width:var(--hsw,auto);
   box-sizing:border-box;padding:0 16px;overflow-x:auto}
+/* На телефоне таблицы внутри разбора строки не помещались: от них было видно
+   серую шапку и пустоту, а цены и суммы уезжали за край. Ужимаем под экран:
+   переносим текст, убираем второе название предмета и лишние отступы. */
+@media (max-width:768px){
+  /* table-layout:fixed — иначе браузер считает ширину по содержимому и max-width
+     на ячейке просто игнорирует: колонка с названием раздувалась до 190 px. */
+  #tableWrap tr.det .detIn table{width:100%;min-width:0;table-layout:fixed}
+  #tableWrap tr.det .detIn th,#tableWrap tr.det .detIn td{padding:5px 5px;white-space:normal}
+  /* переносить посреди слова можно только названия: заголовки от этого
+     рассыпаются по букве в строке («BUY IN TOTA L») */
+  #tableWrap tr.det .detIn td:first-child{overflow-wrap:anywhere}
+  #tableWrap tr.det .detIn th{font-size:9.5px;letter-spacing:0}
+  #tableWrap tr.det .detIn th:first-child,#tableWrap tr.det .detIn td:first-child{width:36%}
+  #tableWrap tr.det .detIn td:has(img[data-ico]) .fresh{display:none}
+  #tableWrap tr.det .detIn td img[data-ico]{width:24px;height:24px}
+  #tableWrap tr.det .detIn input[type=number]{width:62px}
+}
 
 .mchip.err{border-color:rgba(228,111,97,.45);color:var(--red)}
 /* Премиум меняет налог с продаж вдвое и двигает каждую цифру на сайте,
