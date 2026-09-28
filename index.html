@@ -209,6 +209,15 @@ tr.det b{color:var(--text)}
 #sideCol .secCtls b{font-size:13px;color:var(--accent)}
 #sideCol .ctl>span:first-child,#sideCol .ctl{font-size:12px}
 #sideCol .help{margin-left:4px}
+/* Общие настройки внизу колонки: то, что ставят один раз и забывают. */
+#sideCol .genSet{width:100%;border-top:1px solid var(--border);padding-top:11px;margin-top:2px}
+#sideCol .genSet summary{cursor:pointer;color:var(--muted);font-size:12px;list-style:none;user-select:none}
+#sideCol .genSet summary::-webkit-details-marker{display:none}
+#sideCol .genSet summary::before{content:"▸ "}
+#sideCol .genSet[open] summary::before{content:"▾ "}
+#sideCol .genSet summary:hover{color:var(--text)}
+#sideCol .ctlMore{display:flex;flex-direction:column;align-items:stretch;gap:10px;
+  width:100%;margin:10px 0 0;padding:0;border:0;background:none}
 #colHide{align-self:flex-end;border:1px solid var(--border);background:var(--card);
   color:var(--muted);border-radius:8px;padding:2px 8px;cursor:pointer;font-size:12px}
 #appMain{padding-left:18px}
@@ -1427,8 +1436,8 @@ function buildMorePanel(){
 function paintMoreBtn(){
   const btn = $('ctlMoreBtn'), box = $('ctlMore');
   if(!btn || !box) return;
-  // Кнопка прятала переполнение старой шапки. Настройки уехали в боковую
-  // колонку, прятать больше нечего — и «ещё 12» в шапке только сбивает.
+  // Кнопка прятала переполнение старой шапки. Сам ящик теперь живёт внизу
+  // боковой колонки (см. fillSideCol), поэтому кнопка в шапке не нужна.
   if($('sideCol')){ btn.style.display='none'; box.classList.remove('on'); return; }
   const n = CTL_MORE_EL.filter(el => el.style.display !== 'none' && !(isLite() && el.classList.contains('proOnly'))).length;
   btn.style.display = n ? '' : 'none';
@@ -1810,6 +1819,7 @@ Object.assign(T_UI, {"Сколько штук в день реально про�
 Object.assign(T_UI, {"Сейчас окна нет. Следующее в {} UTC (через ~{} ч {} мин, шанс от {} до {}%).": ["No window right now. The next one at {} UTC (in ~{} h {} min, chance {} to {}%).", "Ahora no hay ventana. La siguiente a las {} UTC (en ~{} h {} min, probabilidad del {} al {}%)."], "Сейчас окна нет. Следующее в {} UTC (через ~{} ч {} мин, шанс ~{}%).": ["No window right now. The next one at {} UTC (in ~{} h {} min, chance ~{}%).", "Ahora no hay ventana. La siguiente a las {} UTC (en ~{} h {} min, probabilidad ~{}%)."], "Вечерний прайм-тайм, с {} до {} UTC. Ганкеров на дорогах больше всего.": ["Evening prime time, {} to {} UTC. This is when the roads have the most gankers.", "Hora punta de la tarde, de las {} a las {} UTC. Es cuando hay más gankers en los caminos."]});
 Object.assign(T_UI, {"⏳ Опрашиваю киллборд Europe, последние примерно {} убийств…": ["⏳ Polling the Europe killboard, roughly the last {} kills…", "⏳ Consultando el killboard de Europa, aproximadamente las últimas {} muertes…"], "Полный плейт с защитными абилками, булава+щит (корни и иммун), латные сапоги. Философия стримера из видео: пусть бьют, броня переживёт, главное дотянуть до безопасной зоны.": ["Full plate with defensive abilities, mace and shield (roots and immunity), plate boots. The streamer's philosophy from the video: let them hit you, the armour will hold, the point is to reach the safe zone.", "Placas completas con habilidades defensivas, maza y escudo (raíces e inmunidad), botas de placas. La filosofía del streamer del vídeo: que peguen, la armadura aguantará; lo importante es llegar a la zona segura."]});
 Object.assign(T_UI, {"Скопировать название. Вставь его в поиск на рынке в игре": ["Copy the name. Paste it into the market search in game", "Copia el nombre. Pégalo en la búsqueda del mercado del juego"], "Впиши свою цену, если на рынке она другая. Оставь пусто или поставь {}, чтобы вернуть цену с рынка.": ["Type your own price if the market says otherwise. Leave it empty or put {} to bring the market price back.", "Escribe tu propio precio si el mercado dice otra cosa. Déjalo vacío o pon {} para recuperar el precio del mercado."], "По какой цене ты реально продашь. Оставь пусто или поставь {}, чтобы вернуть цену с рынка.": ["The price you will actually sell at. Leave it empty or put {} to bring the market price back.", "El precio al que venderás de verdad. Déjalo vacío o pon {} para recuperar el precio del mercado."], "Сырьё и станок (станок за партию {}). Возврат придёт материалами уже после крафта.": ["Materials and the station (the station costs {} per batch). The return comes back as materials after the crafting.", "Materiales y el taller (el taller cuesta {} por lote). El retorno llega en materiales después de fabricar."], "Сырьё и станок. Возврат придёт материалами уже после крафта.": ["Materials and the station. The return comes back as materials after the crafting.", "Materiales y el taller. El retorno llega en materiales después de fabricar."], "Считаем, что ты забираешь {}% дневного оборота рынка, {}/д.": ["We assume you take {}% of the market's daily turnover, {}/day.", "Suponemos que te llevas el {}% del movimiento diario del mercado, {}/día."], "сырьё {}, возврат {}% → эффективно {}": ["materials {}, return {}% → effectively {}", "materiales {}, retorno {}% → efectivamente {}"], "· компоненты {} (без возврата)": ["components {} (no return)", "componentes {} (sin retorno)"], "· станок {}": ["· station {}", "· taller {}"], "Цена выставленных на ЧР ордеров на продажу, но не выше обычной цены за месяц. Минус налог и сбор {}%.": ["The price of sell orders placed on the Black Market, but never above the usual monthly price. Minus the tax and the {}% fee.", "El precio de las órdenes de venta puestas en el mercado negro, pero nunca por encima del precio habitual del mes. Menos el impuesto y la comisión del {}%."], "Сколько ты реально заработаешь за день, если будешь крафтить и продавать эту позицию: профит с штуки умножен на то, сколько штук рынок съедает за день.": ["How much you will really earn in a day if you craft and sell this row: the profit per piece times how many pieces the market swallows in a day.", "Cuánto ganarás de verdad al día si fabricas y vendes esta fila: el beneficio por unidad multiplicado por las unidades que el mercado absorbe al día."], "Сдать сразу: продаёшь по живому бай-ордеру, деньги в ту же секунду и гарантированно, платится только налог.": ["Sell instantly: you sell into a live buy order, the money is there the same second and guaranteed, and only the tax is paid.", "Vender al instante: vendes a una orden de compra viva, el dinero llega en el mismo segundo y garantizado, y solo se paga el impuesto."], "Выставить ордер: ставишь свой на продажу и ждёшь, пока ЧР поднимет свою цену до твоей. Может и не подняться, а сбор за выставление {}% не вернётся.": ["Place an order: you put your own up for sale and wait for the Black Market to raise its price to yours. It may never get there, and the {}% listing fee does not come back.", "Poner una orden: pones la tuya en venta y esperas a que el mercado negro suba su precio hasta el tuyo. Puede que no lo haga, y la comisión de publicación del {}% no se devuelve."], "Средняя цена сделок на чёрном рынке за месяц. На ЧР каждая сделка это исполнившийся ордер на продажу, поэтому это и есть ответ на вопрос, по какой цене такие ордера реально уходили.": ["The average price of Black Market deals over the month. On the BM every deal is a sell order that went through, so this is the answer to the question of what such orders actually went for.", "El precio medio de las operaciones del mercado negro durante el mes. En el MN cada operación es una orden de venta ejecutada, así que esta es la respuesta a por cuánto se vendieron realmente esas órdenes."], "ордера сейчас стоят на": ["orders are currently sitting", "las órdenes están ahora"], "выше нормы": ["above normal", "por encima de lo normal"], ", в расчёт взята обычная": [", the maths uses the usual one", ", el cálculo usa el habitual"], "· сейчас просят на {}% выше, в расчёт взята обычная": ["· they are asking {}% more right now, the maths uses the usual one", "· ahora piden un {}% más, el cálculo usa el habitual"], "Обычная цена за месяц. Это то, за сколько вещь уходит изо дня в день. Если бай-ордер сейчас выше неё, профит считается по обычной цене.": ["The usual price over the month. That is what the item goes for day in, day out. If the buy order is above it right now, the profit is counted at the usual price.", "El precio habitual del mes. Es por lo que el objeto se va día tras día. Si la orden de compra está ahora por encima, el beneficio se calcula al precio habitual."], "Самый дешёвый выставленный на продажу ордер на чёрном рынке. По этой цене можно встать в очередь и ждать.": ["The cheapest sell order placed on the Black Market. At this price you can join the queue and wait.", "La orden de venta más barata puesta en el mercado negro. A ese precio puedes ponerte en la cola y esperar."], "«Впритык, с возвратом»: возврат падает в сумку после каждого крафта, и его можно пустить в следующий. Тогда покупать надо примерно на четверть меньше. Но возврат случайный. {}% это среднее за много крафтов, а на одной партии может не повезти. Поэтому сюда заложено {}% запаса. Раньше его не было, и партия вставала на последней штуке.\n\nВажно. Станок проверяет материалы сразу на весь заказ. Поставить {} штук одной кнопкой в этом режиме не выйдет, крафтить придётся кусками по {} или {} штук, подбирая возврат из сумки.\n\n«На всё количество»: полный рецепт на все штуки. Одна кнопка и никакой возни, но денег нужно на четверть больше, а в конце останется гора возвращённых материалов. Профит от выбора не меняется: остатки стоят ровно столько, сколько ты переплатил.": ["«Just enough, with returns»: the return drops into your bag after every craft and can go into the next one. Then you need to buy about a quarter less. But the return is random. {}% is the average over many crafts, and a single batch can be unlucky. That is why {}% of slack is built in here. It was not there before, and a batch would stall on the last piece.\n\nImportant. The station checks the materials for the whole order at once. Putting {} pieces in with one button will not work in this mode: you will craft in chunks of {} or {} pieces, picking the return out of your bag.\n\n«For the whole amount»: the full recipe for every piece. One button and no fuss, but you need a quarter more money, and at the end you are left with a pile of returned materials. The profit does not change with this choice: the leftovers are worth exactly what you overpaid.", "«Lo justo, con retorno»: el retorno cae en la bolsa después de cada fabricación y puede ir a la siguiente. Entonces hay que comprar alrededor de un cuarto menos. Pero el retorno es aleatorio. El {}% es la media de muchas fabricaciones, y en un solo lote puedes tener mala suerte. Por eso aquí se ha metido un {}% de margen. Antes no lo había y el lote se atascaba en la última pieza.\n\nImportante. El taller comprueba los materiales de todo el pedido de golpe. Poner {} unidades con un botón no funcionará en este modo: tendrás que fabricar en tandas de {} o {} unidades, sacando el retorno de la bolsa.\n\n«Para toda la cantidad»: la receta completa para todas las unidades. Un botón y sin líos, pero hace falta un cuarto más de dinero y al final te queda un montón de materiales devueltos. El beneficio no cambia con esta elección: las sobras valen exactamente lo que pagaste de más."]});
+Object.assign(T_UI, {"Общие настройки": ["General settings", "Ajustes generales"]});
 const T_RE = [
   [/^Обычная цена за месяц: (.+?) \(по сделкам в (.+?)\)\.$/,
    "Usual price over the month: $1 (from deals in $2).",
@@ -5266,22 +5276,20 @@ const ISL_TIP_CYCLE='Средняя ожидаемая прибыль на се�
 const ISL_TIP_DAY='Эквивалент за 24 часа при непрерывных 22-часовых циклах без простоя.';
 const islOutOf={}; ISL_CROPS.forEach(c=>islOutOf[c.seed]=c.out); ISL_ANIMALS.forEach(a=>islOutOf[a.grown]=a.out);
 
-function islInit(){ if(!S.isl) S.isl={sel:null, full:null, plots:27, herd:9, fav:false, focus:false, seedRet:'as-is', sellMode:'any', recQ:'', rec:null, recN:10, sortK:'day', sortD:-1};
+function islInit(){ if(!S.isl) S.isl={sel:null, full:null, plots:27, herd:9, fav:false, focus:false, sellMode:'any', recQ:'', rec:null, recN:10, sortK:'day', sortD:-1};
   if(S.isl.full===undefined) S.isl.full=null;
-  if(!S.isl.seedRet) S.isl.seedRet='as-is'; }
+  delete S.isl.seedRet; }
 
-// Возврат семян без фокуса под вопросом. В игровом дампе (items.xml, 19 сентября
-// 2026) у всех пятнадцати семян activefarmbonus × itemvalue даёт ровно 800, а
-// отдельного поля «шанс вернуть семя» нет вовсе — похоже, без фокуса семена не
-// возвращаются. Наши ret при этом в точности равны 1 − bon/2, то есть выведены
-// из того же поля, прочитанного вторым способом.
+// Возврат семян взят из игрового дампа и проверен 28 сентября 2026. Он лежит не
+// в атрибутах farmableitem, а во вложенном узле: <harvest><seed chance="0.8"/>.
+// Совпадает с нашими ret до знака у всех пятнадцати семян; у моркови T1 честный
+// ноль. Прежний переключатель «возвращаются / не возвращаются» был подпоркой на
+// время, пока поле считалось ненайденным, и убран.
 //
-// Пока не проверено грядкой в игре, не меняем числа молча: даём переключатель и
-// говорим вслух, что вопрос открыт. Разница немалая — на T5 расход на семена
-// отличается в пять раз, на T8 в пятнадцать.
+// Открытым остаётся одно: фокус складывается с базовым возвратом или заменяет
+// его. Складываем — само слово «bonus» за это, и по умолчанию фокус выключен.
 function islSeedRet(q, focus){
-  if(focus) return q.ret + q.bon;
-  return (S.isl && S.isl.seedRet==='none') ? 0 : q.ret;
+  return focus ? q.ret + q.bon : q.ret;
 }
 function islName(id){ const o=(DATA.matNames&&DATA.matNames[id]); return o?nmA(o):id; }
 function islPx(id, city){ const p=matPrice(id, city); return p?p.price:0; }
@@ -5397,10 +5405,6 @@ function islCtlHTML(){
   return `<div class="secCtls" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <b>🏝 Острова</b>${backBtnHTML()}
       <label class="ctl"><input type="checkbox" id="islFocus"${c.focus?' checked':''}> фокус</label>
-      <label class="ctl" title="${tr('Возврат семян без фокуса под вопросом: в игровом дампе такого поля нет, а наши числа выведены из бонуса фокуса. Пока не проверено грядкой в игре, оставляем выбор за тобой.')}">${tr('семена')} <select id="islSeedRet">
-        <option value="as-is"${(c.seedRet||'as-is')==='as-is'?' selected':''}>${tr('возвращаются')}</option>
-        <option value="none"${c.seedRet==='none'?' selected':''}>${tr('не возвращаются')}</option>
-      </select></label>
       <label class="ctl">продаю <select id="islSellMode">
         <option value="any"${m==='any'?' selected':''}>где выгодно</option>
         <option value="near"${m==='near'?' selected':''}>у соседей</option>
@@ -5686,7 +5690,6 @@ function wireIslands(){
   n('islHerd',  el=>c.herd=Math.max(0,+el.value||0));
   n('islFav',   el=>c.fav=el.checked);
   n('islFocus', el=>c.focus=el.checked);
-  n('islSeedRet', el=>c.seedRet=el.value);
   n('islSellMode', el=>c.sellMode=el.value);
   document.querySelectorAll('[data-isl]').forEach(el=>el.onclick=()=>{
     const i=+el.dataset.isl; c.sel = (c.sel===i?null:i); render(); });
@@ -5922,6 +5925,8 @@ function moveSecCtls(){
   col.querySelectorAll('.secCtls').forEach(el=>el.remove());  // прошлая копия
   const row=document.querySelector('#appMain .secCtls');
   if(row) col.appendChild(row);
+  // общие настройки всегда внизу: раздел свои показывает первыми
+  const общие=$('genSet'); if(общие) col.appendChild(общие);
   const пусто = !col.querySelector('.ctl');
   const sh=$('appShell'); if(sh) sh.classList.toggle('emptyCol', пусто);
   const b=$('colHide'); if(b) b.style.display = пусто?'none':'';
@@ -5944,6 +5949,23 @@ function fillSideCol(vis){
       ctr.appendChild(w);
       if(id==='wrapCity'){ const h=$('cityHint'); if(h) ctr.appendChild(h); }
     }
+  }
+  // Общие настройки: дневной бонус, премиум, бюджет, дни, вес, возраст цен,
+  // автообновление и язык названий. Они жили во втором ряду шапки под кнопкой
+  // «ещё». Ряд после перестройки на рельсу исчез вместе с кнопкой, а содержимое
+  // никуда не переехало — и всё это пропало из интерфейса совсем. Теперь оно
+  // внизу колонки, одинаково на всех разделах, свёрнутое.
+  const box=$('ctlMore');
+  if(box){
+    let det=$('genSet');
+    if(!det){
+      det=document.createElement('details'); det.id='genSet'; det.className='genSet';
+      const sum=document.createElement('summary');
+      sum.textContent='Общие настройки';
+      det.appendChild(sum);
+    }
+    if(box.parentNode!==det){ det.appendChild(box); box.classList.add('on'); }
+    col.appendChild(det);   // всегда последним, под настройками раздела
   }
 }
 
