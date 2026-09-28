@@ -260,6 +260,16 @@ tr.det b{color:var(--text)}
 .heroAll{background:var(--card);color:var(--text);border:1px solid var(--border);
   border-radius:12px;padding:12px 20px;font:inherit;font-size:15px;cursor:pointer}
 .heroStats{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:16px 0 6px}
+/* Бонус дня на главной: две категории, которым игра сегодня подняла возврат. */
+.homeDaily{display:none;flex-direction:column;align-items:center;gap:7px;margin:16px 0 2px}
+.homeDaily .hdTitle{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.homeDaily .hdRow{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.hdPill{display:inline-flex;align-items:center;gap:9px;padding:8px 16px;border-radius:24px;font-size:14px;
+  border:1px solid rgba(238,188,78,.45);background:linear-gradient(180deg,rgba(238,188,78,.15),rgba(238,188,78,.05));
+  box-shadow:0 2px 12px rgba(0,0,0,.25)}
+.hdPill .hdIco{font-size:17px;line-height:1}
+.hdPill b{color:var(--accent2);font-size:15px}
+.homeDaily .hdNote{font-size:11.5px;color:var(--muted)}
 .heroStat{background:var(--card);border:1px solid var(--border);border-radius:12px;
   padding:10px 18px;text-align:center;min-width:120px}
 .heroStat b{display:block;color:var(--accent);font-size:19px;letter-spacing:.5px}
@@ -476,6 +486,13 @@ body.light td.item{min-width:230px}
   box-sizing:border-box;padding:0 16px;overflow-x:auto}
 
 .mchip.err{border-color:rgba(228,111,97,.45);color:var(--red)}
+/* Премиум меняет налог с продаж вдвое и двигает каждую цифру на сайте,
+   поэтому он стоит кнопкой в шапке, рядом с «Золотой серединой». */
+#premBtn{white-space:nowrap}
+#premBtn.on{border-color:rgba(238,188,78,.55);color:var(--accent2);background:rgba(238,188,78,.1)}
+#premBtn.on:hover{background:rgba(238,188,78,.18)}
+#premBtn.off{border-color:rgba(228,111,97,.45);color:var(--red);background:rgba(228,111,97,.08)}
+#premBtn.off:hover{background:rgba(228,111,97,.14)}
 /* индикатор загрузки в полосе */
 .sbar .spin{width:14px;height:14px;border:2px solid var(--panel3);border-top-color:var(--accent);
   border-radius:50%;animation:spin .8s linear infinite;flex:none}
@@ -731,6 +748,7 @@ body.pix tbody tr:last-child td{background-image:none}
   <button class="heroAll" onclick="document.querySelector('#home .cards').scrollIntoView({behavior:'smooth',block:'start'})">Все разделы</button>
 </div>
 <div id="heroStats" class="heroStats"></div>
+<div id="homeDaily" class="homeDaily"></div>
 <div class="heroChips">
   <span class="hchip">без регистрации</span>
   <span class="hchip">без рекламы</span>
@@ -872,6 +890,7 @@ body.pix tbody tr:last-child td{background-image:none}
       <span class="lngbox"><button class="lng on" data-l="en" onclick="setLang('en')">EN</button><button class="lng" data-l="ru" onclick="setLang('ru')">RU</button><button class="lng" data-l="es" onclick="setLang('es')">ES</button></span><button id="gearBtn" class="mini" title="Настройки: язык и стиль" onclick="openSettings()">⚙</button>
     </label>
     <button class="gold" id="goldBtn" title="Что это такое?&#10;&#10;Одно нажатие, и таблица встаёт по тому, сколько серебра строка принесёт лично тебе за день.&#10;&#10;Сколько штук ты сделаешь, считается по двум пределам: сколько потянет твой кошелёк и сколько съест рынок за выбранный срок. Берётся тот, который закончится раньше. Если бюджет не введён, сайт считает деньги бесконечными и смотрит только на оборот.&#10;&#10;Отсюда простой вывод. При небольших деньгах наверх сами собой выходят строки с высокой маржой. При больших выходят массовые, с большим оборотом. Значок в строке говорит, во что она упирается.&#10;&#10;Старая цена учитывается слабее свежей: суточная считается наполовину, двухсуточная на четверть.&#10;&#10;Отсекаются: маржа ниже 10%, объём ниже 50 шт/день, устаревшие данные и строки с флагом «⚠ проверить». Топ-10 помечается бейджем ТОП.">⭐ Золотая середина</button>
+    <button id="premBtn" type="button" onclick="togglePrem()" title="Премиум режет налог с продаж вдвое: 4% вместо 8%. Он сидит в каждой цифре на сайте, поэтому стоит здесь, а не в настройках. Нажми, чтобы переключить.">💎 Премиум 4%</button>
     <label class="ctl proOnly" id="wrapBudget" title="Сколько серебра ты готов вложить в одну строку.&#10;&#10;Пока поле пустое, сайт считает деньги бесконечными и смотрит только на то, сколько съест рынок.&#10;&#10;Как только впишешь сумму, появится предел: больше, чем позволяет твоё серебро, не сделать. При небольших деньгах наверх сами собой полезут строки с высокой маржой. При больших опять станет важнее оборот.">Бюджет
       <input type="number" id="budgetInp" placeholder="без лимита" min="0" step="100000" style="width:120px">
     </label>
@@ -1820,6 +1839,8 @@ Object.assign(T_UI, {"Сейчас окна нет. Следующее в {} UTC
 Object.assign(T_UI, {"⏳ Опрашиваю киллборд Europe, последние примерно {} убийств…": ["⏳ Polling the Europe killboard, roughly the last {} kills…", "⏳ Consultando el killboard de Europa, aproximadamente las últimas {} muertes…"], "Полный плейт с защитными абилками, булава+щит (корни и иммун), латные сапоги. Философия стримера из видео: пусть бьют, броня переживёт, главное дотянуть до безопасной зоны.": ["Full plate with defensive abilities, mace and shield (roots and immunity), plate boots. The streamer's philosophy from the video: let them hit you, the armour will hold, the point is to reach the safe zone.", "Placas completas con habilidades defensivas, maza y escudo (raíces e inmunidad), botas de placas. La filosofía del streamer del vídeo: que peguen, la armadura aguantará; lo importante es llegar a la zona segura."]});
 Object.assign(T_UI, {"Скопировать название. Вставь его в поиск на рынке в игре": ["Copy the name. Paste it into the market search in game", "Copia el nombre. Pégalo en la búsqueda del mercado del juego"], "Впиши свою цену, если на рынке она другая. Оставь пусто или поставь {}, чтобы вернуть цену с рынка.": ["Type your own price if the market says otherwise. Leave it empty or put {} to bring the market price back.", "Escribe tu propio precio si el mercado dice otra cosa. Déjalo vacío o pon {} para recuperar el precio del mercado."], "По какой цене ты реально продашь. Оставь пусто или поставь {}, чтобы вернуть цену с рынка.": ["The price you will actually sell at. Leave it empty or put {} to bring the market price back.", "El precio al que venderás de verdad. Déjalo vacío o pon {} para recuperar el precio del mercado."], "Сырьё и станок (станок за партию {}). Возврат придёт материалами уже после крафта.": ["Materials and the station (the station costs {} per batch). The return comes back as materials after the crafting.", "Materiales y el taller (el taller cuesta {} por lote). El retorno llega en materiales después de fabricar."], "Сырьё и станок. Возврат придёт материалами уже после крафта.": ["Materials and the station. The return comes back as materials after the crafting.", "Materiales y el taller. El retorno llega en materiales después de fabricar."], "Считаем, что ты забираешь {}% дневного оборота рынка, {}/д.": ["We assume you take {}% of the market's daily turnover, {}/day.", "Suponemos que te llevas el {}% del movimiento diario del mercado, {}/día."], "сырьё {}, возврат {}% → эффективно {}": ["materials {}, return {}% → effectively {}", "materiales {}, retorno {}% → efectivamente {}"], "· компоненты {} (без возврата)": ["components {} (no return)", "componentes {} (sin retorno)"], "· станок {}": ["· station {}", "· taller {}"], "Цена выставленных на ЧР ордеров на продажу, но не выше обычной цены за месяц. Минус налог и сбор {}%.": ["The price of sell orders placed on the Black Market, but never above the usual monthly price. Minus the tax and the {}% fee.", "El precio de las órdenes de venta puestas en el mercado negro, pero nunca por encima del precio habitual del mes. Menos el impuesto y la comisión del {}%."], "Сколько ты реально заработаешь за день, если будешь крафтить и продавать эту позицию: профит с штуки умножен на то, сколько штук рынок съедает за день.": ["How much you will really earn in a day if you craft and sell this row: the profit per piece times how many pieces the market swallows in a day.", "Cuánto ganarás de verdad al día si fabricas y vendes esta fila: el beneficio por unidad multiplicado por las unidades que el mercado absorbe al día."], "Сдать сразу: продаёшь по живому бай-ордеру, деньги в ту же секунду и гарантированно, платится только налог.": ["Sell instantly: you sell into a live buy order, the money is there the same second and guaranteed, and only the tax is paid.", "Vender al instante: vendes a una orden de compra viva, el dinero llega en el mismo segundo y garantizado, y solo se paga el impuesto."], "Выставить ордер: ставишь свой на продажу и ждёшь, пока ЧР поднимет свою цену до твоей. Может и не подняться, а сбор за выставление {}% не вернётся.": ["Place an order: you put your own up for sale and wait for the Black Market to raise its price to yours. It may never get there, and the {}% listing fee does not come back.", "Poner una orden: pones la tuya en venta y esperas a que el mercado negro suba su precio hasta el tuyo. Puede que no lo haga, y la comisión de publicación del {}% no se devuelve."], "Средняя цена сделок на чёрном рынке за месяц. На ЧР каждая сделка это исполнившийся ордер на продажу, поэтому это и есть ответ на вопрос, по какой цене такие ордера реально уходили.": ["The average price of Black Market deals over the month. On the BM every deal is a sell order that went through, so this is the answer to the question of what such orders actually went for.", "El precio medio de las operaciones del mercado negro durante el mes. En el MN cada operación es una orden de venta ejecutada, así que esta es la respuesta a por cuánto se vendieron realmente esas órdenes."], "ордера сейчас стоят на": ["orders are currently sitting", "las órdenes están ahora"], "выше нормы": ["above normal", "por encima de lo normal"], ", в расчёт взята обычная": [", the maths uses the usual one", ", el cálculo usa el habitual"], "· сейчас просят на {}% выше, в расчёт взята обычная": ["· they are asking {}% more right now, the maths uses the usual one", "· ahora piden un {}% más, el cálculo usa el habitual"], "Обычная цена за месяц. Это то, за сколько вещь уходит изо дня в день. Если бай-ордер сейчас выше неё, профит считается по обычной цене.": ["The usual price over the month. That is what the item goes for day in, day out. If the buy order is above it right now, the profit is counted at the usual price.", "El precio habitual del mes. Es por lo que el objeto se va día tras día. Si la orden de compra está ahora por encima, el beneficio se calcula al precio habitual."], "Самый дешёвый выставленный на продажу ордер на чёрном рынке. По этой цене можно встать в очередь и ждать.": ["The cheapest sell order placed on the Black Market. At this price you can join the queue and wait.", "La orden de venta más barata puesta en el mercado negro. A ese precio puedes ponerte en la cola y esperar."], "«Впритык, с возвратом»: возврат падает в сумку после каждого крафта, и его можно пустить в следующий. Тогда покупать надо примерно на четверть меньше. Но возврат случайный. {}% это среднее за много крафтов, а на одной партии может не повезти. Поэтому сюда заложено {}% запаса. Раньше его не было, и партия вставала на последней штуке.\n\nВажно. Станок проверяет материалы сразу на весь заказ. Поставить {} штук одной кнопкой в этом режиме не выйдет, крафтить придётся кусками по {} или {} штук, подбирая возврат из сумки.\n\n«На всё количество»: полный рецепт на все штуки. Одна кнопка и никакой возни, но денег нужно на четверть больше, а в конце останется гора возвращённых материалов. Профит от выбора не меняется: остатки стоят ровно столько, сколько ты переплатил.": ["«Just enough, with returns»: the return drops into your bag after every craft and can go into the next one. Then you need to buy about a quarter less. But the return is random. {}% is the average over many crafts, and a single batch can be unlucky. That is why {}% of slack is built in here. It was not there before, and a batch would stall on the last piece.\n\nImportant. The station checks the materials for the whole order at once. Putting {} pieces in with one button will not work in this mode: you will craft in chunks of {} or {} pieces, picking the return out of your bag.\n\n«For the whole amount»: the full recipe for every piece. One button and no fuss, but you need a quarter more money, and at the end you are left with a pile of returned materials. The profit does not change with this choice: the leftovers are worth exactly what you overpaid.", "«Lo justo, con retorno»: el retorno cae en la bolsa después de cada fabricación y puede ir a la siguiente. Entonces hay que comprar alrededor de un cuarto menos. Pero el retorno es aleatorio. El {}% es la media de muchas fabricaciones, y en un solo lote puedes tener mala suerte. Por eso aquí se ha metido un {}% de margen. Antes no lo había y el lote se atascaba en la última pieza.\n\nImportante. El taller comprueba los materiales de todo el pedido de golpe. Poner {} unidades con un botón no funcionará en este modo: tendrás que fabricar en tandas de {} o {} unidades, sacando el retorno de la bolsa.\n\n«Para toda la cantidad»: la receta completa para todas las unidades. Un botón y sin líos, pero hace falta un cuarto más de dinero y al final te queda un montón de materiales devueltos. El beneficio no cambia con esta elección: las sobras valen exactamente lo que pagaste de más."]});
 Object.assign(T_UI, {"Общие настройки": ["General settings", "Ajustes generales"]});
+Object.assign(T_UI, {"Бонус дня в игре": ["Today's bonus in game", "Bono del día en el juego"], "подставлено само": ["filled in automatically", "puesto automáticamente"], "отмечено вручную": ["set by hand", "marcado a mano"], "меняется в 10:00 UTC": ["changes at 10:00 UTC", "cambia a las 10:00 UTC"], "поправить в разделе, блок «Общие настройки»": ["fix it inside a section, under “General settings”", "se corrige dentro de una sección, en «Ajustes generales»"], "💎 премиум · налог 4%": ["💎 premium · 4% tax", "💎 premium · impuesto del 4%"], "без премиума · налог 8%": ["no premium · 8% tax", "sin premium · impuesto del 8%"], "С премиумом налог с продаж 4%. Нажми, если премиума нет: станет 8%, и все цифры пересчитаются.": ["With premium the sales tax is 4%. Click if you have no premium: it becomes 8% and every number is recalculated.", "Con premium el impuesto de ventas es del 4%. Haz clic si no tienes premium: pasa al 8% y todo se recalcula."], "Без премиума налог с продаж 8%. Нажми, если премиум есть: станет 4%.": ["Without premium the sales tax is 8%. Click if you do have premium: it becomes 4%.", "Sin premium el impuesto de ventas es del 8%. Haz clic si sí tienes premium: pasa al 4%."]});
+Object.assign(T_UI, {"💎 Премиум 4%": ["💎 Premium 4%", "💎 Premium 4%"], "Без премиума 8%": ["No premium 8%", "Sin premium 8%"], "Премиум режет налог с продаж вдвое: 4% вместо 8%. Он сидит в каждой цифре на сайте, поэтому стоит здесь, а не в настройках. Нажми, чтобы переключить.": ["Premium halves the sales tax: 4% instead of 8%. It sits inside every number on the site, which is why it lives here and not in the settings. Click to switch.", "El premium reduce a la mitad el impuesto de ventas: 4% en lugar del 8%. Está dentro de cada cifra del sitio, por eso vive aquí y no en los ajustes. Haz clic para cambiarlo."], "Сейчас считается без премиума: налог с продаж 8%. Нажми, если премиум есть, станет 4% и все цифры пересчитаются.": ["Right now it counts without premium: 8% sales tax. Click if you do have premium — it becomes 4% and every number is recalculated.", "Ahora se calcula sin premium: 8% de impuesto de ventas. Haz clic si sí tienes premium: pasa al 4% y todo se recalcula."]});
 const T_RE = [
   [/^Обычная цена за месяц: (.+?) \(по сделкам в (.+?)\)\.$/,
    "Usual price over the month: $1 (from deals in $2).",
@@ -2174,6 +2195,7 @@ function applyDailyFromServer(d){
   DAILY = normDaily(DAILY_AUTO.c.map(x=>({k:x.k, v:x.v})));
   saveDaily(false);
   if(typeof fillDaily==='function') fillDaily(); else paintDailySrc();
+  if(typeof paintHomeDaily==='function') paintHomeDaily();
   return !same;
 }
 // прибавка к СУММЕ бонусов, если категория строки отмечена как сегодняшний бонус
@@ -2464,6 +2486,29 @@ function renderStatus(){
       ${st.partial?`<span class="mchip err">частично: ${st.partial}</span>`:''}`;
   }
   el.innerHTML = `<div class="sbar">${inner}</div>`;
+}
+// Премиум: налог с продаж 4% против 8%. Это самая дорогая галочка на сайте,
+// а стояла она в общем ящике настроек, где её никто не искал. Теперь она же
+// щёлкается чипом в полосе состояния, и выбор запоминается: премиум у человека
+// либо есть, либо нет, каждый заход отмечать его заново незачем.
+const PREM_KEY='acp_prem';
+function premOn(){ const c=$('premChk'); return !c || c.checked; }
+function savePrem(){ try{ localStorage.setItem(PREM_KEY, premOn()?'1':'0'); }catch(e){} }
+function togglePrem(){
+  const c=$('premChk'); if(!c) return;
+  c.checked=!c.checked; savePrem();
+  c.dispatchEvent(new Event('change',{bubbles:true}));
+  paintPremBtn();
+}
+function paintPremBtn(){
+  const b=$('premBtn'); if(!b) return;
+  const on=premOn();
+  b.classList.toggle('on', on); b.classList.toggle('off', !on);
+  b.textContent = on ? '💎 Премиум 4%' : 'Без премиума 8%';
+  b.title = on
+    ? 'Премиум режет налог с продаж вдвое: 4% вместо 8%. Он сидит в каждой цифре на сайте, поэтому стоит здесь, а не в настройках. Нажми, чтобы переключить.'
+    : 'Сейчас считается без премиума: налог с продаж 8%. Нажми, если премиум есть, станет 4% и все цифры пересчитаются.';
+  if(UI!=='ru') trDOM(b.parentNode);
 }
 function setStatus(st){ S.st = {...(S.st||{}), ...st}; renderStatus(); }
 setInterval(()=>{ if(S.st && S.st.kind==='ok') renderStatus(); }, 30000); // возраст тикает сам
@@ -5788,6 +5833,9 @@ function backBtnHTML(){
 }
 
 // ─── События ───
+try{ const v=localStorage.getItem(PREM_KEY); if(v!==null) $('premChk').checked = v==='1'; }catch(e){}
+$('premChk').addEventListener('change', ()=>{ savePrem(); paintPremBtn(); });
+paintPremBtn();
 ['citySel','focusChk','premChk','feeInp','qualSel','bmModeSel'].forEach(id=>$(id).onchange=()=>{ paintCityHint(); compute(); render(); });
 // способ продажи на ЧР запоминаем отдельно для каждого раздела: в Крафте и Флиппинге
 // торгуют по-разному, и один общий переключатель каждый раз пришлось бы перещёлкивать
@@ -6063,7 +6111,7 @@ function fillDaily(){
       const box=$(vid); if(box) box.style.display = $(id)?.value ? '' : 'none';
     }
   };
-  const apply = ()=>{ DAILY = readDaily(); saveDaily(true); paintV(); paintDailySrc(); S.limit=0; compute(); render(); };
+  const apply = ()=>{ DAILY = readDaily(); saveDaily(true); paintV(); paintDailySrc(); paintHomeDaily(); S.limit=0; compute(); render(); };
   for(const [i,id] of [[0,'daily1'],[1,'daily2']]){
     const sel=$(id); if(!sel) continue;
     sel.innerHTML = html;
@@ -6206,6 +6254,27 @@ function paintDrift(){
   box.innerHTML=html;
 }
 
+// Бонус дня показываем на главной крупно: это единственное, что меняется
+// каждый день и что сайт сам знать не может наверняка.
+const DAILY_ICO = {ore:'🪨', hide:'🐄', fiber:'🌿', wood:'🪵', rock:'🧱'};
+function dailyPill(x){
+  const k=x.k||'';
+  const рес=k.startsWith('chain:');
+  const ico=рес ? (DAILY_ICO[k.slice(6)]||'⛏') : '🛠';
+  const имя=рес ? chainName(k.slice(6)) : catName(k);
+  const pct=Math.round((x.v||CFG.dailyBonus)*100);
+  return `<span class="hdPill"><span class="hdIco">${ico}</span>${имя} <b>+${pct}%</b></span>`;
+}
+function paintHomeDaily(){
+  const el=$('homeDaily'); if(!el) return;
+  if(!DAILY.length){ el.style.display='none'; return; }
+  el.style.display='flex';
+  el.innerHTML = `<div class="hdTitle">${tr('Бонус дня в игре')}</div>`
+    + `<div class="hdRow">${DAILY.map(dailyPill).join('')}</div>`
+    + `<div class="hdNote">${DAILY_MANUAL?tr('отмечено вручную'):tr('подставлено само')}`
+    + ` · ${tr('меняется в 10:00 UTC')} · ${tr('поправить в разделе, блок «Общие настройки»')}</div>`;
+}
+
 function paintHeroStats(){
   const el=$('heroStats'); if(!el) return;
   const предметов = (DATA&&DATA.items&&DATA.items.length)||0;
@@ -6225,6 +6294,7 @@ function showHome(){
   $('appMain').style.display='none';
   { const sh=$('appShell'); if(sh) sh.style.display='none'; }
   paintHeroStats();
+  paintHomeDaily();
   paintDrift();
   $('appFooter').style.display='none';
 }
