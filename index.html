@@ -3636,8 +3636,12 @@ function itemById(id){
 let hsDrag=null, hsMoved=false;
 function hsGlobal(){
   if(hsGlobal.done) return; hsGlobal.done=true;
-  window.addEventListener('mousemove',e=>{
-    if(!hsDrag) return;
+  // Только мышь. На телефоне таблицу листает сам браузер, а поверх этого
+  // приходили ещё и поддельные мышиные события — палец листал вбок, наш
+  // обработчик считал это перетаскиванием и глотал следующее касание:
+  // первый тык по строке не открывал карточку.
+  window.addEventListener('pointermove',e=>{
+    if(!hsDrag || e.pointerType!=='mouse') return;
     const d=e.clientX-hsDrag.x0;
     if(!hsMoved && Math.abs(d)<5) return;
     hsMoved=true;
@@ -3645,10 +3649,9 @@ function hsGlobal(){
     hsDrag.el.scrollLeft = hsDrag.s0-d;
     e.preventDefault();
   });
-  window.addEventListener('mouseup',()=>{
-    if(hsDrag) hsDrag.wrap.classList.remove('grabbing');
-    hsDrag=null;
-  });
+  const конец = ()=>{ if(hsDrag) hsDrag.wrap.classList.remove('grabbing'); hsDrag=null; };
+  window.addEventListener('pointerup', конец);
+  window.addEventListener('pointercancel', конец);
 }
 function hsInit(el){
   if(!el || el.dataset.hs) return;
@@ -3685,8 +3688,8 @@ function hsInit(el){
     if(el.scrollWidth-el.clientWidth<=4) return;
     el.scrollLeft += e.deltaY; e.preventDefault();
   },{passive:false});
-  el.addEventListener('mousedown',e=>{
-    if(e.button!==0) return;
+  el.addEventListener('pointerdown',e=>{
+    if(e.pointerType!=='mouse' || e.button!==0) return;
     if(el.scrollWidth-el.clientWidth<=4) return;
     if(e.target.closest('a,button,input,select,textarea,label,.help')) return;
     hsDrag={el,wrap,x0:e.clientX,s0:el.scrollLeft}; hsMoved=false;
