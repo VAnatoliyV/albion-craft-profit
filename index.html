@@ -204,6 +204,24 @@ tr.det b{color:var(--text)}
 #colHide{align-self:flex-end;border:1px solid var(--border);background:var(--card);
   color:var(--muted);border-radius:8px;padding:2px 8px;cursor:pointer;font-size:12px}
 #appMain{padding-left:18px}
+/* Плывущие значки предметов на главной: три слоя с разной скоростью, чтобы
+   был объём. Всё держится на transform, значит считает видеокарта, а не
+   процессор — на телефоне ничего не греется. Кто просил меньше движения
+   в системе, тот его и не увидит (см. prefers-reduced-motion ниже). */
+#home{position:relative;overflow:hidden}
+#drift{position:absolute;inset:-12% -6%;z-index:0;pointer-events:none}
+#drift img{position:absolute;width:var(--s);height:var(--s);opacity:var(--o);
+  filter:saturate(.75) brightness(.85);will-change:transform;
+  animation:ajFloat var(--d) ease-in-out var(--t) infinite alternate}
+@keyframes ajFloat{
+  from{transform:translate3d(0,0,0) rotate(var(--r1))}
+  to{transform:translate3d(var(--dx),var(--dy),0) rotate(var(--r2))}
+}
+#heroVeil{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(58% 55% at 50% 40%, rgba(11,13,18,.88) 0%, rgba(11,13,18,.66) 45%, rgba(11,13,18,.3) 100%),
+             linear-gradient(180deg, rgba(11,13,18,.75) 0%, rgba(11,13,18,0) 22%, rgba(11,13,18,0) 68%, var(--bg) 100%)}
+#home>*:not(#drift):not(#heroVeil){position:relative;z-index:2}
+@media(prefers-reduced-motion:reduce){ #drift img{animation:none} }
 /* Главная по концепту: строка смысла, две кнопки, четыре числа и чипы.
    Карточки разделов остаются под ними — их не трогаем. */
 .heroLead{max-width:640px;margin:10px auto 0;text-align:center;color:var(--muted);
@@ -639,6 +657,7 @@ body.pix tbody tr:last-child td{background-image:none}
   </div>
 </noscript>
 <div id="home">
+<div id="drift" aria-hidden="true"></div><div id="heroVeil" aria-hidden="true"></div>
   <canvas id="logoHome" class="logoc" aria-hidden="true" width="44" height="58" title="Albion Journal · стукни по ней"></canvas>
   <h1>Albion <span>Journal</span></h1>
   <div class="sub"><span class="proOnly">Europe-сервер · живые цены Albion Online Data Project · выбери раздел</span><span class="liteOnly">Живые цены с рынков Albion, сервер Europe. Выбери, чем хочешь заняться.</span></div>
@@ -5888,6 +5907,40 @@ function routeParse(){
 // сколько предметов в базе, у скольких есть история чёрного рынка, через
 // сколько минут следующий снимок и сколько городов. Пока цены не приехали,
 // блок молчит, а не показывает нули.
+// Значки для фона: обычные предметы игры, те же, что в концепте. Картинки
+// берём с официальной отдачи, лениво и без веса для первой отрисовки.
+const DRIFT_ITEMS=['T4_BAG','T5_2H_BOW','T6_MAIN_SWORD','T5_HEAD_PLATE_SET1','T4_ARMOR_LEATHER_SET2',
+ 'T6_2H_FIRESTAFF','T5_OFF_SHIELD','T8_MOUNT_OX','T4_SHOES_CLOTH_SET1','T6_POTION_HEAL',
+ 'T5_MEAL_PIE','T4_2H_HAMMER','T7_MAIN_AXE','T5_CAPE','T6_MAIN_DAGGER','T4_2H_CROSSBOW',
+ 'T6_ARMOR_PLATE_SET2','T5_HEAD_LEATHER_SET3','T7_2H_HOLYSTAFF','T4_MAIN_MACE',
+ 'T6_SHOES_PLATE_SET1','T5_2H_QUARTERSTAFF','T8_METALBAR','T6_LEATHER','T5_PLANKS','T7_CLOTH'];
+
+function paintDrift(){
+  const box=$('drift'); if(!box || box.dataset.готово) return;
+  box.dataset.готово='1';
+  // В концепте значки лежали на экране во всю высоту, у нас главная короче,
+  // поэтому той же горсти хватало только на углы. Кладём гуще и раскладываем
+  // по сетке с разбросом, иначе они сбиваются в кучки.
+  const слои=[{s:46,o:.20,d:[26,38],n:26,кол:7},{s:74,o:.28,d:[20,30],n:18,кол:6},
+              {s:108,o:.34,d:[15,24],n:12,кол:4}];
+  let html='';
+  слои.forEach((L,li)=>{
+    for(let i=0;i<L.n;i++){
+      const id=DRIFT_ITEMS[(i*3+li*7)%DRIFT_ITEMS.length];
+      // сетка со сдвигом: столбец и строка плюс небольшой разброс
+      const стр=Math.floor(i/L.кол), стлб=i%L.кол;
+      const x=(стлб+0.5)/L.кол*100 + ((i*37+li*11)%14) - 7;
+      const y=(стр+0.5)/Math.ceil(L.n/L.кол)*100 + ((i*53+li*17)%16) - 8;
+      const d=L.d[0]+((i*13+li*5)%(L.d[1]-L.d[0]));
+      const dx=((i%2?1:-1)*(18+li*10))+'px', dy=((i%3?-1:1)*(26+li*12))+'px';
+      html+=`<img src="https://render.albiononline.com/v1/item/${id}.png?size=${L.s<80?109:217}&quality=1"
+        alt="" loading="lazy" style="--s:${L.s}px;--o:${L.o};--d:${d}s;--t:-${i*2.3}s;
+        --dx:${dx};--dy:${dy};--r1:${(i%2?-4:3)}deg;--r2:${(i%2?5:-6)}deg;left:${x}%;top:${y}%">`;
+    }
+  });
+  box.innerHTML=html;
+}
+
 function paintHeroStats(){
   const el=$('heroStats'); if(!el) return;
   const предметов = (DATA&&DATA.items&&DATA.items.length)||0;
@@ -5907,6 +5960,7 @@ function showHome(){
   $('appMain').style.display='none';
   { const sh=$('appShell'); if(sh) sh.style.display='none'; }
   paintHeroStats();
+  paintDrift();
   $('appFooter').style.display='none';
 }
 function showApp(){
