@@ -213,7 +213,16 @@ tr.det b{color:var(--text)}
    был объём. Всё держится на transform, значит считает видеокарта, а не
    процессор — на телефоне ничего не греется. Кто просил меньше движения
    в системе, тот его и не увидит (см. prefers-reduced-motion ниже). */
-#home{position:relative;overflow:hidden}
+#home{position:relative}
+/* Геройская часть: только она держит плывущие значки. Раньше они жили за
+   всей главной, и при прокрутке к карточкам торчали по бокам без вуали —
+   выглядело как сломанная вёрстка. */
+/* #home — колонка с выравниванием по центру, поэтому обёртке нужно
+   явно занять всю ширину и самой центрировать содержимое: иначе она
+   съёживается по своему тексту и всё уезжает влево. */
+#heroTop{position:relative;overflow:hidden;padding-bottom:6px;width:100%;
+  display:flex;flex-direction:column;align-items:center}
+.cards{scroll-margin-top:18px}
 #drift{position:absolute;inset:-12% -6%;z-index:0;pointer-events:none}
 #drift img{position:absolute;width:var(--s);height:var(--s);opacity:var(--o);
   filter:saturate(.75) brightness(.85);will-change:transform;
@@ -225,7 +234,7 @@ tr.det b{color:var(--text)}
 #heroVeil{position:absolute;inset:0;z-index:1;pointer-events:none;
   background:radial-gradient(58% 55% at 50% 40%, rgba(11,13,18,.88) 0%, rgba(11,13,18,.66) 45%, rgba(11,13,18,.3) 100%),
              linear-gradient(180deg, rgba(11,13,18,.75) 0%, rgba(11,13,18,0) 22%, rgba(11,13,18,0) 68%, var(--bg) 100%)}
-#home>*:not(#drift):not(#heroVeil){position:relative;z-index:2}
+#heroTop>*:not(#drift):not(#heroVeil){position:relative;z-index:2}
 @media(prefers-reduced-motion:reduce){ #drift img{animation:none} }
 /* Главная по концепту: строка смысла, две кнопки, четыре числа и чипы.
    Карточки разделов остаются под ними — их не трогаем. */
@@ -662,6 +671,7 @@ body.pix tbody tr:last-child td{background-image:none}
   </div>
 </noscript>
 <div id="home">
+<div id="heroTop">
 <div id="drift" aria-hidden="true"></div><div id="heroVeil" aria-hidden="true"></div>
   <canvas id="logoHome" class="logoc" aria-hidden="true" width="44" height="58" title="Albion Journal · стукни по ней"></canvas>
   <h1>Albion <span>Journal</span></h1>
@@ -681,7 +691,8 @@ body.pix tbody tr:last-child td{background-image:none}
 <div id="homeView"><span class="viewbox" title="Лайт: на экране только то, что нужно, чтобы понять, на чём заработать. Про: все колонки и все настройки."><button data-v="light" onclick="setView('light')">Лайт</button><button data-v="pro" onclick="setView('pro')">Про</button></span>
     <span class="fresh">Лайт показывает только главное. Про открывает все колонки и настройки.</span>
     <button class="mini" style="margin-left:10px" title="Настройки: язык и стиль" onclick="openSettings()">⚙ Настройки</button></div>
-  <div class="cards">
+  </div>
+<div class="cards">
     <div class="card" onclick="enterApp('craft')"><b>🛠 Крафт</b>
       <span class="proOnly">Что выгодно крафтить в каждом городе: себестоимость с бонусами и станком, продажа на чёрный рынок или городские рынки. Золотая середина, калькулятор партии, журналы.</span><span class="liteOnly">Сделать вещь и продать дороже, чем стоили материалы. Начни отсюда.</span></div>
     <div class="card" onclick="enterApp('ref')"><b>♻️ Переработка</b>
