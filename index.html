@@ -5058,9 +5058,17 @@ function itemCardHTML(id){
 // где процент возврата и плата за станок свои, и для прикидок «а если».
 function calcInit(){
   if(S.calc) return;
+  // Покупка по умолчанию не в Каэрлеоне: рынок материалов там пустой, и
+  // калькулятор открывался с прочерком вместо цены. Берём город из Крафта,
+  // а если там «все города» — Бриджвотч, он всегда с данными.
+  const кр = ($('citySel')||{}).value;
+  const покуп = (кр && кр!=='all' && кр!=='Caerleon') ? кр : 'Bridgewatch';
   S.calc = {q:'', tier:'', ench:'', sel:null, qty:1,
-            place:'city', city:'Caerleon', ret:null, fee:null, focus:false,
-            sell:'bm', bmSrc:'now', sellCity:'Caerleon', qual:1, px:{}, sellPx:null};
+            place:'city', city:покуп, ret:null, fee:null, focus:false,
+            // «Обычная за месяц», а не «даёт сейчас»: сам сайт называет её честной,
+            // и именно по ней считает таблица Крафта. С «сейчас» калькулятор
+            // показывал убыток там, где в таблице стояла прибыль.
+            sell:'bm', bmSrc:'base', sellCity:'Caerleon', qual:1, px:{}, sellPx:null};
 }
 function calcItem(){
   const id=S.calc.sel; if(!id) return null;
@@ -5082,7 +5090,16 @@ function calcMatPx(mid){
   const c=S.calc;
   if(c.px[mid]!=null) return {price:c.px[mid], own:true};
   const p = effMatPrice(mid, c.city) || matPrice(mid, c.city);
-  return p ? {price:p.price, age:p.age} : null;
+  if(p) return {price:p.price, age:p.age};
+  // В выбранном городе цены нет — это норма: по мелким рынкам данных мало.
+  // Берём самую дешёвую из тех, что есть, и честно пишем, откуда она.
+  let лучший=null;
+  for(const г of CITIES){
+    if(г===c.city) continue;
+    const q = effMatPrice(mid, г) || matPrice(mid, г);
+    if(q && (!лучший || q.price < лучший.price)) лучший={price:q.price, age:q.age, from:г};
+  }
+  return лучший;
 }
 function calcCost(){
   const it=calcItem(); if(!it) return null;
@@ -5094,7 +5111,7 @@ function calcCost(){
     if(!p){ miss.push(m); rows.push({id:m,n,price:null,sum:null}); continue; }
     const sum=p.price*n;
     if(noRet && noRet.has(m)) rawNoRet+=sum; else raw+=sum;
-    rows.push({id:m,n,price:p.price,sum,own:p.own});
+    rows.push({id:m,n,price:p.price,sum,own:p.own,from:p.from});
   }
   let artCost=0, artId=null;
   if(it.art){
@@ -5219,7 +5236,7 @@ function calcTabHTML(){
     out+=`<tr><td style="width:40px"><img ${icoAttr(r.id,32)} alt="" style="width:28px;height:28px;vertical-align:middle"></td>
       <td>${label}${r.art?' <span class="badge">артефакт</span>':''}<div class="fresh">${r.id}</div></td>
       <td>${r.n}</td>
-      <td><input type="number" class="calcPx" data-m="${r.id}" min="0" value="${r.price!=null?Math.round(r.price):''}" placeholder="нет цены" style="width:96px">${r.own?' <span class="badge">своя</span>':''}</td>
+      <td><input type="number" class="calcPx" data-m="${r.id}" min="0" value="${r.price!=null?Math.round(r.price):''}" placeholder="нет цены" style="width:96px">${r.own?' <span class="badge">своя</span>':r.from?` <span class="badge">из ${r.from}</span>`:''}</td>
       <td class="num">${money(r.sum)}</td></tr>`;
   }
   out+=`</tbody></table>`;
