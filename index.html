@@ -3803,10 +3803,20 @@ function hsInit(el){
     el.scrollLeft += e.deltaY; e.preventDefault();
   },{passive:false});
   el.addEventListener('pointerdown',e=>{
+    // Флаг снимаем в самом начале и всегда. Раньше его снимал только обработчик
+    // клика, и если перетаскивание заканчивалось без клика — отпустил кнопку за
+    // пределами таблицы, — флаг оставался поднятым и съедал следующий клик.
+    hsMoved=false;
     if(e.pointerType!=='mouse' || e.button!==0) return;
     if(el.scrollWidth-el.clientWidth<=4) return;
-    if(e.target.closest('a,button,input,select,textarea,label,.help')) return;
-    hsDrag={el,wrap,x0:e.clientX,s0:el.scrollLeft}; hsMoved=false;
+    // Не начинаем перетаскивание с того, по чему кликают. Кнопки и поля тут были
+    // сразу, а карточки островов — нет: это обычные div, и дрожание руки на пять
+    // пикселей превращало клик в «перетаскивание». Клик проглатывался, остров не
+    // выбирался, а вместе с ним оставалась мёртвой и кнопка «Подробнее»: она
+    // оживает только у выбранной карточки.
+    if(e.target.closest('a,button,input,select,textarea,label,.help,'
+       +'[data-isl],[data-islmore],[data-isrec],[data-islrank],.islCard,.islMoreBtn')) return;
+    hsDrag={el,wrap,x0:e.clientX,s0:el.scrollLeft};
   });
   // строка раскрывается по клику, поэтому клик после перетаскивания глотаем
   el.addEventListener('click',e=>{
