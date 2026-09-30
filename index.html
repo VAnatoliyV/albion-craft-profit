@@ -666,6 +666,7 @@ img[data-ico]:not([src]),img.icoFail{background:rgba(255,255,255,.05);border-rad
    наследуют размер карточек и ломают строку. Правим обе беды разом. */
 .islRecTbl th:nth-child(1),.islRecTbl td:nth-child(1),
 .islRecTbl th:nth-child(3),.islRecTbl td:nth-child(3){text-align:left}
+button[data-isrec] img{display:inline-block!important;width:26px!important;height:26px!important;aspect-ratio:auto!important;vertical-align:-7px;margin-right:6px;flex:none}
 .islRecTbl img{display:inline-block!important;width:24px!important;height:24px!important;aspect-ratio:auto!important;vertical-align:-7px;margin-right:6px}
 .islRecTbl td{white-space:normal}
 .islSide table img{display:inline-block!important;width:22px!important;height:22px!important;aspect-ratio:auto!important;vertical-align:-6px;margin-right:4px}
@@ -2356,12 +2357,23 @@ const icoQ=[]; let icoBusy=0;
 // ждала своей очереди — выглядело так, будто по клику всё перезагружается,
 // а картинки пропадают на несколько секунд. Знакомым ставим адрес сразу:
 // браузер достаёт их из кэша мгновенно, очередь остаётся только для новых.
+// Ключ с размером: один и тот же предмет просят и на 32, и на 40, и на 64,
+// а это разные адреса. Без размера «знакомая» иконка ставилась мимо очереди,
+// браузер промахивался мимо кэша, упирался в лимит рендера и уезжала на повтор.
 const icoOk=new Set();
-const icoSrc=(id,sz)=>'https://render.albiononline.com/v1/item/'+enc(id)+'.png?size='+(sz||40);
+// Один и тот же предмет разные места просят в пяти размерах: 24, 32, 36, 40, 44.
+// Для браузера это пять разных адресов и пять загрузок одной картинки — на
+// «Островах» из-за этого иконки в поиске под рецепт появлялись с задержкой,
+// хотя точно такие же уже висели в таблице культур. Округляем запрос до трёх
+// ступеней: всё мелкое просим одним размером, и второе место берёт его из кэша.
+const ICO_STEPS=[48,64,128];
+const icoStep=sz=>ICO_STEPS.find(x=>x>=(sz||40)) || 217;
+const icoSrc=(id,sz)=>'https://render.albiononline.com/v1/item/'+enc(id)+'.png?size='+icoStep(sz);
+const icoKey=(id,sz)=>id+'|'+icoStep(sz);
 function icoFast(root){
   (root||document).querySelectorAll('img[data-ico]:not([src])').forEach(el=>{
     const id=el.dataset.ico, sz=+el.dataset.sz||40;
-    if(!icoOk.has(id)) return;
+    if(!icoOk.has(icoKey(id,sz))) return;
     // Быстрый путь идёт мимо очереди, и если браузер всё-таки промахнётся мимо
     // кэша и упрётся в лимит, подхватить такую иконку будет некому. Поэтому на
     // осечке роняем её обратно в очередь, где есть повторы.
@@ -2377,7 +2389,7 @@ function icoPump(){
     icoBusy++;
     const fin=ok=>{
       icoBusy--;
-      if(ok) icoOk.add(j.id);
+      if(ok) icoOk.add(icoKey(j.id,j.sz));
       if(!ok){
         if(j.n<ICO_TRIES){
           j.el.removeAttribute('src');
