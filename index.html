@@ -3831,7 +3831,17 @@ function hsScan(){
   document.querySelectorAll('.islRecScroll,.islFullWrap').forEach(hsInit);
 }
 
-function render(){ renderCore(); moveSecCtls(); hsScan(); }
+// Старую копию настроек раздела убираем ДО перерисовки, а не после неё.
+// Настройки раздела живут внутри самого раздела, а показываются в колонке
+// слева, куда их переносит moveSecCtls. Пока перенесённая копия висит в
+// колонке, а renderCore уже собрал новую, в документе два узла с одинаковыми
+// id. Колонка идёт раньше по документу, поэтому getElementById отдавал старую,
+// и wireIslands вешал обработчики на неё. Дальше moveSecCtls старую удалял, а
+// свежую уносил в колонку уже без обработчиков: «фокус», «грядок», «голов» и
+// «продаю» переставали работать со второй перерисовки. На первой старой копии
+// ещё нет, поэтому сразу после загрузки всё выглядело исправным.
+function dropSecCtls(){ const col=$('sideCol'); if(col) col.querySelectorAll('.secCtls').forEach(el=>el.remove()); }
+function render(){ dropSecCtls(); renderCore(); moveSecCtls(); hsScan(); }
 
 function renderCore(){
   const wrap=$('tableWrap');
