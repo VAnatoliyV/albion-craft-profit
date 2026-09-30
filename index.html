@@ -2366,8 +2366,11 @@ const icoOk=new Set();
 // «Островах» из-за этого иконки в поиске под рецепт появлялись с задержкой,
 // хотя точно такие же уже висели в таблице культур. Округляем запрос до трёх
 // ступеней: всё мелкое просим одним размером, и второе место берёт его из кэша.
-const ICO_STEPS=[48,64,128];
-const icoStep=sz=>ICO_STEPS.find(x=>x>=(sz||40)) || 217;
+// И просим вдвое крупнее, чем показываем: на плотном экране иконка 42 px
+// занимает 84 настоящих пикселя, а приходила 48 — отсюда мыло.
+const ICO_DPR=(window.devicePixelRatio||1)>1.25 ? 2 : 1;
+const ICO_STEPS=ICO_DPR>1 ? [96,128,217] : [48,64,128];
+const icoStep=sz=>ICO_STEPS.find(x=>x>=(sz||40)*ICO_DPR) || ICO_STEPS[ICO_STEPS.length-1];
 const icoSrc=(id,sz)=>'https://render.albiononline.com/v1/item/'+enc(id)+'.png?size='+icoStep(sz);
 const icoKey=(id,sz)=>id+'|'+icoStep(sz);
 function icoFast(root){
