@@ -2741,7 +2741,8 @@ function resetLive(snapT){
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) loadLive(); });
 // Где сервер недоступен (в России облачные адреса часто режут), сайт молча живёт
 // на снимке с GitHub. Чтобы не висеть на мёртвом адресе каждые 15 секунд, после
-// неудачи ждём всё дольше: 30 с, 1 мин, 2 мин… но не реже раза в 10 минут.
+// неудачи ждём всё дольше: 30 с, 1 мин, 2 мин — и дальше раз в 2 минуты, чтобы
+// после починки сервера открытая вкладка подхватила его сама и быстро.
 let liveFail = 0, livePause = 0, liveOkAt = 0;
 // Значок держим, пока опросы удаются; полторы минуты тишины — снова показываем снимок
 function liveIsOn(){ return !!LIVE_URL && Date.now() - liveOkAt < 90000; }
@@ -2766,7 +2767,7 @@ async function loadLive(){
   }catch(e){
     // сервер живых цен недоступен — работаем на снимке с GitHub
     liveFail++;
-    livePause = Date.now() + Math.min(600000, 15000 * 2**liveFail);
+    livePause = Date.now() + Math.min(120000, 15000 * 2**liveFail);
     liveOkAt = 0; renderStatus(); paintHeroStats();
   }
 }
