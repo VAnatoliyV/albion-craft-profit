@@ -445,13 +445,16 @@ footer{padding:16px 22px;color:var(--muted);font-size:11.5px;border-top:1px soli
 /* Анимации выключены — настройкой или потому, что устройство не тянет. Крутилки
    загрузки не трогаем: они говорят «идёт работа», а не украшают. */
 body.noanim #drift img,body.noanim .zap i,body.noanim .live i::after,body.noanim .sbar::after,
-body.noanim .ring.due span,body.noanim .skel-row,body.noanim tr.row.liveHit>td{animation:none!important}
-/* Свежая цена с сервера: строка вспыхивает жёлтым и гаснет, снизу всплывают плюсики */
-tr.row.liveHit>td{animation:liveHit 1.8s ease-out}
-@keyframes liveHit{0%{background-color:rgba(238,188,78,.26)}100%{background-color:transparent}}
-#lfx{position:fixed;inset:0;pointer-events:none;z-index:60;overflow:hidden}
-#lfx b{position:absolute;color:var(--accent);font-weight:800;font-size:17px;line-height:1;opacity:0;
-  text-shadow:0 0 8px rgba(238,188,78,.8);animation:plusUp 1.3s ease-out forwards}
+body.noanim .ring.due span,body.noanim .skel-row,body.noanim td.liveCell{animation:none!important}
+body.noanim .lplus{display:none}
+/* Число в ячейке сменилось от живой цены: ячейка вспыхивает жёлтым и гаснет,
+   из-под числа всплывают плюсики. Они внутри самой ячейки, поэтому при прокрутке
+   едут вместе с таблицей, а при следующей перерисовке исчезают вместе с ней. */
+td.liveCell{position:relative;animation:liveHit 1.8s ease-out}
+@keyframes liveHit{0%{background-color:rgba(238,188,78,.30)}100%{background-color:transparent}}
+.lplus{position:absolute;bottom:6px;pointer-events:none;color:var(--accent);font-weight:800;
+  font-size:15px;line-height:1;opacity:0;text-shadow:0 0 8px rgba(238,188,78,.8);
+  animation:plusUp 1.3s ease-out forwards}
 @keyframes plusUp{0%{transform:translateY(0) scale(.5);opacity:0}18%{opacity:1}
   100%{transform:translateY(-38px) scale(1.15);opacity:0}}
 .ownTag{font-size:10.5px;padding:1px 5px;border-radius:5px;background:rgba(98,201,111,.15);color:var(--green);border:1px solid rgba(98,201,111,.3)}
@@ -1213,27 +1216,61 @@ function probeFps(){
   };
   requestAnimationFrame(step);
 }
-// Строки, где только что сменилась цена: вспышка и плюсики. Только видимые на экране
-// и не больше восьми за раз, чтобы при наплыве цен не превращать таблицу в салют.
-function flashLiveRows(ids){
-  if(!ANIM_ON || !ids || !ids.size) return;
-  let fx=$('lfx');
-  if(!fx){ fx=document.createElement('div'); fx.id='lfx'; fx.setAttribute('aria-hidden','true'); document.body.appendChild(fx); }
-  const vh=innerHeight; let k=0;
+// Живые цены перерисовывают таблицу. Чтобы показать, что именно поменялось, до
+// перерисовки запоминаем текст ячеек в строках, видимых на экране, а после
+// сравниваем: вспыхивает только ячейка, где число правда стало другим. Строки,
+// которые просто уехали при сортировке, не мигают. Не больше восьми за раз.
+// текст ячейки без наших плюсиков, иначе они сами сочтутся «изменением»
+const cellText = td => { let t=''; td.childNodes.forEach(n=>{ if(!(n.classList&&n.classList.contains('lplus'))) t+=n.textContent; }); return t; };
+// «То же самое» с допуском. Часть чисел зависит от времени (доход за день тает по
+// мере того, как стареет ордер) и сдвигается на сотые доли процента при каждом
+// пересчёте. Это не новая цена, мигать на это нельзя. Меняется надпись или число
+// больше чем на полпроцента — значит, правда пришло новое.
+const NUM_RE=/-?\d+(?:[ \u00a0\u202f]\d{3})*(?:[.,]\d+)?/g;
+function sameCell(a, b){
+  if(a===b) return true;
+  const na=a.match(NUM_RE)||[], nb=b.match(NUM_RE)||[];
+  if(na.length!==nb.length || a.replace(NUM_RE,'#')!==b.replace(NUM_RE,'#')) return false;
+  const v=x=>parseFloat(x.replace(/[ \u00a0\u202f]/g,'').replace(',','.'));
+  return na.every((x,i)=>{ const p=v(x), q=v(nb[i]); return Math.abs(p-q) <= Math.max(Math.abs(p),Math.abs(q))*0.005; });
+}
+function snapRows(){
+  const m=new Map(), vh=innerHeight;
+  if(!ANIM_ON) return m;
   for(const tr of document.querySelectorAll('#tableWrap tr.row[data-k]')){
-    if(!ids.has(tr.dataset.k.split('|')[1])) continue;
     const r=tr.getBoundingClientRect();
-    if(!r.height || r.bottom<0 || r.top>vh) continue;
-    tr.classList.remove('liveHit'); void tr.offsetWidth; tr.classList.add('liveHit');
-    for(let i=0;i<4;i++){
-      const b=document.createElement('b'); b.textContent='+';
-      b.style.left=(r.left + r.width*(0.35+Math.random()*0.5))+'px';
-      b.style.top=(r.bottom-16)+'px';
-      b.style.animationDelay=(i*140)+'ms';
-      fx.appendChild(b);
-      setTimeout(()=>b.remove(), 1500+i*140);
-    }
-    if(++k>=8) break;
+    if(r.bottom<0) continue;
+    if(r.top>vh) break;
+    m.set(tr.dataset.k, [...tr.cells].map(cellText));
+  }
+  return m;
+}
+function flashChanged(before){
+  if(!ANIM_ON || !before.size) return;
+  // Таблица рисуется по-русски, а переводится чуть позже, следующим кадром. Без
+  // перевода здесь на английском и испанском «поменялась» бы каждая ячейка.
+  const tw=$('tableWrap'); if(tw) trDOM(tw);
+  let k=0;
+  for(const tr of document.querySelectorAll('#tableWrap tr.row[data-k]')){
+    const old=before.get(tr.dataset.k); if(!old) continue;
+    let hit=false;
+    [...tr.cells].forEach((td,i)=>{
+      // название предмета не мигает: там меняются разве что метки, а смотрят на числа
+      if(i===0 || old[i]===undefined || !/\d/.test(old[i])) return;
+      if(sameCell(old[i], cellText(td))) return;
+      td.classList.add('liveCell');
+      if(hit) return;                 // плюсики — из одной ячейки на строку, иначе рябит
+      hit=true;
+      for(let j=0;j<3;j++){
+        const b=document.createElement('span'); b.className='lplus'; b.textContent='+';
+        b.setAttribute('aria-hidden','true');
+        b.style.left=(20+Math.random()*60)+'%';
+        b.style.animationDelay=(j*160)+'ms';
+        td.appendChild(b);
+        setTimeout(()=>b.remove(), 1500+j*160);
+      }
+    });
+    if(hit && ++k>=8) break;
   }
 }
 function nameOfId(id){
@@ -2761,7 +2798,6 @@ function armOwnPoll(){
 function applyOwnPrices(d, live){
   const P = d && d.prices; if(!P) return 0;
   let n = 0;
-  const hits = live ? new Set() : null;   // какие предметы получили свежую цену
   for(const [k, v] of Object.entries(P)){
     const i = k.lastIndexOf('|'); if(i < 0) continue;
     const j = k.lastIndexOf('|', i-1); if(j < 0) continue;
@@ -2781,7 +2817,7 @@ function applyOwnPrices(d, live){
         let hit = false;
         if(v.buy && v.buyTs*1000 > (cell.orderTs||0)){ cell.order = v.buy; cell.orderTs = v.buyTs*1000; cell.own = false; hit = true; }
         if(v.sell && v.sellTs*1000 > (cell.askTs||0)){ cell.ask = v.sell; cell.askTs = v.sellTs*1000; cell.askOwn = false; hit = true; }
-        if(hit){ n++; hits.add(id); }
+        if(hit) n++;
         continue;
       }
       if(v.buy){ cell.order = v.buy; cell.orderTs = v.buyTs*1000; cell.own = true; }
@@ -2795,7 +2831,7 @@ function applyOwnPrices(d, live){
       if(cur && (live ? Math.max(cur.ts||0, cur.buyTs||0) >= mine : (!cur.own && cur.ts >= mine))) continue;   // что есть, свежее — не трогаем
       mat[city] = {price: v.sell || (cur&&cur.price) || 0, ts: sMin || (cur&&cur.ts) || 0,
                    buy: v.buy || (live&&cur&&cur.buy) || 0, buyTs: bMin || (live&&cur&&cur.buyTs) || 0, own: !live, live: !!live};
-      n++; if(hits) hits.add(id); continue;
+      n++; continue;
     }
     const it = S.cityPrices[id];
     if(it){
@@ -2804,10 +2840,10 @@ function applyOwnPrices(d, live){
       if(cur && (live ? Math.max(cur.ts||0, cur.buyTs||0) >= mine : (!cur.own && cur.ts >= mine))) continue;
       byQ[q] = {sell: v.sell || (cur&&cur.sell) || 0, ts: sMin || (cur&&cur.ts) || 0,
                 buy: v.buy || (live&&cur&&cur.buy) || 0, buyTs: bMin || (live&&cur&&cur.buyTs) || 0, own: !live, live: !!live};
-      n++; if(hits) hits.add(id);
+      n++;
     }
   }
-  if(live){ S.liveHits = hits; return n; }
+  if(live) return n;
   S.own = {n, at: (d.built||0)*1000, total: Object.keys(P).length};
   if(n){ compute(); render(); if(typeof renderStatus==='function') renderStatus(); }
   return n;
@@ -2853,7 +2889,7 @@ async function loadLive(){
     S.live.since = d.built;
     const n = applyOwnPrices(d, true);
     S.live.n += n; S.live.at = d.built*1000;
-    if(n){ compute(); render(); flashLiveRows(S.liveHits); }
+    if(n){ const before=snapRows(); compute(); render(); flashChanged(before); }
     renderStatus();
   }catch(e){
     // сервер живых цен недоступен — работаем на снимке с GitHub
