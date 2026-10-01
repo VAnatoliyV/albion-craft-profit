@@ -1779,7 +1779,9 @@ function logoDraw(t, ctx, g){
     const q=g.px[i];
     if((q.part==='eyeL'&&closedL)||(q.part==='eyeR'&&closedR)) continue;
     let a=1;
-    if(q.v===1){ const r=logoHash(i,noise); if(r>0.62) continue; a=0.30+r*0.75; }
+    // Полутон в движении мерцает: часть точек выпадает, у остальных гуляет яркость.
+    // Неподвижным такой кадр выглядит грязно, поэтому без анимации — ровно и все точки.
+    if(q.v===1){ if(!ANIM_ON) a=0.55; else { const r=logoHash(i,noise); if(r>0.62) continue; a=0.30+r*0.75; } }
     let dx=shear(q.y);
     if(q.part==='earL'||q.part==='earR'){
       const r=(g.earY-q.y)/g.earY;
@@ -1836,7 +1838,7 @@ function sadDraw(t, ctx, g){
   const put=(x,y,a)=>{ if(x<0||y<0||x>=g.w||y>=g.h) return;
     const i=y*g.w+x, v=(Math.min(255,a*255|0)<<24)|SAD_INK;
     if((u32[i]>>>24)<(v>>>24)) u32[i]=v; };
-  for(let i=0;i<6;i++){
+  if(ANIM_ON) for(let i=0;i<6;i++){          // капли дождя только в движении
     const period=1500+((i*457)%1300), p=((t+i*611)%period)/period;
     const x=Math.round(g.w*(0.20+0.12*i));
     const y0=Math.round(g.h*(0.72+logoHash(i,3)*0.12));
@@ -1928,6 +1930,7 @@ function anvilDraw(t, ctx, g){
     const [x,y]=g.core[i];
     ctx.fillStyle='#f2efe9';
     ctx.fillRect(x+dx0, y+dy, 1, 1);
+    if(!ANIM_ON) continue;                     // стоп-кадр: контур без ряби
     for(let k=0;k<4;k++){
       const r=logoHash(i*4+k, noise);
       if(r>shake) continue;
@@ -1935,7 +1938,7 @@ function anvilDraw(t, ctx, g){
       ctx.fillRect(x+[1,-1,0,0][k]+dx0, y+[0,0,1,-1][k]+dy, 1, 1);
     }
   }
-  for(let i=0;i<4;i++){                       // подтёки под подошвой
+  if(ANIM_ON) for(let i=0;i<4;i++){           // подтёки под подошвой
     const per=1900+i*430, p=((t+i*700)%per)/per;
     const y=32+ANVIL_DY+Math.round(p*3.4);
     if(y<g.h){ ctx.fillStyle='rgba(242,239,233,0.85)'; ctx.fillRect([13,18,24,29][i]+dx0, y+dy, 1, 1); }
@@ -1951,7 +1954,7 @@ function anvilDraw(t, ctx, g){
       ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
     }
   };
-  for(const at of ANVIL_HITS)                 // искры от обычных ударов
+  if(ANIM_ON) for(const at of ANVIL_HITS)     // искры от обычных ударов
     spark(((t-at)%ANVIL_PERIOD+ANVIL_PERIOD)%ANVIL_PERIOD, Math.round(at), 14, 18);
   if(anvilClickT!=null){                      // клик: свой молот и вдвое больше искр
     const age=t-anvilClickT;
