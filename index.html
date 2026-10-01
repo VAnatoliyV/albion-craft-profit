@@ -851,6 +851,12 @@ body.pix tbody tr:last-child td{background-image:none}
         <button data-v="en" onclick="setLang('en')">English</button>
         <button data-v="ru" onclick="setLang('ru')">Русский</button>
         <button data-v="es" onclick="setLang('es')">Español</button>
+        <button data-v="pl" onclick="setLang('pl')">Polski</button>
+        <button data-v="de" onclick="setLang('de')">Deutsch</button>
+        <button data-v="tr" onclick="setLang('tr')">Türkçe</button>
+        <button data-v="fr" onclick="setLang('fr')">Français</button>
+        <button data-v="pt" onclick="setLang('pt')">Português</button>
+        <button data-v="it" onclick="setLang('it')">Italiano</button>
       </div></div>
 
     <div class="setrow"><div class="setlab">Второй язык, подписью<span class="help" title="Мелкая строчка под названием. Она нужна не для красоты: поиск на рынке в игре ищет по языку клиента. Смотришь список по-русски, а искать и копировать надо английское имя — вот оно и стоит снизу.&#10;&#10;«Как получится» подставит английское имя, если главный язык русский или испанский. Если главный английский — подпишет твоим системным языком, а если система тоже английская, подписи не будет: она там не нужна.">?</span></div>
@@ -859,6 +865,12 @@ body.pix tbody tr:last-child td{background-image:none}
         <button data-v="en" onclick="setLang2('en')">English</button>
         <button data-v="ru" onclick="setLang2('ru')">Русский</button>
         <button data-v="es" onclick="setLang2('es')">Español</button>
+        <button data-v="pl" onclick="setLang2('pl')">Polski</button>
+        <button data-v="de" onclick="setLang2('de')">Deutsch</button>
+        <button data-v="tr" onclick="setLang2('tr')">Türkçe</button>
+        <button data-v="fr" onclick="setLang2('fr')">Français</button>
+        <button data-v="pt" onclick="setLang2('pt')">Português</button>
+        <button data-v="it" onclick="setLang2('it')">Italiano</button>
         <button data-v="off" onclick="setLang2('off')">Без подписи</button>
       </div></div>
 
@@ -867,6 +879,12 @@ body.pix tbody tr:last-child td{background-image:none}
         <button data-v="ru" onclick="setUI('ru')">Русский</button>
         <button data-v="en" onclick="setUI('en')">English</button>
         <button data-v="es" onclick="setUI('es')">Español</button>
+        <button data-v="pl" onclick="setUI('pl')">Polski</button>
+        <button data-v="de" onclick="setUI('de')">Deutsch</button>
+        <button data-v="tr" onclick="setUI('tr')">Türkçe</button>
+        <button data-v="fr" onclick="setUI('fr')">Français</button>
+        <button data-v="pt" onclick="setUI('pt')">Português</button>
+        <button data-v="it" onclick="setUI('it')">Italiano</button>
       </div></div>
 
     <div class="setrow"><div class="setlab">Анимации<span class="help" title="Молния живых цен, заяц и наковальня, плывущие значки на главной, вспышка строки, когда приходит свежая цена. «Авто» выключает их сам на слабом устройстве, при экономии трафика или если в системе просили меньше движения.">?</span></div>
@@ -1113,8 +1131,28 @@ function trendChartHTML(tr){
 // ─── Язык названий и копирование в буфер ───
 // Поиск на рынке в игре ищет по названию клиента. Клиент английский, значит и
 // копировать надо английское имя. Поэтому en по умолчанию; выбор запоминается.
-const LANGS = ['en','ru','es'];
-const LANG_NAME = {en:'English', ru:'Русский', es:'Español'};
+const LANGS = ['en','ru','es','pl','de','tr','fr','pt','it'];
+const LANG_NAME = {en:'English', ru:'Русский', es:'Español', pl:'Polski', de:'Deutsch', tr:'Türkçe',
+                   fr:'Français', pt:'Português', it:'Italiano'};
+// Английский, русский и испанский встроены в страницу. Остальные лежат отдельными
+// файлами и скачиваются, только если человек выбрал этот язык: i18n/<язык>.json —
+// подписи сайта, names/<язык>.json — названия предметов и категорий из файлов игры.
+// Чего нет в файле, показываем по-английски.
+const EXT_LANGS = ['pl','de','tr','fr','pt','it'];
+const EXT = {ui:{}, re:{}, word:{}, title:''};      // подписи для языка интерфейса
+const EXT_NAMES = {};                               // язык → {cat, chain}; имена кладём прямо в DATA
+async function loadJSON(url){
+  try{ const r=await fetch(url, {cache:'no-cache'}); return r.ok ? await r.json() : null; }catch(e){ return null; }
+}
+async function ensureNames(l){
+  if(!EXT_LANGS.includes(l) || EXT_NAMES[l] || !DATA) return;
+  const d = await loadJSON('names/'+l+'.json'); if(!d) return;
+  for(const it of DATA.items) if(d.items[it.id]) it[l]=d.items[it.id];
+  const mn = DATA.matNames||{};
+  for(const id in d.mats) (mn[id] ||= {})[l] = d.mats[id];
+  for(const c of (DATA.cons||[])) if(d.items[c.id]) c[l]=d.items[c.id];
+  EXT_NAMES[l] = {cat:d.cat||{}, chain:d.chain||{}};
+}
 const ls = (k,d)=>{ try{ return localStorage.getItem(k) ?? d; }catch(e){ return d; } };
 const lsSet = (k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
 // Главный язык названий и второй, который идёт мелкой подписью снизу.
@@ -1152,17 +1190,19 @@ const nmB = o => {
   const v = pick(o,l);
   return v && v!==nmA(o) ? v : '';
 };
-window.setLang = v => {
+window.setLang = async v => {
   LANG = LANGS.includes(v) ? v : 'en';
   lsSet('acp_lang', LANG);
+  await ensureNames(LANG); await ensureNames(lang2eff());
   document.querySelectorAll('button.lng').forEach(b=>b.classList.toggle('on', b.dataset.l===LANG));
   if(typeof fillDaily==='function') fillDaily();   // «Дневной бонус», теми же словами, что в игре
   if(typeof fillCats==='function')  fillCats();
   if(typeof paintSettings==='function') paintSettings();
   S.limit = 0; render();
 };
-window.setLang2 = v => {
+window.setLang2 = async v => {
   LANG2 = v; lsSet('acp_lang2', v);
+  await ensureNames(lang2eff());
   if(typeof paintSettings==='function') paintSettings();
   S.limit = 0; render();
 };
@@ -2552,10 +2592,14 @@ const T_WORD = [
   [/ресурс\/материал/g, "resource / material", "recurso / material"],
   [/зачар\./g, "ench.", "encant."],
 ];
+// Перевод для текущего языка: en/es — из встроенных таблиц, остальные — из файла i18n
+const uiRow  = (row, key) => UI_IDX[UI]!==undefined ? (row && row[UI_IDX[UI]]) : (EXT.ui[key] || (row && row[0]));
+const reRep  = (re, en, es) => UI==='en' ? en : UI==='es' ? es : (EXT.re[re.source] ?? en);
+const wordRep= (re, en, es) => UI==='en' ? en : UI==='es' ? es : (EXT.word[re.source] ?? en);
 function trWords(t){
   let out=t, hit=false;
   for(const [re,en,es] of T_WORD){
-    const v=out.replace(re, UI==='en'?en:es);
+    const v=out.replace(re, wordRep(re,en,es));
     if(v!==out){ out=v; hit=true; }
   }
   return hit ? out : null;
@@ -2563,7 +2607,7 @@ function trWords(t){
 function trRe(t){
   const k=t.trim(); if(!k) return null;
   for(const [re,en,es] of T_RE){
-    if(re.test(k)) return t.replace(k, k.replace(re, UI==='en'?en:es));
+    if(re.test(k)) return t.replace(k, k.replace(re, reRep(re,en,es)));
   }
   return null;
 }
@@ -2579,8 +2623,7 @@ function trNum(t){
   const nums=[];
   const key = t.trim().replace(TR_NUM, m=>{ nums.push(m); return '{}'; });
   if(!nums.length) return null;
-  const row = T_UI[key];
-  const v = row && row[UI_IDX[UI]];
+  const v = uiRow(T_UI[key], key);
   if(!v) return null;
   let i=0;
   return t.replace(t.trim(), v.replace(/\{\}/g, ()=> nums[i++] ?? ''));
@@ -2606,8 +2649,8 @@ function trParts(t){
   let нашли=false;
   const out=куски.map(p=>{
     const k=p.trim(); if(!k) return p;
-    const row=T_UI[k];
-    let v = (row && row[UI_IDX[UI]]) ? p.replace(k, row[UI_IDX[UI]]) : null;
+    const tv=uiRow(T_UI[k], k);
+    let v = tv ? p.replace(k, tv) : null;
     if(v==null) v=trNum(p);
     if(v==null) v=trRe(p);
     if(v==null) return p;
@@ -2619,8 +2662,7 @@ function trStr(t){
   if(UI==='ru') return null;
   const k=t.trim(); if(!k) return null;
   let out=null;
-  const row=T_UI[k];
-  if(row){ const v=row[UI_IDX[UI]]; if(v && v!==k) out=t.replace(k, v); }
+  { const v=uiRow(T_UI[k], k); if(v && v!==k) out=t.replace(k, v); }
   if(out==null) out=trNum(t);
   if(out==null) out=trRe(t);
   if(out==null) out=trParts(t);
@@ -2660,7 +2702,7 @@ function trWatch(){
   obs.observe(document.body, {childList:true, subtree:true, characterData:true});
 }
 window.setUI = v => {
-  v = ['ru','en','es'].includes(v) ? v : 'ru';
+  v = LANGS.includes(v) ? v : 'ru';
   if(v===UI) return;
   lsSet('acp_ui', v);
   // Перевод затирает русский текст на странице, поэтому переключаться между
@@ -4178,8 +4220,8 @@ const CAT_EN = {
 const CHAIN_EN = {ore:'Ore → Metal Bars', hide:'Hide → Leather', fiber:'Fiber → Cloth',
                   wood:'Wood → Planks', rock:'Stone → Blocks'};
 // одно место, где решается, каким языком назвать категорию
-const catName   = c => (LANG==='ru' ? (CAT_RU[c]||c) : (CAT_EN[c]||CAT_RU[c]||c));
-const chainName = c => (LANG==='ru' ? (CHAIN_RU[c]||c) : (CHAIN_EN[c]||CHAIN_RU[c]||c));
+const catName   = c => (LANG==='ru' ? (CAT_RU[c]||c) : (EXT_NAMES[LANG]?.cat[c] || CAT_EN[c]||CAT_RU[c]||c));
+const chainName = c => (LANG==='ru' ? (CHAIN_RU[c]||c) : (EXT_NAMES[LANG]?.chain[c] || CHAIN_EN[c]||CHAIN_RU[c]||c));
 const STONE_RU = {RUNE:'руны', SOUL:'души', RELIC:'реликты'};
 const stoneKind = id => STONE_RU[id.split('_')[1]]||id;
 const CHAIN_RU = {ore:'Руда → Бруски', hide:'Шкуры → Кожа', fiber:'Волокно → Ткань', wood:'Дерево → Доски', rock:'Камень → Блоки'};
@@ -6759,7 +6801,7 @@ function fillDaily(){
   // Слова самого интерфейса берутся по языку интерфейса, а не по языку названий
   // предметов: у человека с русским интерфейсом и английскими названиями в списке
   // дневного бонуса стояло «none».
-  const L = (r,e,sp) => UI==='es' ? sp : UI==='en' ? e : r;
+  const L = (r,e,sp) => UI==='ru' ? r : UI==='es' ? sp : UI==='en' ? e : (EXT.ui[r] || e);
   const html = opt('', L('нет','none','ninguno'))
     + `<optgroup label="${L('Ресурсы (переработка)','Resources (refining)','Recursos (refinado)')}">`
     + DAILY_RES.map(([k,word])=>opt('chain:'+k, ru ? word+' · '+chainName(k) : chainName(k))).join('')
@@ -7049,12 +7091,18 @@ window.goHome   = ()=> nav('');
     if(hs) hs.innerHTML='<span style="color:var(--red)">Не удалось загрузить базу предметов (items.json). Обнови страницу.</span>';
     return;
   }
+  // язык не встроенный — сначала скачиваем его файлы, иначе мелькнёт русский
+  if(EXT_LANGS.includes(UI)){
+    const d = await loadJSON('i18n/'+UI+'.json');
+    if(d) Object.assign(EXT, d);
+  }
+  await ensureNames(LANG); await ensureNames(lang2eff());
   document.body.classList.toggle('pix', SKIN==='pix');
   document.documentElement.lang = UI;
   // Шапка страницы статична и написана по-английски: её читают поисковый робот и
   // превью в мессенджере, а они приходят до всякого JS. Вкладку же подписываем на
   // языке человека, иначе русский пользователь видит английский заголовок.
-  if(T_TITLE[UI]) document.title = T_TITLE[UI];
+  if(T_TITLE[UI] || EXT.title) document.title = T_TITLE[UI] || EXT.title;
   buildMorePanel();   // раскладываем шапку на два ряда до первого перевода
   trDOM(document.body); trWatch();
   applyAnim();
