@@ -401,6 +401,8 @@ footer{padding:16px 22px;color:var(--muted);font-size:11.5px;border-top:1px soli
 /* Строка-задача под статусом: у конкурентов это первое, что читает человек,
    и только у нас нигде не было написано, на какой вопрос отвечает раздел. */
 .secTask{color:var(--muted);font-size:13.5px;line-height:1.5;margin:0 0 10px;padding:0 2px}
+.secTip{color:var(--muted);font-size:12.5px;line-height:1.5;margin:-4px 0 12px;padding:2px 0 2px 10px;border-left:2px solid var(--accent)}
+.secTip:empty{display:none}
 /* Подсказка рядом с выбором города: что именно даёт этот город. Правило игры
    должно попадаться на глаза в момент выбора, а не потом значком в строке. */
 .ctlHint{display:inline-flex;align-items:center;gap:6px;max-width:370px;
@@ -994,6 +996,7 @@ body.pix tbody tr:last-child td{background-image:none}
 <main id="appMain">
   <div id="status">Загрузка цен с Albion Online Data Project…</div>
   <div id="secTask" class="secTask"></div>
+  <div id="secTip" class="secTip"></div>
   <div id="grpRow" class="proOnly" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
     <span class="fresh proOnly" style="margin-right:2px">Показывать:</span>
   </div>
@@ -2276,6 +2279,7 @@ for(const [k,v] of Object.entries({
   "Обнови страницу.": ["Refresh the page.", "Recarga la página."]
 })) if(!(k in T_UI)) T_UI[k]=v;   // готовые переводы не перебиваем
 Object.assign(T_UI, {"Общие настройки": ["General settings", "Ajustes generales"]});
+Object.assign(T_UI, {"💡 Здесь лучше выключить «Золотую середину»: она прячет свежие строки без истории, а во флипе выгодные окна как раз такие. И перед покупкой сверь обе цены со сборщиком цен в игре: наценка держится считанные минуты.": ["💡 Better turn off Sweet spot here: it hides fresh rows with no history, and that is exactly what good flips look like. Before buying, check both prices in game with the data client running: the margin lasts only minutes.", "💡 Aquí conviene desactivar Punto justo: oculta las filas recientes sin historial, y los buenos flips son justo así. Antes de comprar, comprueba ambos precios en el juego con el recolector de datos: el margen dura solo minutos."]});
 Object.assign(T_UI, {
   "🖤 Флиппинг → ЧР": ["🖤 Flipping → BM", "🖤 Reventa → MN"],
   "ЧР, сразу": ["BM, instant", "MN, al instante"], "ЧР, ордером": ["BM, by order", "MN, con orden"], "ЧР, моя цена": ["BM, my price", "MN, mi precio"],
@@ -6609,6 +6613,10 @@ const TAB_TASK={
   calc:'Ручной счёт одной позиции: свои цены, свой возврат, своя плата за станок.',
   item:'Сколько стоит любая вещь или ресурс во всех семи городах и на чёрном рынке.',
   roads:'Стоит ли сейчас везти товар: живая сводка по убийствам транспортников и окна бандитов.'};
+// Совет под описанием, только где он правда нужен. Во флипе «Золотая середина» прячет
+// строки без недельной истории и с наценкой меньше 10%, а выгодные окна там как раз свежие.
+const TAB_TIP={
+  flip:'💡 Здесь лучше выключить «Золотую середину»: она прячет свежие строки без истории, а во флипе выгодные окна как раз такие. И перед покупкой сверь обе цены со сборщиком цен в игре: наценка держится считанные минуты.'};
 const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', cons:'🧪 Зелья и еда', isl:'🏝 Острова', calc:'🧮 Калькулятор', item:'🔍 Цены предмета', roads:'🛡 Дороги в Карлеон · БЕТА'};
 // какие контролы нужны на каждой вкладке (премиум, возраст данных, обновление и поиск, всегда)
 const TAB_CONTROLS={
@@ -6741,6 +6749,7 @@ function setTab(t){
   fillRouteCities();
   const el=$('secName'); if(el) el.textContent=TAB_NAMES[t]||'';
   const task=$('secTask'); if(task) task.textContent=TAB_TASK[t]||'';
+  const tip=$('secTip'); if(tip) tip.textContent=TAB_TIP[t]||'';
   const vis=TAB_CONTROLS[t]||[];
   for(const id of ALL_WRAPS){ const w=$(id); if(w) w.style.display = vis.includes(id)?'':'none'; }
   fillSideCol(vis);
