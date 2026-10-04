@@ -4235,8 +4235,10 @@ const CAT_EN = {
 const CHAIN_EN = {ore:'Ore → Metal Bars', hide:'Hide → Leather', fiber:'Fiber → Cloth',
                   wood:'Wood → Planks', rock:'Stone → Blocks'};
 // одно место, где решается, каким языком назвать категорию
-const catName   = c => (LANG==='ru' ? (CAT_RU[c]||c) : (EXT_NAMES[LANG]?.cat[c] || CAT_EN[c]||CAT_RU[c]||c));
-const chainName = c => (LANG==='ru' ? (CHAIN_RU[c]||c) : (EXT_NAMES[LANG]?.chain[c] || CHAIN_EN[c]||CHAIN_RU[c]||c));
+const catNameIn   = (l,c) => (l==='ru' ? (CAT_RU[c]||c) : (EXT_NAMES[l]?.cat[c] || CAT_EN[c]||CAT_RU[c]||c));
+const chainNameIn = (l,c) => (l==='ru' ? (CHAIN_RU[c]||c) : (EXT_NAMES[l]?.chain[c] || CHAIN_EN[c]||CHAIN_RU[c]||c));
+const catName   = c => catNameIn(LANG, c);
+const chainName = c => chainNameIn(LANG, c);
 const STONE_RU = {RUNE:'руны', SOUL:'души', RELIC:'реликты'};
 const stoneKind = id => STONE_RU[id.split('_')[1]]||id;
 const CHAIN_RU = {ore:'Руда → Бруски', hide:'Шкуры → Кожа', fiber:'Волокно → Ткань', wood:'Дерево → Доски', rock:'Камень → Блоки'};
@@ -7002,7 +7004,9 @@ function dailyPill(x){
   const k=x.k||'';
   const рес=k.startsWith('chain:');
   const ico=рес ? (DAILY_ICO[k.slice(6)]||'⛏') : '🛠';
-  const имя=рес ? chainName(k.slice(6)) : catName(k);
+  // Плашка — часть интерфейса, поэтому язык интерфейса, а не названий предметов:
+  // с турецким интерфейсом и английскими названиями тут стояло «Cloth Cowl».
+  const имя=рес ? chainNameIn(UI, k.slice(6)) : catNameIn(UI, k);
   const pct=Math.round((x.v||CFG.dailyBonus)*100);
   return `<span class="hdPill"><span class="hdIco">${ico}</span>${имя} <b>+${pct}%</b></span>`;
 }
@@ -7116,7 +7120,7 @@ window.goHome   = ()=> nav('');
     const d = await loadJSON('i18n/'+UI+'.json');
     if(d) Object.assign(EXT, d);
   }
-  await ensureNames(LANG); await ensureNames(lang2eff());
+  await ensureNames(LANG); await ensureNames(lang2eff()); await ensureNames(UI);
   document.body.classList.toggle('pix', SKIN==='pix');
   document.documentElement.lang = UI;
   // Шапка страницы статична и написана по-английски: её читают поисковый робот и
