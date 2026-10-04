@@ -1419,7 +1419,7 @@ function routesPanelHTML(){
     return `<button class="rt${on?' on':''}" onclick="pickRoute('${r.key}')"
       title="${r.n} позиций в плюсе на этом маршруте. ${fmt(Math.round(per))} серебра на один переход.">
       <b>${routeLabel(r)}</b>
-      <span>${fmt(Math.round(r.sum))} за день · ${r.total} ${r.total%10===1&&r.total%100!==11?'переход':(r.total%10>=2&&r.total%10<=4&&(r.total%100<10||r.total%100>=20))?'перехода':'переходов'}</span>
+      <span>${r.total} ${r.total%10===1&&r.total%100!==11?'переход':(r.total%10>=2&&r.total%10<=4&&(r.total%100<10||r.total%100>=20))?'перехода':'переходов'}</span>
       <i style="width:${bar}%"></i></button>`;
   };
   return `<div class="panel" style="margin-bottom:12px">
@@ -1428,7 +1428,7 @@ function routesPanelHTML(){
       <span class="fresh">два или три города подряд, в одну сторону, без возврата назад</span>
     </div>
     <div class="rtRow">${list.map(chip).join('')}</div>
-    <div class="fresh" style="margin-top:8px">Сумма это пять лучших позиций маршрута: столько увезёшь за поездку, а не весь список. В таблице ниже показаны все позиции выбранного маршрута.</div>
+    <div class="fresh" style="margin-top:8px">Сверху маршрут, который сейчас выгоднее всего, а полоска показывает, сколько он даёт рядом с лучшим. В таблице ниже показаны все позиции выбранного маршрута.</div>
   </div>`;
 }
 window.pickRoute = k => { S.optRoute = k; S.open={}; S.lastOrder=null; S.limit=0; compute(); render(); };
@@ -2081,6 +2081,7 @@ for(const [k,v] of Object.entries({
   "{} позиций в плюсе на этом маршруте. {} серебра на один переход.": ["{} profitable items on this route. {} silver per jump.", "{} objetos con ganancia en esta ruta. {} de plata por salto."],
   "🧭 Куда ехать сегодня": ["🧭 Where to go today", "🧭 Adónde ir hoy"],
   "два или три города подряд, в одну сторону, без возврата назад": ["two or three cities in a row, one way, no going back", "dos o tres ciudades seguidas, en un solo sentido, sin volver atrás"],
+  "Сверху маршрут, который сейчас выгоднее всего, а полоска показывает, сколько он даёт рядом с лучшим. В таблице ниже показаны все позиции выбранного маршрута.": ["The most profitable route right now is first, and the bar shows how it compares with the best one. The table below shows every item on the selected route.", "Primero va la ruta más rentable ahora mismo, y la barra muestra cuánto da frente a la mejor. La tabla de abajo muestra todos los objetos de la ruta elegida."],
   "Сумма это пять лучших позиций маршрута: столько увезёшь за поездку, а не весь список. В таблице ниже показаны все позиции выбранного маршрута.": ["The total is the route's top five items: that's what you can carry in one trip, not the whole list. The table below shows every item on the selected route.", "La suma son los cinco mejores objetos de la ruta: lo que te llevas en un viaje, no toda la lista. La tabla de abajo muestra todos los objetos de la ruta elegida."],
   "Сумма это пять лучших позиций маршрута: столько увезёшь за поездку, а не весь список.": ["The total is the route's top five items: that's what you can carry in one trip, not the whole list.", "La suma son los cinco mejores objetos de la ruta: lo que te llevas en un viaje, no toda la lista."],
   "В таблице ниже показаны все позиции выбранного маршрута.": ["The table below shows every item on the selected route.", "La tabla de abajo muestra todos los objetos de la ruta elegida."],
