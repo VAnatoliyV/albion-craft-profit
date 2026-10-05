@@ -950,10 +950,15 @@ body.pix tbody tr:last-child td{background-image:none}
       <input type="number" id="feeInp" value="500" min="0" step="50">
     </label>
     <label class="ctl proOnly" id="wrapQual">Качество<span class="help" title="По какому качеству вещей считать цену на чёрном рынке.&#10;&#10;Обычное, осторожный вариант: берётся цена сделок только обычного, белого качества. Это самый нижний край, такое качество выходит всегда.&#10;&#10;По всем качествам сразу: средняя цена по всем пяти качествам, где каждое считается по числу сделок. Так ближе к жизни, потому что часть крафтов случайно выходит лучше обычного и продаётся дороже. Чем выше твой спек, тем чаще это случается.">?</span>
-      <select id="qualSel">
+      <select id="qualSel" autocomplete="off">
         <option value="q1">Обычное (консервативно)</option>
         <option value="wavg">Взвешенно по всем качествам</option>
+        <option value="craft">По шансам крафта</option>
       </select>
+    </label>
+    <label class="ctl proOnly" id="wrapQualCraft" style="display:none">Очки качества<span class="help" title="Очки качества от специализации. Каждый уровень общего навыка (например, «Кузнец мечей») даёт 0,75 очка, каждый уровень навыка самой вещи даёт 6. Пример: 100 общего и 100 по палашу = 75 + 75 + 600 = 750. Фокус сверху даёт ещё 50, еда — свои очки.&#10;&#10;Каждые полные 100 очков дают лишний бросок по таблице качества, и вещь берёт лучший результат. Выручка считается как ожидаемая по ценам всех пяти качеств.">?</span>
+      <input type="number" id="qualPtsInp" value="0" min="0" step="25" style="width:80px" autocomplete="off">
+      <select id="qualFoodSel" autocomplete="off"></select>
     </label>
     <label class="ctl proOnly">Данные не старше
       <select id="ageSel">
@@ -1203,6 +1208,7 @@ window.setLang = async v => {
   lsSet('acp_lang', LANG);
   await ensureNames(LANG); await ensureNames(lang2eff());
   document.querySelectorAll('button.lng').forEach(b=>b.classList.toggle('on', b.dataset.l===LANG));
+  if(typeof fillQualFood==='function') fillQualFood();
   if(typeof fillDaily==='function') fillDaily();   // «Дневной бонус», теми же словами, что в игре
   if(typeof fillCats==='function')  fillCats();
   if(typeof paintSettings==='function') paintSettings();
@@ -2184,6 +2190,23 @@ for(const [k,v] of Object.entries({
   "ЧР сразу · обыч. кач.": ["BM instant · normal q.", "MN al instante · cal. normal"],
   "ЧР сразу · все кач.": ["BM instant · all q.", "MN al instante · todas cal."],
   "· обыч. кач.": ["· normal q.", "· cal. normal"],
+  "По шансам крафта": ["By crafting chances", "Según probabilidades de fabricación"],
+  "Очки качества": ["Quality points", "Puntos de calidad"],
+  "Очки качества от специализации. Каждый уровень общего навыка (например, «Кузнец мечей») даёт 0,75 очка, каждый уровень навыка самой вещи даёт 6. Пример: 100 общего и 100 по палашу = 75 + 75 + 600 = 750. Фокус сверху даёт ещё 50, еда — свои очки.\n\nКаждые полные 100 очков дают лишний бросок по таблице качества, и вещь берёт лучший результат. Выручка считается как ожидаемая по ценам всех пяти качеств.": ["Quality points from specialization. Each level of the general skill (e.g. “Sword Crafter”) gives 0.75 points, each level of the item's own skill gives 6. Example: 100 general and 100 broadsword = 75 + 75 + 600 = 750. Focus adds another 50, food adds its own points.\n\nEvery full 100 points gives an extra roll on the quality table, and the item keeps the best result. Revenue is the expected value over the prices of all five qualities.", "Puntos de calidad por especialización. Cada nivel de la habilidad general (p. ej. «Herrero de espadas») da 0,75 puntos, cada nivel de la habilidad del propio objeto da 6. Ejemplo: 100 general y 100 de espada ancha = 75 + 75 + 600 = 750. El foco suma otros 50 y la comida sus propios puntos.\n\nCada 100 puntos completos dan una tirada extra en la tabla de calidad y el objeto se queda con el mejor resultado. Los ingresos son el valor esperado sobre los precios de las cinco calidades."],
+  "без еды": ["no food", "sin comida"],
+  "дешевле в": ["cheaper in", "más barato en"],
+  "экономия": ["saving", "ahorro"],
+  "телепорт сюда ≈": ["teleport here ≈", "teletransporte aquí ≈"],
+  "выгода": ["gain", "ganancia"],
+  "телепорт съест экономию": ["the teleport eats the saving", "el teletransporte se come el ahorro"],
+  "цену телепорта для Карлеона не знаем": ["teleport price for Caerleon is unknown", "precio de teletransporte a Caerleon desconocido"],
+  "Качество по шансам крафта": ["Quality by crafting chances", "Calidad según probabilidades de fabricación"],
+  "очков": ["points", "puntos"],
+  "еда": ["food", "comida"],
+  "по шансам": ["by chances", "según prob."],
+  "ЧР сразу · по шансам": ["BM instant · by chances", "MN al instante · según prob."],
+  "ЧР ордером · по шансам": ["BM by order · by chances", "MN con orden · según prob."],
+  "· по шансам": ["· by chances", "· según prob."],
   "Все качества (взвеш.)": ["All qualities (weighted)", "Todas las calidades (ponderado)"],
   "Про продажи этой вещи в этом городе данных нет. Либо за неделю не было ни одной сделки, либо сборщик их не получил": ["There is no sales data for this item in this city. Either there was not a single trade all week, or the data client didn't pick them up", "No hay datos de ventas de este objeto en esta ciudad. O no hubo ni una operación en toda la semana, o el recolector no las recibió"],
   "нет": ["none", "no hay"],
@@ -3720,10 +3743,84 @@ function bmQ(bm, q, asking){
   }
   return raw;
 }
+// ─── Качество по шансам крафта ───
+// Игра бросает таблицу качества 68,9 / 25 / 5 / 1 / 0,1%. Каждые полные 100 очков
+// бонуса качества дают ещё один бросок, остаток — шанс на ещё один, и вещь берёт
+// лучший результат. Очки: специализация (0,75 за уровень общего навыка и 6 за уровень
+// навыка самой вещи), еда (бафф craftingquality из дампа) и фокус +50.
+const QUAL_BASE = [0.689, 0.25, 0.05, 0.01, 0.001];
+function craftQualDist(points){
+  const pts = Math.max(0, +points||0);
+  const rolls = Math.floor(pts/100) + 1, extra = (pts%100)/100;
+  const ge = k => QUAL_BASE.slice(k-1).reduce((a,b)=>a+b, 0);   // «не хуже k» за один бросок
+  const atLeast = [1,2,3,4,5].map(k => k===1 ? 1 : 1 - Math.pow(1-ge(k), rolls)*(1 - extra*ge(k)));
+  return atLeast.map((v,i) => v - (atLeast[i+1]||0));
+}
+function qualFoodPts(){
+  const id = $('qualFoodSel')?.value; if(!id) return 0;
+  const f = (DATA.qfood||[]).find(x=>x[0]===id); return f ? f[1] : 0;
+}
+function qualPoints(){
+  return Math.max(0, +($('qualPtsInp')?.value)||0) + qualFoodPts() + ($('focusChk')?.checked ? 50 : 0);
+}
+// Ожидаемая цена по шансам. Если цены какого-то качества нет, берём ближайшую ниже:
+// так ошибаемся в сторону осторожности, а не выдумываем шедевры.
+function expectedByQuality(dist, priceOf){
+  let last=null, sum=0;
+  for(let q=1; q<=5; q++){
+    const p = priceOf(q);
+    if(p!=null && p>0) last = p;
+    if(last==null) return null;
+    sum += dist[q-1]*last;
+  }
+  return sum;
+}
+
+// ─── Телепорт материала из другого города ───
+// Планировщик путешествий: 150 серебра × вес × модификатор предмета × расстояние.
+// Модификатор из дампа (@fasttravelfactor), у кого его нет — 1. Соседние королевские
+// города — 1, остальные пары и всё с Бресильеном — 2. Для Карлеона данных нет.
+// Серверный множитель игра не публикует, поэтому это оценка.
+function tpDist(a, b){
+  if(a===b) return 0;
+  if(a==='Caerleon' || b==='Caerleon') return null;
+  if(a==='Brecilien' || b==='Brecilien') return 2;
+  const i=RING.indexOf(a), j=RING.indexOf(b);
+  if(i<0 || j<0) return null;
+  const d=Math.abs(i-j);
+  return (d===1 || d===RING.length-1) ? 1 : 2;
+}
+function tpFee(mid, qty, from, to){
+  const d=tpDist(from, to); if(!d) return null;
+  const kg=(DATA.weights||{})[mid.split('@')[0]]; if(kg==null) return null;
+  return Math.ceil(150 * kg * ((DATA.tf||{})[mid]||1) * d * qty);
+}
+function cheaperElsewhere(mid, city){
+  let best=null;
+  for(const [c,p] of Object.entries(S.matPrices[mid]||{})){
+    if(c===city || !p || hoursAgo(p.ts)>CFG.staleHours) continue;
+    if(!best || p.price<best.price) best={city:c, price:p.price};
+  }
+  return best;
+}
+function teleportHint(mid, need, city, unit){
+  if(unit==null || !need) return '';
+  const alt=cheaperElsewhere(mid, city);
+  if(!alt || alt.price > unit*0.95) return '';
+  const save=(unit-alt.price)*need, fee=tpFee(mid, need, alt.city, city);
+  const head=`📦 ${tr('дешевле в')} ${alt.city}: ${fmt(alt.price)} · ${tr('экономия')} <b>${fmt(save)}</b>`;
+  if(fee==null) return `${head} · <span class="fresh">${tr('цену телепорта для Карлеона не знаем')}</span>`;
+  const gain=save-fee;
+  return gain>0
+    ? `${head} · ${tr('телепорт сюда ≈')} ${fmt(fee)} → <b style="color:var(--green)">${tr('выгода')} ${fmt(gain)}</b>`
+    : `${head} · ${tr('телепорт сюда ≈')} ${fmt(fee)} → <span style="color:var(--red)">${tr('телепорт съест экономию')}</span>`;
+}
+
 function bmExpected(bm, mode, asking){
   // консервативно: цена сделок обычного качества; взвешенно: средняя по всем качествам с весом объёма
   if(!bm) return null;
   if(mode==='q1'){ const a=bmQ(bm,1,asking)||bmQ(bm,2,asking); return a?a.price:null; }
+  if(mode==='craft') return expectedByQuality(craftQualDist(qualPoints()), q => { const a=bmQ(bm,q,asking); return a?a.price:null; });
   let s=0, v=0;
   for(const ql of Object.keys(bm.qs)){ const a=bmQ(bm,ql,asking); if(!a||!a.vol) continue; s += a.price*a.vol; v += a.vol; }
   return v ? s/v : null;
@@ -3734,6 +3831,7 @@ function compute(){
   GOLD = {B: Math.max(0, +$('budgetInp').value||0), T: Math.max(1, +$('horizonInp').value||1)};
   const focus=$('focusChk').checked, tax=$('premChk').checked?0.04:0.08;
   const citySel=$('citySel').value, qualMode=$('qualSel').value;
+  const QD = qualMode==='craft' ? craftQualDist(qualPoints()) : null;
   if(need('craft')||need('ref')) buildSelfCosts(focus);
   const rows=[];
   if(need('craft')) for(const it of DATA.items){
@@ -3775,7 +3873,15 @@ function compute(){
         if(v.sell>bestCityPrice){ bestCityPrice=v.sell; bestCity=c; }
       }
       const cityFair = bestCity ? cityAsk(it.id, 1, bestCityPrice) : null;
-      const revCity = cityFair ? cityFair.price*(1-tax-CFG.setupFee) : null;
+      let cityUnit = cityFair ? cityFair.price : null;
+      if(cityUnit!=null && qualMode==='craft'){
+        const byQ = cp[bestCity]||{};
+        cityUnit = expectedByQuality(QD, q => {
+          if(q===1) return cityFair.price;
+          const v=byQ[q]; return v && hoursAgo(v.ts)<=CFG.staleHours && v.sell<=askCapFor(it.id,q) ? v.sell : null;
+        });
+      }
+      const revCity = cityUnit!=null ? cityUnit*(1-tax-CFG.setupFee) : null;
       let rev, channel;
       if(revBM!=null && (revCity==null || revBM>=revCity)){ rev=revBM; channel='ЧР'; }
       else if(revCity!=null){ rev=revCity; channel=bestCity; }
@@ -4281,7 +4387,7 @@ const QUAL_RU = {1:'Обычное',2:'Хорошее',3:'Выдающееся',
 function icon(id,q){ return `<img ${icoAttr(id,64)}${q?` data-q="${q}"`:''} alt="">`; }
 function nameCell(it, extra, qualText){
   return `<td class="item">${icon(it.id)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${nmA(it)}</b>${extra||''}`+`
-    <span>${nmB(it)} · T${it.tier}${it.ench?'.'+it.ench:''}${isLite()?'':' · '+catName(it.cat)+(qualText?' · '+qualText:'')}</span></div></td>`;
+    <span>${nmB(it)} · T${it.tier}${it.ench?'.'+it.ench:''}${isLite()?'':' · '+catName(it.cat)+(qualText?' · '+tr(qualText):'')}</span></div></td>`;
 }
 function nameCellQ(it, q, extra){
   return `<td class="item">${icon(it.id,q)}<div class="iname"><b class="lnk" onclick="event.stopPropagation();openItem('${it.id}')" title="Показать все цены этого предмета">${nmA(it)}</b>${extra||''}`+`
@@ -4571,8 +4677,8 @@ function renderCore(){
     if(craft){
       const bonusBadge = (r.bonus?'<span class="badge b-bonus">бонус</span>':'')
         + (r.daily?`<span class="badge b-bonus" title="Сегодняшний дневной бонус производства из окна Activities. Он прибавляется к сумме бонусов, а не к готовому возврату, и уже сидит внутри процента рядом. Ты отметил это в шапке.">+${Math.round(r.daily*100)}% день</span>`:'');
-      const chLabel = r.channel==='ЧР' ? `ЧР ${bmAsking()?'ордером':'сразу'} · ${qualMode==='q1'?'обыч. кач.':'все кач.'}` : r.channel+' · обыч. кач.';
-      const qualText = qualMode==='q1' ? 'Обычное' : 'Все качества (взвеш.)';
+      const chLabel = r.channel==='ЧР' ? `ЧР ${bmAsking()?'ордером':'сразу'} · ${qualMode==='q1'?'обыч. кач.':qualMode==='craft'?'по шансам':'все кач.'}` : r.channel+(qualMode==='craft'?' · по шансам':' · обыч. кач.');
+      const qualText = qualMode==='q1' ? 'Обычное' : qualMode==='craft' ? 'По шансам крафта' : 'Все качества (взвеш.)';
       html+=`<tr class="row" data-i="${i}" data-k="${rowKey(r)}">${nameCell(it, topBadge+limBadge+openBadge+spikeBadge+citySpikeBadge+warnBadge+staleBadge, qualText)}
         <td>${r.city}${bonusBadge}</td><td>${fmt(r.cost)}</td><td>${fmt(r.rev)}${normLine(r)}</td>
         <td><span class="badge b-ch">${chLabel}</span></td>
@@ -5115,6 +5221,8 @@ function calcUpd(idx){
          onclick="event.stopPropagation()" onchange="setOverride('${mid}','${r.city}',this.value)"
          title="Впиши свою цену, если на рынке она другая. Оставь пусто или поставь 0, чтобы вернуть цену с рынка."></td>`+
       `<td><b>${fmt(need)}</b></td><td>${cost!=null?fmt(cost):'нет'}</td></tr>`;
+    const tp=teleportHint(mid, need, r.city, unit);
+    if(tp) html+=`<tr><td class="item" colspan="5" style="font-size:12px;padding-top:0">${tp}</td></tr>`;
   }
   if(it.art && r.artInfo){
     const a=r.artInfo, cost=N*it.art.n*a.price; matTotal+=cost;
@@ -5132,6 +5240,14 @@ function calcUpd(idx){
   }
   html+=`<tr><td class="item"><b>Итого сырья</b></td><td></td><td></td><td></td><td><b>${fmt(Math.round(matTotal))}</b></td></tr>`;
   html+='</table>';
+  if($('qualSel').value==='craft'){
+    const pts=qualPoints(), d=craftQualDist(pts), qn=['Обычное','Хорошее','Выдающееся','Отличное','Шедевр'];
+    const fid=$('qualFoodSel')?.value, fp=fid ? (S.cityPrices[fid]?.[r.city]?.[1]?.sell ?? null) : null;
+    html+=`<div class="fresh" style="margin:4px 0">${tr('Качество по шансам крафта')}, ${fmt(pts)} ${tr('очков')}: `
+      + d.map((v,i)=>`${tr(qn[i])} ${(v*100).toFixed(v<0.01?2:1)}%`).join(' · ')
+      + (fid ? ` · ${tr('еда')}: ${nmA((DATA.matNames||{})[fid]||{})||fid}${fp!=null?' ≈ '+fmt(fp):''}` : '')
+      + `</div>`;
+  }
   const feeN = r.fee*N;
   // журналы: 3 крафта = 1 журнал своего тира
   let jHtml='', jNet=0, jSum='';
@@ -6568,6 +6684,15 @@ try{ const v=localStorage.getItem(PREM_KEY); if(v!==null) $('premChk').checked =
 $('premChk').addEventListener('change', ()=>{ savePrem(); paintPremBtn(); });
 paintPremBtn();
 ['citySel','focusChk','premChk','feeInp','qualSel','bmModeSel'].forEach(id=>$(id).onchange=()=>{ paintCityHint(); compute(); render(); });
+// Качество по шансам крафта: режим, свои очки и еду запоминаем.
+function paintQualCraft(){ const w=$('wrapQualCraft'); if(w) w.style.display = $('qualSel').value==='craft' ? '' : 'none'; }
+{ const q=ls('acp_qual',''); if(q && [...$('qualSel').options].some(o=>o.value===q)) $('qualSel').value=q;
+  // и defaultValue: при старте boot() возвращает поля шапки к значениям по умолчанию
+  const pts=ls('acp_qualPts',''); if(pts!==''){ $('qualPtsInp').value=pts; $('qualPtsInp').defaultValue=pts; }
+  paintQualCraft(); }
+$('qualSel').addEventListener('change', ()=>{ lsSet('acp_qual', $('qualSel').value); paintQualCraft(); });
+$('qualPtsInp').addEventListener('change', ()=>{ lsSet('acp_qualPts', $('qualPtsInp').value); $('qualPtsInp').defaultValue=$('qualPtsInp').value; compute(); render(); });
+$('qualFoodSel').addEventListener('change', ()=>{ lsSet('acp_qualFood', $('qualFoodSel').value); compute(); render(); });
 // способ продажи на ЧР запоминаем отдельно для каждого раздела: в Крафте и Флиппинге
 // торгуют по-разному, и один общий переключатель каждый раз пришлось бы перещёлкивать
 if($('bmModeSel')) $('bmModeSel').addEventListener('change', e=>{
@@ -6813,6 +6938,14 @@ function fillCats(){
 // Поэтому ресурсы стоят первыми и подписаны тем же словом, что в окне Activities:
 // ищешь Hide, находишь Hide, а не «Переработка: Шкуры → Кожа» в самом низу списка.
 const DAILY_RES = [['ore','Ore'], ['hide','Hide'], ['fiber','Fiber'], ['wood','Wood'], ['rock','Stone']];
+// Еда на качество: названия на языке предметов, рядом её очки.
+function fillQualFood(){
+  const sel=$('qualFoodSel'); if(!sel || !DATA) return;
+  const cur = sel.value || ls('acp_qualFood','');
+  sel.innerHTML = `<option value="">${tr('без еды')}</option>`
+    + (DATA.qfood||[]).map(([id,pt])=>`<option value="${id}">${nmA((DATA.matNames||{})[id]||{})||id} +${pt}</option>`).join('');
+  sel.value = cur;
+}
 function fillDaily(){
   const ru = LANG==='ru';
   const esc = t => String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
@@ -7135,6 +7268,7 @@ window.goHome   = ()=> nav('');
   logoStart();  // кролик оживает сразу, ещё до того как приедут цены
   fillCats();   // категории в фильтр, на выбранном языке
   fillDaily();   // списки дневного бонуса зависят от базы предметов, строим после её загрузки
+  fillQualFood();
   applyRoute();  // если в адресе есть #раздел — открываем сразу его, а не главную
   if(hs) hs.textContent='Цены загружаются в фоне, выбирай раздел…';
   await loadAll(false);
