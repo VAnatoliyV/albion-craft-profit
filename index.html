@@ -131,6 +131,11 @@ th{background:var(--panel2);color:var(--muted);font-weight:600;font-size:11.5px;
   position:sticky;top:0;z-index:5;text-transform:uppercase;letter-spacing:.4px}
 th:hover{color:var(--accent)}
 td.item,th.item{text-align:left}
+/* Подпись про телепорт под строкой материала: обычная ячейка во всю ширину
+   (td.item это flex, colspan на нём ломается), тихим текстом под названием. */
+tr.tpRow td, tr.det tr.tpRow td{text-align:left;padding:0 12px 10px 63px;font-size:12px;color:var(--muted);border-top:0;white-space:normal}
+tr.tpRow td b{color:var(--text);font-weight:600}
+tr:has(+ tr.tpRow) td{border-bottom:0}
 td.item{display:flex;align-items:center;gap:9px;min-width:260px}
 td.item img{width:42px;height:42px;flex:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))}
 /* Заголовок «Журналы» в разборе строки. Картинка тут лежит не в ячейке таблицы,
@@ -5222,7 +5227,7 @@ function calcUpd(idx){
          title="Впиши свою цену, если на рынке она другая. Оставь пусто или поставь 0, чтобы вернуть цену с рынка."></td>`+
       `<td><b>${fmt(need)}</b></td><td>${cost!=null?fmt(cost):'нет'}</td></tr>`;
     const tp=teleportHint(mid, need, r.city, unit);
-    if(tp) html+=`<tr><td class="item" colspan="5" style="font-size:12px;padding-top:0">${tp}</td></tr>`;
+    if(tp) html+=`<tr class="tpRow"><td colspan="5">${tp}</td></tr>`;
   }
   if(it.art && r.artInfo){
     const a=r.artInfo, cost=N*it.art.n*a.price; matTotal+=cost;
