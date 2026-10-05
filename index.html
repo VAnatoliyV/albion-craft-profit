@@ -136,6 +136,7 @@ td.item,th.item{text-align:left}
 tr.tpRow td, tr.det tr.tpRow td{text-align:left;padding:0 12px 10px 63px;font-size:12px;color:var(--muted);border-top:0;white-space:normal}
 tr.tpRow td b{color:var(--text);font-weight:600}
 tr:has(+ tr.tpRow) td{border-bottom:0}
+tr.tpRow input.tpPx{width:84px;padding:2px 6px;font-size:12px;margin:0 2px}
 td.item{display:flex;align-items:center;gap:9px;min-width:260px}
 td.item img{width:42px;height:42px;flex:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))}
 /* Заголовок «Журналы» в разборе строки. Картинка тут лежит не в ячейке таблицы,
@@ -2211,6 +2212,8 @@ for(const [k,v] of Object.entries({
   "по шансам": ["by chances", "según prob."],
   "ЧР сразу · по шансам": ["BM instant · by chances", "MN al instante · según prob."],
   "ЧР ордером · по шансам": ["BM by order · by chances", "MN con orden · según prob."],
+  "Своя цена в этом городе. Оставь пусто или поставь 0, чтобы вернуть цену с рынка.": ["Your own price in this city. Leave it empty or put 0 to bring back the market price.", "Tu propio precio en esta ciudad. Déjalo vacío o pon 0 para volver al precio del mercado."],
+  "не дешевле, чем здесь": ["not cheaper than here", "no es más barato que aquí"],
   "· по шансам": ["· by chances", "· según prob."],
   "Все качества (взвеш.)": ["All qualities (weighted)", "Todas las calidades (ponderado)"],
   "Про продажи этой вещи в этом городе данных нет. Либо за неделю не было ни одной сделки, либо сборщик их не получил": ["There is no sales data for this item in this city. Either there was not a single trade all week, or the data client didn't pick them up", "No hay datos de ventas de este objeto en esta ciudad. O no hubo ni una operación en toda la semana, o el recolector no las recibió"],
@@ -3800,25 +3803,39 @@ function tpFee(mid, qty, from, to){
   const kg=(DATA.weights||{})[mid.split('@')[0]]; if(kg==null) return null;
   return Math.ceil(150 * kg * ((DATA.tf||{})[mid]||1) * d * qty);
 }
+// Самый дешёвый другой город для материала. Своя цена (✎) учитывается как рыночная,
+// а город, где её поправили руками, показываем всегда: иначе после правки вверх
+// подпись пропала бы, и вернуть цену было бы негде.
 function cheaperElsewhere(mid, city){
-  let best=null;
-  for(const [c,p] of Object.entries(S.matPrices[mid]||{})){
-    if(c===city || !p || hoursAgo(p.ts)>CFG.staleHours) continue;
-    if(!best || p.price<best.price) best={city:c, price:p.price};
+  const cities=new Set(Object.keys(S.matPrices[mid]||{}));
+  for(const k of Object.keys(S.overrides)){ const [m,c]=k.split('|'); if(m===mid && c) cities.add(c); }
+  let best=null, mine=null;
+  for(const c of cities){
+    if(c===city) continue;
+    const p=matPrice(mid, c);
+    if(!p || (!p.ovr && hoursAgo(p.ts)>CFG.staleHours)) continue;
+    const x={city:c, price:p.price, ovr:p.ovr};
+    if(p.ovr && (!mine || x.price<mine.price)) mine=x;
+    if(!best || x.price<best.price) best=x;
   }
-  return best;
+  return mine || best;
 }
 function teleportHint(mid, need, city, unit){
   if(unit==null || !need) return '';
   const alt=cheaperElsewhere(mid, city);
-  if(!alt || alt.price > unit*0.95) return '';
+  if(!alt || (!alt.ovr && alt.price > unit*0.95)) return '';
+  const px=`<input type="number" class="tpPx" value="${Math.round(alt.price)}" onclick="event.stopPropagation()"
+    onchange="setOverride('${mid}','${alt.city}',this.value)"
+    title="${tr('Своя цена в этом городе. Оставь пусто или поставь 0, чтобы вернуть цену с рынка.')}">${alt.ovr?' <span style="color:var(--accent)">✎</span>':''}`;
+  const head=`📦 ${tr('дешевле в')} ${alt.city}: ${px}`;
+  if(alt.price >= unit) return `📦 ${alt.city}: ${px} · <span class="fresh">${tr('не дешевле, чем здесь')}</span>`;
   const save=(unit-alt.price)*need, fee=tpFee(mid, need, alt.city, city);
-  const head=`📦 ${tr('дешевле в')} ${alt.city}: ${fmt(alt.price)} · ${tr('экономия')} <b>${fmt(save)}</b>`;
-  if(fee==null) return `${head} · <span class="fresh">${tr('цену телепорта для Карлеона не знаем')}</span>`;
+  const tail=` · ${tr('экономия')} <b>${fmt(save)}</b>`;
+  if(fee==null) return `${head}${tail} · <span class="fresh">${tr('цену телепорта для Карлеона не знаем')}</span>`;
   const gain=save-fee;
   return gain>0
-    ? `${head} · ${tr('телепорт сюда ≈')} ${fmt(fee)} → <b style="color:var(--green)">${tr('выгода')} ${fmt(gain)}</b>`
-    : `${head} · ${tr('телепорт сюда ≈')} ${fmt(fee)} → <span style="color:var(--red)">${tr('телепорт съест экономию')}</span>`;
+    ? `${head}${tail} · ${tr('телепорт сюда ≈')} ${fmt(fee)} → <b style="color:var(--green)">${tr('выгода')} ${fmt(gain)}</b>`
+    : `${head}${tail} · ${tr('телепорт сюда ≈')} ${fmt(fee)} → <span style="color:var(--red)">${tr('телепорт съест экономию')}</span>`;
 }
 
 function bmExpected(bm, mode, asking){
