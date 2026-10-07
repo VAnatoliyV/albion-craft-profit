@@ -16,6 +16,12 @@ import { readFile, writeFile } from 'node:fs/promises';
 // Адрес внутренний, а не обещанный API, и может пропасть при их обновлении.
 // Любая осечка — молча возвращаем null: на сайте останется ручной выбор.
 const SAGE_URL = 'https://ao-sage.com/today/__data.json';
+// Cloudflare на ao-sage режет запросы без браузерного User-Agent (403 с 2026-10-07)
+const SAGE_HEADERS = {
+  'accept': 'application/json',
+  'accept-language': 'en-US,en;q=0.9',
+  'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
+};
 // Пять линий переработки у них названы сырьём (ore, hide...), у нас это цепочки.
 const SAGE_CHAIN = new Set(['ore','hide','fiber','wood','rock']);
 
@@ -82,7 +88,7 @@ async function fetchDailyBonus(items){
   try{
     const ctrl = new AbortController();
     const kill = setTimeout(()=>ctrl.abort(), 15000);
-    const r = await fetch(SAGE_URL, { signal: ctrl.signal, headers:{ 'accept':'application/json' } });
+    const r = await fetch(SAGE_URL, { signal: ctrl.signal, headers: SAGE_HEADERS });
     clearTimeout(kill);
     if(!r.ok){ console.log(`дневной бонус: HTTP ${r.status}, оставляем ручной выбор`); return null; }
     // чем считаем «нашей» категорию: всё, что реально встречается в предметах,
