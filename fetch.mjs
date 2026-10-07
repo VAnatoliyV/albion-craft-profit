@@ -16,6 +16,9 @@ import { readFile, writeFile } from 'node:fs/promises';
 // Адрес внутренний, а не обещанный API, и может пропасть при их обновлении.
 // Любая осечка — молча возвращаем null: на сайте останется ручной выбор.
 const SAGE_URL = 'https://ao-sage.com/today/__data.json';
+// Запасной путь: наш сервер в Oracle отдаёт тот же ответ ao-sage как есть
+// (и последний удачный, если ao-sage закроется и для него).
+const SAGE_MIRROR = 'https://129-80-180-213.sslip.io/sage.json';
 // Cloudflare на ao-sage режет запросы без браузерного User-Agent (403 с 2026-10-07)
 const SAGE_HEADERS = {
   'accept': 'application/json',
@@ -84,25 +87,33 @@ export function sageParse(raw, today, valid){
 // Сутки бонуса начинаются в 10:00 UTC, вместе с обслуживанием серверов.
 export const bonusDay = (now=Date.now()) => new Date(now - 10*3600*1000).toISOString().slice(0,10);
 
-async function fetchDailyBonus(items){
+async function sageGet(url){
+  const ctrl = new AbortController();
+  const kill = setTimeout(()=>ctrl.abort(), 15000);
   try{
-    const ctrl = new AbortController();
-    const kill = setTimeout(()=>ctrl.abort(), 15000);
-    const r = await fetch(SAGE_URL, { signal: ctrl.signal, headers: SAGE_HEADERS });
-    clearTimeout(kill);
-    if(!r.ok){ console.log(`дневной бонус: HTTP ${r.status}, оставляем ручной выбор`); return null; }
-    // чем считаем «нашей» категорию: всё, что реально встречается в предметах,
-    // плюс зелья с едой и пять линий переработки
-    const valid = new Set([...(items.items||[]).map(i=>i.cat), 'potion','meal']);
-    const got = sageParse(await r.text(), bonusDay(), valid);
-    if(!got){ console.log('дневной бонус: в ответе нет сегодняшнего опубликованного дня'); return null; }
-    console.log(`дневной бонус ${got.d}: ${got.c.map(x=>x.k+' +'+Math.round(x.v*100)).join(', ')||'ничего не легло'}`);
-    if(got.miss) console.log(`  не совпало с нашими категориями: ${got.miss.join(', ')}`);
-    return got;
-  }catch(e){
-    console.log(`дневной бонус не получен (${e.message}), оставляем ручной выбор`);
-    return null;
+    const r = await fetch(url, { signal: ctrl.signal, headers: SAGE_HEADERS });
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.text();
+  }finally{ clearTimeout(kill); }
+}
+
+async function fetchDailyBonus(items){
+  // чем считаем «нашей» категорию: всё, что реально встречается в предметах,
+  // плюс зелья с едой и пять линий переработки
+  const valid = new Set([...(items.items||[]).map(i=>i.cat), 'potion','meal']);
+  for(const [name, url] of [['ao-sage', SAGE_URL], ['наш сервер', SAGE_MIRROR]]){
+    try{
+      const got = sageParse(await sageGet(url), bonusDay(), valid);
+      if(!got){ console.log(`дневной бонус (${name}): в ответе нет сегодняшнего опубликованного дня`); continue; }
+      console.log(`дневной бонус ${got.d} (${name}): ${got.c.map(x=>x.k+' +'+Math.round(x.v*100)).join(', ')||'ничего не легло'}`);
+      if(got.miss) console.log(`  не совпало с нашими категориями: ${got.miss.join(', ')}`);
+      return got;
+    }catch(e){
+      console.log(`дневной бонус (${name}) не получен: ${e.message}`);
+    }
   }
+  console.log('дневной бонус: оставляем ручной выбор');
+  return null;
 }
 
 const API = 'https://europe.albion-online-data.com/api/v2/stats';
