@@ -45,7 +45,10 @@
       const o=nb ? list[at.get(nb[0]===n?nb[1]:nb[0])] : {x:0,y:0};
       list[i]={x:o.x+(R()-.5)*80, y:o.y+(R()-.5)*80, ax:null, ay:null};
     });
-    for(let it=0; it<300; it++){
+    // Тёплый старт: если есть прежние позиции, сеть уже устоялась — мало шагов,
+    // низкая температура и жёсткая привязка, чтобы карта не прыгала.
+    const warm=list.some(p=>p.ax!==null), iters=warm?80:300, t0=warm?0.04:1, pull=warm?1.0:0.3;
+    for(let it=0; it<iters; it++){
       const f=list.map(()=>({x:0,y:0}));
       for(let i=0;i<list.length;i++) for(let j=i+1;j<list.length;j++){
         let dx=list[i].x-list[j].x, dy=list[i].y-list[j].y, d2=dx*dx+dy*dy+0.01;
@@ -57,9 +60,9 @@
         const dx=list[j].x-list[i].x, dy=list[j].y-list[i].y, d=Math.hypot(dx,dy)||1, k=(d-70)*0.04;
         f[i].x+=dx/d*k*d/10; f[i].y+=dy/d*k*d/10; f[j].x-=dx/d*k*d/10; f[j].y-=dy/d*k*d/10;
       }
-      const t=1-it/300;
+      const t=t0*(1-it/iters);
       list.forEach((p,i)=>{
-        if(p.ax!==null){ f[i].x+=(p.ax-p.x)*0.3; f[i].y+=(p.ay-p.y)*0.3; }
+        if(p.ax!==null){ f[i].x+=(p.ax-p.x)*pull; f[i].y+=(p.ay-p.y)*pull; }
         p.x+=Math.max(-8,Math.min(8,f[i].x))*t; p.y+=Math.max(-8,Math.min(8,f[i].y))*t;
       });
     }
