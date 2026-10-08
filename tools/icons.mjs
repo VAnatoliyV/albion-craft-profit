@@ -4,7 +4,7 @@
 // G-Core, а из России без VPN он не открывается (как и игровые серверы — отсюда
 // же чёрный экран при смене зоны). Тогда сайт берёт иконки отсюда, с GitHub Pages.
 //
-// Список предметов — все id из items.json. Качаем только недостающие, поэтому
+// Список предметов — все id из items.json и сырьё для карты Авалона. Качаем только недостающие, поэтому
 // повторный запуск после патча дотягивает лишь новые вещи. Ответ 404 запоминаем
 // в ico/none.txt, чтобы не спрашивать render о них на каждой сборке.
 //
@@ -23,7 +23,10 @@ const PAR = 6;         // render ограничивает частоту — н�
 const enc = s => encodeURIComponent(s).replace(/%40/g, '@');
 
 const raw = await readFile(new URL('items.json', root), 'utf8');
-const ids = [...new Set(raw.match(/"[A-Z][A-Z0-9_]*_[A-Z0-9_]+(?:@[1-4])?"/g).map(s => s.slice(1, -1)))].sort();
+// Сырьё карты Авалона: карточка зоны показывает значок ресурса по тиру узлов,
+// а T2 и T3 в items.json не попадают (из них ничего не крафтят на сайте).
+const MAP_RES = ['FIBER', 'HIDE', 'ORE', 'ROCK', 'WOOD'].flatMap(k => [2, 3, 4, 5, 6, 7, 8].map(t => `T${t}_${k}`));
+const ids = [...new Set([...raw.match(/"[A-Z][A-Z0-9_]*_[A-Z0-9_]+(?:@[1-4])?"/g).map(s => s.slice(1, -1)), ...MAP_RES])].sort();
 await mkdir(dir, { recursive: true });
 const none = new Set((await readFile(noneFile, 'utf8').catch(() => '')).split('\n').filter(Boolean));
 const exists = id => access(new URL(id + '.webp', dir)).then(() => true, () => false);

@@ -21,15 +21,76 @@ test('path: кратчайший, в обе стороны, с фильтром 
   assert.deepEqual(C.path(links,'A','A',false), ['A']);
 });
 
-test('layout: детерминирован и не двигает старые узлы далеко', ()=>{
+test('layout: детерминирован; маленькая карта раскладывается заново, без прежних мест', ()=>{
   const nodes=['A','B','C'], edges=[['A','B'],['B','C']];
   const p1=C.layout(nodes,edges,new Map(),7), p2=C.layout(nodes,edges,new Map(),7);
   assert.deepEqual([...p1], [...p2]);
-  const p3=C.layout([...nodes,'D'],[...edges,['C','D']],p1,7);
-  for(const k of nodes){
-    const d=Math.hypot(p3.get(k).x-p1.get(k).x, p3.get(k).y-p1.get(k).y);
-    assert.ok(d<60, k+' уехал на '+d);
+  // До 80 узлов холодная раскладка чище тёплой и быстрая: прежние места не держим.
+  const far=new Map(nodes.map((n,i)=>[n,{x:1000+i*500,y:-800}]));
+  assert.deepEqual([...C.layout(nodes,edges,far,7)], [...p1]);
+});
+
+// Отрезок ребра не должен проходить через чужой узел: иначе кажется, что
+// дорога идёт через эту зону. Случай с живой карты: Setos связан с Xoritos,
+// Giantweald, Floatshoal и Thirstwater, Xoritos — с Thunderrock.
+const segDist=(p,a,b)=>{
+  const dx=b.x-a.x, dy=b.y-a.y, l2=dx*dx+dy*dy||1;
+  const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l2));
+  return Math.hypot(p.x-a.x-t*dx, p.y-a.y-t*dy);
+};
+function farFromEdges(nodes, edges, pos, min){
+  for(const n of nodes) for(const [a,b] of edges){
+    if(n===a||n===b) continue;
+    const d=segDist(pos.get(n),pos.get(a),pos.get(b));
+    assert.ok(d>=min, `${n} в ${d.toFixed(1)} px от ребра ${a}–${b}`);
   }
+}
+test('layout: ребро не проходит через чужой узел (случай со скриншота)', ()=>{
+  const nodes=['F','G','S','T','W','X'];
+  const edges=[['S','X'],['S','G'],['X','T'],['S','F'],['S','W']];
+  for(const seed of [1,7,42,1234]) farFromEdges(nodes, edges, C.layout(nodes,edges,new Map(),seed), 25);
+  // На живой карте связи приходили по одной, и раскладка шла от прежних мест.
+  let pos=new Map(); const got=[];
+  for(const e of edges){ got.push(e); pos=C.layout([...new Set(got.flat())].sort(), got, pos, 7); }
+  farFromEdges(nodes, edges, pos, 25);
+});
+test('layout: и на сети побольше узлы не лежат на чужих рёбрах', ()=>{
+  const nodes=[], edges=[];
+  for(let i=0;i<30;i++){ nodes.push('z'+i); if(i) edges.push(['z'+Math.floor(i/3),'z'+i]); }
+  edges.push(['z4','z9'],['z2','z20']);
+  for(let seed=1;seed<=20;seed++) farFromEdges(nodes, edges, C.layout(nodes,edges,new Map(),seed), 25);
+});
+
+// Подписи рёбер: прямоугольники с центром x,y и размером w,h.
+const over=(a,b)=>Math.abs(a.x-b.x)<(a.w+b.w)/2 && Math.abs(a.y-b.y)<(a.h+b.h)/2;
+const onCircle=(r,c)=>{
+  const px=Math.max(r.x-r.w/2,Math.min(c.x,r.x+r.w/2)), py=Math.max(r.y-r.h/2,Math.min(c.y,r.y+r.h/2));
+  return Math.hypot(px-c.x,py-c.y)<c.r;
+};
+test('labels: подпись отступает от линии по нормали', ()=>{
+  const [p]=C.labels([{x:0,y:0,dx:1,dy:0,len:200,w:40,h:14}], []);
+  assert.equal(p.x, 0);
+  const gap=Math.abs(p.y)-7;
+  assert.ok(gap>=8 && gap<=10, 'зазор '+gap);
+});
+test('labels: подписи не налезают друг на друга и на узлы', ()=>{
+  const items=[
+    {x:0,y:0,dx:1,dy:0,len:200,w:60,h:14},
+    {x:0,y:0,dx:Math.SQRT1_2,dy:Math.SQRT1_2,len:200,w:60,h:14},
+    {x:4,y:2,dx:0,dy:1,len:200,w:60,h:14},
+  ];
+  const obs=[{x:0,y:-16,r:12},{x:30,y:20,r:12}];
+  const out=C.labels(items, obs);
+  const R=out.map((p,i)=>({x:p.x,y:p.y,w:items[i].w,h:items[i].h}));
+  for(let i=0;i<R.length;i++){
+    for(let j=i+1;j<R.length;j++) assert.ok(!over(R[i],R[j]), `подписи ${i} и ${j} пересеклись`);
+    for(const c of obs) assert.ok(!onCircle(R[i],c), `подпись ${i} на узле`);
+  }
+});
+test('labels: прямоугольные препятствия (имена узлов) тоже обходятся', ()=>{
+  const [p]=C.labels([{x:0,y:0,dx:1,dy:0,len:300,w:50,h:14}], [{x:0,y:-15,w:80,h:14},{x:0,y:15,w:80,h:14}]);
+  assert.ok(!over({x:p.x,y:p.y,w:50,h:14},{x:0,y:-15,w:80,h:14}));
+  assert.ok(!over({x:p.x,y:p.y,w:50,h:14},{x:0,y:15,w:80,h:14}));
 });
 
 test('left и soon', ()=>{

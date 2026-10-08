@@ -793,6 +793,25 @@ body.pix th{background-color:var(--panel2)}
 /* Слова-ярлыки внутри строк: сам ярлык в нашем шрифте, число рядом обычным */
 body.pix .plab{font-family:var(--pix);letter-spacing:.4px}
 body.pix tbody tr:last-child td{background-image:none}
+/* Карточка зоны на карте Авалона — как в приложении Albion Journal */
+.mzName{font-size:17px;font-weight:700;color:var(--accent);letter-spacing:.3px}
+.mzSub{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;margin:3px 0 10px}
+.mzSq{width:9px;height:9px;flex:none}
+.mzBox{border:1px solid var(--border2);background:var(--panel2);border-radius:8px;padding:0 12px}
+.mzRow{display:flex;gap:8px;padding:7px 0;align-items:flex-start}
+.mzRow+.mzRow{border-top:1px solid var(--border)}
+.mzLbl{width:78px;flex:none;color:var(--muted);font-size:11px;padding-top:6px}
+.mzVal{flex:1;min-width:0;font-size:12px;padding-top:4px}
+.mzIcons{display:flex;flex-wrap:wrap;gap:6px 12px}
+.mzI{display:flex;flex-direction:column;align-items:center;gap:1px;font-size:10px;color:var(--muted);min-width:34px}
+.mzI img{width:30px;height:30px}
+.mzI svg{width:26px;height:26px;shape-rendering:crispEdges}
+.mzI .mzN{color:var(--text);opacity:.85}
+.mzI .mzMain{color:var(--accent)}
+.mzCamps{font-size:11px;color:var(--muted);margin-top:4px}
+.mzLinks{margin-top:8px;font-size:12px;color:var(--muted)}
+.mzLinks div{padding:2px 0}
+@media (max-width:480px){ .mzLbl{width:62px} }
 </style>
 </head>
 <body>
@@ -2334,7 +2353,7 @@ for(const [k,v] of Object.entries({
   "Обнови страницу.": ["Refresh the page.", "Recarga la página."]
 })) if(!(k in T_UI)) T_UI[k]=v;   // готовые переводы не перебиваем
 Object.assign(T_UI, {"Общие настройки": ["General settings", "Ajustes generales"]});
-Object.assign(T_UI, {"🗺 Карта Авалона": ["🗺 Avalon map", "🗺 Mapa de Avalon"], "Авалон": ["Avalon", "Avalon"], "Общая живая карта Дорог Авалона: связи присылают игроки из Albion Journal, у каждой — сколько осталось до закрытия. Поиск пути между зонами.": ["A shared live map of the Roads of Avalon: links are sent in by players using Albion Journal, each with the time left until it closes. Pathfinding between zones.", "Mapa común en vivo de los Caminos de Avalon: los enlaces los envían jugadores con Albion Journal, cada uno con el tiempo que queda hasta que se cierre. Búsqueda de ruta entre zonas."], "Живая карта Дорог Авалона и поиск пути.": ["Live map of the Roads of Avalon and pathfinding.", "Mapa en vivo de los Caminos de Avalon y búsqueda de ruta."], "Живая карта Дорог Авалона от игроков с Albion Journal: таймеры порталов и путь между зонами.": ["A live map of the Roads of Avalon from players using Albion Journal: portal timers and a path between zones.", "Mapa en vivo de los Caminos de Avalon hecha por jugadores con Albion Journal: temporizadores de portales y ruta entre zonas."], "Найти зону": ["Find a zone", "Buscar zona"], "название": ["name", "nombre"], "Откуда": ["From", "Desde"], "Куда": ["To", "Hasta"], "Только подтверждённые": ["Confirmed only", "Solo confirmadas"], "Скоро закроются": ["Closing soon", "Se cerrarán pronto"], "Ничего не закрывается в ближайший час.": ["Nothing closes within the next hour.", "No se cierra nada en la próxima hora."], "Карта сейчас недоступна": ["The map is unavailable right now", "El mapa no está disponible ahora"], "Сервер не отвечает. Попробуем ещё раз через полминуты.": ["The server isn't responding. We'll try again in half a minute.", "El servidor no responde. Lo intentaremos de nuevo en medio minuto."], "Пока ни одной связи": ["No links yet", "Aún no hay ningún enlace"], "Связи присылают игроки из Albion Journal: наведись в игре на портал дорог и нажми кнопку карточки зоны.": ["Links are sent in by Albion Journal players: point at a roads portal in the game and press the button on the zone card.", "Los enlaces los envían jugadores de Albion Journal: apunta en el juego a un portal de los caminos y pulsa el botón de la ficha de zona."], "Путь:": ["Path:", "Ruta:"], "(перех.: {})": ["({} jumps)", "({} saltos)"], "Пути нет": ["No path", "No hay ruta"], "связей: {} · пунктир — не проверена": ["links: {} · dashed means not verified", "enlaces: {} · la línea discontinua significa sin verificar"], "Ресурсы:": ["Resources:", "Recursos:"], "Сундуки:": ["Chests:", "Cofres:"], "Подземелья:": ["Dungeons:", "Mazmorras:"], "синяя": ["blue", "azul"], "жёлтая": ["yellow", "amarilla"], "красная": ["red", "roja"], "чёрная": ["black", "negra"], "дорога": ["road", "camino"], "подземелье": ["dungeon", "mazmorra"], "остров": ["island", "isla"], "другое": ["other", "otro"], "волокно": ["fiber", "fibra"], "шкуры": ["hide", "pieles"], "руда": ["ore", "mineral"], "дерево": ["wood", "madera"], "камень": ["stone", "piedra"], "малый": ["small", "pequeño"], "малый элитный": ["small elite", "pequeño de élite"], "средний ветеранский": ["medium veteran", "mediano de veterano"], "средний элитный": ["medium elite", "mediano de élite"], "одиночное": ["solo", "en solitario"], "групповое": ["group", "de grupo"], "рейдовое": ["raid", "de incursión"], "удалить": ["delete", "eliminar"], "забанить автора": ["ban the author", "vetar al autor"], "закрыт": ["closed", "cerrado"], "{} ч {} м": ["{}h {}m", "{} h {} min"], "{} м": ["{}m", "{} min"], "<{} м": ["<{}m", "<{} min"], "Удалить эту связь с карты?": ["Remove this link from the map?", "¿Eliminar este enlace del mapa?"], "Забанить автора этой связи? Все связи, где он единственный автор, пропадут с карты.": ["Ban the author of this link? Every link where they are the only author will disappear from the map.", "¿Vetar al autor de este enlace? Todos los enlaces en los que sea el único autor desaparecerán del mapa."], "Готово.": ["Done.", "Hecho."], "Связь уже пропала с карты.": ["The link is already gone from the map.", "El enlace ya no está en el mapa."], "Ключ админа не подошёл, админ-режим выключен.": ["The admin key didn't work, admin mode is off.", "La clave de administrador no ha funcionado, el modo de administrador está desactivado."], "Сервер не ответил, попробуй ещё раз.": ["The server didn't respond, try again.", "El servidor no respondió, inténtalo de nuevo."]});   // Карта Авалона
+Object.assign(T_UI, {"🗺 Карта Авалона": ["🗺 Avalon map", "🗺 Mapa de Avalon"], "Авалон": ["Avalon", "Avalon"], "Общая живая карта Дорог Авалона: связи присылают игроки из Albion Journal, у каждой — сколько осталось до закрытия. Поиск пути между зонами.": ["A shared live map of the Roads of Avalon: links are sent in by players using Albion Journal, each with the time left until it closes. Pathfinding between zones.", "Mapa común en vivo de los Caminos de Avalon: los enlaces los envían jugadores con Albion Journal, cada uno con el tiempo que queda hasta que se cierre. Búsqueda de ruta entre zonas."], "Живая карта Дорог Авалона и поиск пути.": ["Live map of the Roads of Avalon and pathfinding.", "Mapa en vivo de los Caminos de Avalon y búsqueda de ruta."], "Живая карта Дорог Авалона от игроков с Albion Journal: таймеры порталов и путь между зонами.": ["A live map of the Roads of Avalon from players using Albion Journal: portal timers and a path between zones.", "Mapa en vivo de los Caminos de Avalon hecha por jugadores con Albion Journal: temporizadores de portales y ruta entre zonas."], "Найти зону": ["Find a zone", "Buscar zona"], "название": ["name", "nombre"], "Откуда": ["From", "Desde"], "Куда": ["To", "Hasta"], "Только подтверждённые": ["Confirmed only", "Solo confirmadas"], "Скоро закроются": ["Closing soon", "Se cerrarán pronto"], "Ничего не закрывается в ближайший час.": ["Nothing closes within the next hour.", "No se cierra nada en la próxima hora."], "Карта сейчас недоступна": ["The map is unavailable right now", "El mapa no está disponible ahora"], "Сервер не отвечает. Попробуем ещё раз через полминуты.": ["The server isn't responding. We'll try again in half a minute.", "El servidor no responde. Lo intentaremos de nuevo en medio minuto."], "Пока ни одной связи": ["No links yet", "Aún no hay ningún enlace"], "Связи присылают игроки из Albion Journal: наведись в игре на портал дорог и нажми кнопку карточки зоны.": ["Links are sent in by Albion Journal players: point at a roads portal in the game and press the button on the zone card.", "Los enlaces los envían jugadores de Albion Journal: apunta en el juego a un portal de los caminos y pulsa el botón de la ficha de zona."], "Путь:": ["Path:", "Ruta:"], "(перех.: {})": ["({} jumps)", "({} saltos)"], "Пути нет": ["No path", "No hay ruta"], "связей: {} · пунктир — не проверена": ["links: {} · dashed means not verified", "enlaces: {} · la línea discontinua significa sin verificar"], "синяя": ["blue", "azul"], "жёлтая": ["yellow", "amarilla"], "красная": ["red", "roja"], "чёрная": ["black", "negra"], "дорога": ["road", "camino"], "подземелье": ["dungeon", "mazmorra"], "остров": ["island", "isla"], "другое": ["other", "otro"], "волокно": ["fiber", "fibra"], "шкуры": ["hide", "pieles"], "руда": ["ore", "mineral"], "дерево": ["wood", "madera"], "камень": ["stone", "piedra"], "малый": ["small", "pequeño"], "малый элитный": ["small elite", "pequeño de élite"], "средний ветеранский": ["medium veteran", "mediano de veterano"], "средний элитный": ["medium elite", "mediano de élite"], "одиночное": ["solo", "en solitario"], "групповое": ["group", "de grupo"], "рейдовое": ["raid", "de incursión"], "удалить": ["delete", "eliminar"], "забанить автора": ["ban the author", "vetar al autor"], "закрыт": ["closed", "cerrado"], "{} ч {} м": ["{}h {}m", "{} h {} min"], "{} м": ["{}m", "{} min"], "<{} м": ["<{}m", "<{} min"], "Удалить эту связь с карты?": ["Remove this link from the map?", "¿Eliminar este enlace del mapa?"], "Забанить автора этой связи? Все связи, где он единственный автор, пропадут с карты.": ["Ban the author of this link? Every link where they are the only author will disappear from the map.", "¿Vetar al autor de este enlace? Todos los enlaces en los que sea el único autor desaparecerán del mapa."], "Готово.": ["Done.", "Hecho."], "Связь уже пропала с карты.": ["The link is already gone from the map.", "El enlace ya no está en el mapa."], "Ключ админа не подошёл, админ-режим выключен.": ["The admin key didn't work, admin mode is off.", "La clave de administrador no ha funcionado, el modo de administrador está desactivado."], "Сервер не ответил, попробуй ещё раз.": ["The server didn't respond, try again.", "El servidor no respondió, inténtalo de nuevo."], "ресурсы": ["resources", "recursos"], "лагеря": ["camps", "campamentos"], "данжи": ["dungeons", "mazmorras"], "основной ресурс биома": ["the biome's main resource", "recurso principal del bioma"], "есть выход в город туманов": ["exit to the Mists city", "salida a la ciudad de las Nieblas"], "качество {}": ["quality {}", "calidad {}"], "портал на {}": ["portal for {}", "portal para {}"], "дорога убежищ": ["hideout road", "camino de refugios"], "глубокая дорога убежищ": ["deep hideout road", "camino de refugios profundo"], "глубокая дорога": ["deep road", "camino profundo"], "глубокая рейдовая дорога": ["deep raid road", "camino profundo de incursión"], "королевская дорога": ["royal road", "camino real"], "королевская красная дорога": ["royal red road", "camino real rojo"], "соло малый": ["small solo", "solo pequeño"], "соло большой": ["big solo", "solo grande"], "групповой": ["group", "grupal"], "рейдовый малый": ["small raid", "incursión pequeña"], "рейдовый большой": ["big raid", "incursión grande"]});   // Карта Авалона
 Object.assign(T_UI, {"💡 Здесь лучше выключить «Золотую середину»: она прячет свежие строки без истории, а во флипе выгодные окна как раз такие. И перед покупкой сверь обе цены со сборщиком цен в игре: наценка держится считанные минуты.": ["💡 Better turn off Sweet spot here: it hides fresh rows with no history, and that is exactly what good flips look like. Before buying, check both prices in game with the data client running: the margin lasts only minutes.", "💡 Aquí conviene desactivar Punto justo: oculta las filas recientes sin historial, y los buenos flips son justo así. Antes de comprar, comprueba ambos precios en el juego con el recolector de datos: el margen dura solo minutos."]});
 Object.assign(T_UI, {
   "🖤 Флиппинг → ЧР": ["🖤 Flipping → BM", "🖤 Reventa → MN"],
@@ -6959,22 +6978,47 @@ function mapPaint(){
   const onPath=new Set(); if(path) for(let i=1;i<path.length;i++) onPath.add(AvalonCore.key(path[i-1],path[i]));
   const P=c=>{ const p=MAP.pos.get(c)||{x:0,y:0}; return {x:W/2+(p.x+v.x)*v.k, y:H/2+(p.y+v.y)*v.k}; };
   g.font='11px system-ui';
+  const rad=c=>c===MAP.here?14:10;
   for(const l of ls){
     const a=P(l.a), b=P(l.b), s=l.closesAt-now;
     g.setLineDash(l.confirmed?[]:[6,5]);
     g.strokeStyle = onPath.has(AvalonCore.key(l.a,l.b)) ? '#f1c40f' : s<3600 ? '#e74c3c' : '#8a8fa3';
     g.lineWidth = onPath.has(AvalonCore.key(l.a,l.b)) ? 3 : 1.5;
     g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke();
-    g.setLineDash([]); g.fillStyle='#cfd3e0';
-    g.fillText(tr(AvalonCore.left(l.closesAt,now))+(l.size?' · '+l.size:''), (a.x+b.x)/2+4, (a.y+b.y)/2-4);
   }
-  const q=MAP.q.trim().toLowerCase();
+  g.setLineDash([]);
+  // Узлы и их имена — препятствия для подписей рёбер: подпись их обходит.
+  const q=MAP.q.trim().toLowerCase(), obs=[], names=[];
   for(const [c] of MAP.pos){
-    const z=MAP.zones&&MAP.zones.get(c), p=P(c);
-    g.beginPath(); g.arc(p.x,p.y,c===MAP.here?14:10,0,7); g.fillStyle=mapColor(z); g.fill();
-    if(c===MAP.here || c===MAP.sel || (q && mapName(c).toLowerCase().includes(q))){ g.strokeStyle='#fff'; g.lineWidth=2; g.stroke(); }
+    const p=P(c), r=rad(c), nm=mapName(c), w=g.measureText(nm).width;
+    obs.push({x:p.x, y:p.y, r:r+2});
+    obs.push({x:p.x+r+3+w/2, y:p.y, w:w+2, h:14});
+    names.push([c,p,r,nm]);
+  }
+  // Подписи времени: сбоку от линии, на подложке, расталкиваются между собой.
+  const items=[], texts=[];
+  for(const l of ls){
+    const a=P(l.a), b=P(l.b), dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||1;
+    const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+    if(mx<-80||my<-40||mx>W+80||my>H+40) continue;
+    const t=tr(AvalonCore.left(l.closesAt,now))+(l.size?' · '+l.size:'');
+    items.push({x:mx, y:my, dx:dx/d, dy:dy/d, len:Math.max(0,d-rad(l.a)-rad(l.b)), w:g.measureText(t).width+8, h:15});
+    texts.push([t, l.closesAt-now<3600]);
+  }
+  AvalonCore.labels(items, obs).forEach((p,i)=>{
+    const it=items[i], [t,hot]=texts[i];
+    g.fillStyle='rgba(21,25,36,.88)';
+    g.beginPath(); g.roundRect ? g.roundRect(p.x-it.w/2, p.y-it.h/2, it.w, it.h, 4) : g.rect(p.x-it.w/2, p.y-it.h/2, it.w, it.h); g.fill();
+    g.fillStyle=hot?'#f08a7e':'#cfd3e0'; g.textAlign='center'; g.textBaseline='middle';
+    g.fillText(t, p.x, p.y+0.5);
+  });
+  g.textAlign='left'; g.textBaseline='alphabetic';
+  for(const [c,p,r,nm] of names){
+    const z=MAP.zones&&MAP.zones.get(c);
+    g.beginPath(); g.arc(p.x,p.y,r,0,7); g.fillStyle=mapColor(z); g.fill();
+    if(c===MAP.here || c===MAP.sel || (q && nm.toLowerCase().includes(q))){ g.strokeStyle='#fff'; g.lineWidth=2; g.stroke(); }
     g.fillStyle='#fff'; g.fillText(z?'T'+z.t:'?', p.x-6, p.y+4);
-    g.fillStyle='#e6e8ef'; g.fillText(mapName(c), p.x+(c===MAP.here?17:13), p.y+4);
+    g.fillStyle='#e6e8ef'; g.fillText(nm, p.x+r+3, p.y+4);
   }
 }
 function mapHit(x,y){
@@ -6995,16 +7039,75 @@ function mapWord(tab,k){
   const key=String(k).toLowerCase();
   return tab[key] ? '<span>'+tab[key]+'</span>' : mapEsc(key.replace(/_/g,' '));
 }
+// Цвет зоны в карточке — как квадратик в приложении (enum Оформление).
+const MAP_ZCOLOR={safe:'#4E77C4', yellow:'#D8B23A', red:'#C24A3E', black:'#6B6F7A', city:'#8A6A3A', island:'#4E8E5A', roads:'#8A5ABF'};
+// Вид дороги словами. Чёрные и обычные дороги в приложении безымянные —
+// у них остаётся просто «дорога».
+const MAP_ROAD={TUNNEL_HIDEOUT:'дорога убежищ', TUNNEL_HIDEOUT_DEEP:'глубокая дорога убежищ', TUNNEL_DEEP:'глубокая дорога',
+  TUNNEL_DEEP_RAID:'глубокая рейдовая дорога', TUNNEL_ROYAL:'королевская дорога', TUNNEL_ROYAL_RED:'королевская красная дорога'};
+const MAP_CAMP={solo_small:'соло малый', solo_big:'соло большой', group:'групповой', raid_small:'рейдовый малый', raid_big:'рейдовый большой'};
+const MAP_ROMAN=['','I','II','III','IV','V','VI'];
+// Пиксельный сундучок из приложения (СундукЗначок): 16×16, цвет по виду.
+const MAP_CHEST_PIX=['................','................','....DDDDDDDD....','...DLLLLLLLLD...','..DLLLLLLLLLLD..','..DLLBBBBBBLLD..',
+  '..DDDDDDDDDDDD..','..DBBBBGGGBBBD..','..DBBBBGKGBBBD..','..DDDDDDDDDDDD..','..DBBBBBBBBBBD..','..DBBBBBBBBBBD..','..DBBBBBBBBBBD..',
+  '..DDDDDDDDDDDD..','................','................'];
+const MAP_CHEST_COL={medium_veteran:['#4E77C4','#7FA3E0'], small_elite:['#8A5ABF','#B489DC'], medium_elite:['#C98A2E','#EEBC4E'], small:['#4E8E5A','#7FC188']};
+const mapChestSVG=(()=>{ const memo={}; return kind=>{
+  if(memo[kind]) return memo[kind];
+  const [body,light]=MAP_CHEST_COL[kind]||MAP_CHEST_COL.small, col={D:'#1A1F2B',K:'#1A1F2B',B:body,L:light,G:'#EEBC4E'};
+  let r='';
+  MAP_CHEST_PIX.forEach((row,y)=>{ for(let x=0;x<16;){ const ch=row[x]; let e=x; while(e<16&&row[e]===ch) e++;
+    if(col[ch]) r+=`<rect x="${x}" y="${y}" width="${e-x}" height="1" fill="${col[ch]}"/>`; x=e; } });
+  return memo[kind]=`<svg viewBox="0 0 16 16" aria-hidden="true">${r}</svg>`;
+}; })();
+const mapRow=(lbl,val)=>`<div class="mzRow"><div class="mzLbl"><span>${lbl}</span></div><div class="mzVal">${val}</div></div>`;
+const mapNone='<span>нет</span>';
 function mapCardHTML(c){
   const z=MAP.zones&&MAP.zones.get(c); if(!z) return '';
-  const res=Object.entries(z.res||{}).map(([k,t])=>mapWord(MAP_RES,k)+' T'+mapEsc(t)).join(', ')||'—';
-  const ch=Object.entries(z.ch||{}).map(([k,n])=>mapEsc(n)+'× '+mapWord(MAP_CHEST,k)).join(', ')||'—';
-  const dg=Object.entries(z.dg||{}).map(([k,n])=>mapEsc(n)+'× '+mapWord(MAP_DUNGEON,k)).join(', ')||'—';
-  const links=[...MAP.links.values()].filter(l=>l.a===c||l.b===c);
-  const adm = MAP.key ? links.map(l=>{ const k=mapEsc(AvalonCore.key(l.a,l.b));
-    return `<div class="fresh">${mapEsc(mapName(l.a===c?l.b:l.a))}: <button class="btn" data-mdel="${k}">удалить</button> <button class="btn" data-mban="${k}">забанить автора</button></div>`; }).join('') : '';
-  return `<div class="panel"><b>${mapEsc(z.n)}</b> · T${mapEsc(z.t)} · ${mapWord(MAP_ZQ, z.r?'roads':z.q)}<div class="fresh"><span>Ресурсы:</span> ${res}</div>
-    <div class="fresh"><span>Сундуки:</span> ${ch}</div><div class="fresh"><span>Подземелья:</span> ${dg}</div>${adm}${MAP.admMsg?'<div class="fresh">'+mapEsc(tr(MAP.admMsg))+'</div>':''}</div>`;
+  const byKey=o=>Object.entries(o||{}).sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0);
+  // Подзаголовок как в приложении: вид зоны, тир, градация.
+  const head=[];
+  if(z.r){ const nm=MAP_ROAD[z.ty]; head.push(nm ? '<span>'+nm+'</span>'+(z.g>0&&MAP_ROMAN[z.g]?' '+MAP_ROMAN[z.g]:'') : '<span>дорога</span>'); }
+  else head.push(mapWord(MAP_ZQ, z.q));
+  if(z.t>0) head.push('T'+mapEsc(z.t));
+  if(!z.r && z.g>0) head.push('<span>качество '+mapEsc(z.g)+'</span>');
+  const rows=[];
+  // Ресурсы: в открытом мире их задаёт биом (первый — основной), у дорог —
+  // список узлов: значок по старшему тиру, под ним разброс тиров и число узлов.
+  const rb=z.rb||[], res=byKey(z.res);
+  if(rb.length) rows.push(mapRow('ресурсы', '<div class="mzIcons">'+rb.map((k,i)=>{
+    const w=MAP_RES[String(k).toLowerCase()]||String(k).toLowerCase(), t=i?w:'основной ресурс биома';
+    return `<div class="mzI" title="${mapEsc(tr(t))}"><img ${icoAttr(mapEsc('T'+Math.max(z.t,4)+'_'+k),30)} alt=""><span class="${i?'':'mzMain'}">${mapEsc(w)}</span></div>`;
+  }).join('')+'</div>'));
+  else if(res.length) rows.push(mapRow('ресурсы', '<div class="mzIcons">'+res.map(([k,pairs])=>{
+    const ts=pairs.map(p=>+p[0]), lo=Math.min(...ts), hi=Math.max(...ts), n=pairs.reduce((s,p)=>s+(+p[1]||0),0);
+    const w=MAP_RES[String(k).toLowerCase()]||String(k).toLowerCase();
+    return `<div class="mzI" title="${mapEsc(tr(w))}"><img ${icoAttr(mapEsc('T'+hi+'_'+k),30)} alt=""><span>${lo<hi?'T'+lo+'–T'+hi:'T'+hi}</span><span class="mzN">×${n}</span></div>`;
+  }).join('')+'</div>'));
+  // Лагеря: значками добыча (сундуки), строкой под ними — сами лагеря.
+  const ch=byKey(z.ch), lg=byKey(z.lg);
+  if(ch.length || z.r){
+    const icons = ch.length ? '<div class="mzIcons">'+ch.map(([k,n])=>
+      `<div class="mzI" title="${mapEsc(MAP_CHEST[k]?tr(MAP_CHEST[k]):k.replace(/_/g,' '))}">${mapChestSVG(k)}<span class="mzN">×${mapEsc(n)}</span></div>`).join('')+'</div>' : mapNone;
+    const camps = lg.length ? '<div class="mzCamps">'+lg.map(([k,n])=>mapEsc(n)+' × '+mapWord(MAP_CAMP,k)).join(', ')+'</div>' : '';
+    rows.push(mapRow('лагеря', icons+camps));
+  }
+  const dg=byKey(z.dg);
+  if(dg.length || z.mi){
+    let v = dg.length ? dg.map(([k,n])=>mapEsc(n)+' × '+mapWord(MAP_DUNGEON,k)).join(', ') : mapNone;
+    if(z.mi) v+='<div class="mzCamps"><span>есть выход в город туманов</span></div>';
+    rows.push(mapRow('данжи', v));
+  }
+  // Связи зоны на карте: куда ведёт, сколько осталось, на сколько человек портал.
+  const now=Date.now()/1000;
+  const links=[...MAP.links.values()].filter(l=>l.a===c||l.b===c).sort((a,b)=>a.closesAt-b.closesAt);
+  const lk=links.map(l=>{ const k=mapEsc(AvalonCore.key(l.a,l.b));
+    const adm = MAP.key ? ` <button class="btn" data-mdel="${k}">удалить</button> <button class="btn" data-mban="${k}">забанить автора</button>` : '';
+    return `<div>↔ ${mapEsc(mapName(l.a===c?l.b:l.a))} · <span>${mapEsc(tr(AvalonCore.left(l.closesAt, now)))}</span>${l.size?' · <span>портал на '+mapEsc(l.size)+'</span>':''}${adm}</div>`; }).join('');
+  return `<div class="panel"><div class="mzName">${mapEsc(z.n)}</div>
+    <div class="mzSub"><span class="mzSq" style="background:${MAP_ZCOLOR[z.q]||'#8b93a8'}"></span><span>${head.join(' · ')}</span></div>
+    ${rows.length?'<div class="mzBox">'+rows.join('')+'</div>':''}
+    ${lk?'<div class="mzLinks">'+lk+'</div>':''}${MAP.admMsg?'<div class="fresh">'+mapEsc(tr(MAP.admMsg))+'</div>':''}</div>`;
 }
 function wireMap(){
   const q=$('mapQ'); if(q) q.oninput=()=>{ MAP.q=q.value; mapPaint(); };
