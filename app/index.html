@@ -32,6 +32,12 @@ a.big small{display:block;font-weight:500;font-size:13px;opacity:.75}
 .other a:hover{border-color:var(--accent)}
 ul{list-style:none;padding:0;margin:28px 0 0;text-align:left;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 18px}
 li{margin:6px 0}
+.req{margin-top:16px;text-align:left;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 18px;font-size:14px}
+.req h2{margin:0 0 6px;font-size:15px;color:var(--accent)}
+.req h2:not(:first-child){margin-top:14px}
+.req p{margin:3px 0;color:var(--text)}
+.req p.note{color:var(--muted)}
+#started{display:none;margin-top:12px;color:var(--muted);font-size:14px}
 footer{margin-top:20px;font-size:13px;color:var(--muted)}
 footer a{color:var(--muted)}
 </style>
@@ -45,6 +51,7 @@ footer a{color:var(--muted)}
   <a class="big" id="main" href="https://github.com/VAnatoliyV/albion-craft-profit/releases/latest">
     <span data-t="dl">Скачать</span> <span id="os"></span><small id="ver"></small>
   </a>
+  <div id="started" data-t="started">Скачивание началось. Не началось — нажми кнопку выше.</div>
   <div class="other">
     <a id="mac" href="https://github.com/VAnatoliyV/albion-craft-profit/releases/latest"> Mac</a>
     <a id="win" href="https://github.com/VAnatoliyV/albion-zone-fix/releases/latest">⊞ Windows</a>
@@ -56,6 +63,18 @@ footer a{color:var(--muted)}
     <li data-t="f3">🔔 Уведомления о нужных ресурсах и сундуках</li>
     <li data-t="f4">💰 Цены рынка, фейм и урон за сессию</li>
   </ul>
+
+  <div class="req">
+    <h2 data-t="rm"> Mac</h2>
+    <p data-t="rm1">• Mac на Apple M1 и новее (на Intel не работает)</p>
+    <p data-t="rm2">• macOS 13 Ventura или новее</p>
+    <p class="note" data-t="rm3">Первый запуск: «Системные настройки → Конфиденциальность и безопасность → Всё равно открыть». Для карточки зоны — разрешить «Запись экрана».</p>
+    <h2 data-t="rw">⊞ Windows</h2>
+    <p data-t="rw1">• Windows 10 или 11, 64-бит</p>
+    <p data-t="rw2">• Права администратора (программа читает трафик игры)</p>
+    <p class="note" data-t="rw3">SmartScreen: «Подробнее → Выполнить в любом случае». Для карточки зоны в русском клиенте нужен русский языковой пакет Windows (распознавание текста).</p>
+  </div>
+
   <footer><a href="../" data-t="site">Сайт с крафтом</a> · <a href="https://discord.gg/5pV9ZqZMve">Discord</a></footer>
 </main>
 <script>
@@ -64,29 +83,57 @@ footer a{color:var(--muted)}
   if (en) {
     document.documentElement.lang = 'en';
     var T = {sub:'Free · Mac & Windows', dl:'Download', site:'Crafting site',
+      started:'Download started. If not — press the button above.',
       f1:'🗺 Mouse button on an Avalon portal — zone card: tier, resources, chests, dungeons, time left',
       f2:'🌐 Shared Avalon roads map — roads are added automatically',
       f3:'🔔 Notifications for resources and chests you want',
-      f4:'💰 Market prices, fame and damage per session'};
+      f4:'💰 Market prices, fame and damage per session',
+      rm1:'• Mac with Apple M1 or newer (Intel is not supported)',
+      rm2:'• macOS 13 Ventura or newer',
+      rm3:'First launch: System Settings → Privacy & Security → Open Anyway. For the zone card allow “Screen Recording”.',
+      rw1:'• Windows 10 or 11, 64-bit',
+      rw2:'• Administrator rights (the app reads the game traffic)',
+      rw3:'SmartScreen: More info → Run anyway.'};
     document.querySelectorAll('[data-t]').forEach(function(e){ if (T[e.dataset.t]) e.textContent = T[e.dataset.t]; });
     document.title = 'Albion Journal — download';
   }
-  var ua = navigator.userAgent, isWin = /Windows/i.test(ua), isMac = /Macintosh|Mac OS X/i.test(ua) && !/iPhone|iPad/i.test(ua);
-  var REPO = isWin ? 'albion-zone-fix' : 'albion-craft-profit', EXT = isWin ? /Setup.*\.exe$/i : /\.dmg$/i;
+  var OS = {
+    mac: {repo:'albion-craft-profit', ext:/\.dmg$/i, ru:'для Mac', en:'for Mac'},
+    win: {repo:'albion-zone-fix', ext:/Setup.*\.exe$/i, ru:'для Windows', en:'for Windows'}
+  };
+  // ?mac / ?win в ссылке — сразу скачать нужную версию, без выбора.
+  var q = location.search.replace(/^\?/, '').toLowerCase();
+  var want = /(^|&)(mac|win)(=|&|$)/.exec(q), auto = !!want;
+  var ua = navigator.userAgent;
+  var os = want ? want[2] : /Windows/i.test(ua) ? 'win' : (/Macintosh|Mac OS X/i.test(ua) && !/iPhone|iPad/i.test(ua)) ? 'mac' : '';
   var main = document.getElementById('main');
-  if (!isWin && !isMac) return; // телефон и прочее: кнопка ведёт на страницу выпуска Mac, ниже — обе
-  document.getElementById('os').textContent = isWin ? 'для Windows' : 'для Mac';
-  if (en) document.getElementById('os').textContent = isWin ? 'for Windows' : 'for Mac';
-  main.href = 'https://github.com/VAnatoliyV/' + REPO + '/releases/latest';
-  // Прямая ссылка на файл последней версии; не ответил API — остаётся страница выпуска.
-  fetch('https://api.github.com/repos/VAnatoliyV/' + REPO + '/releases/latest')
-    .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(j){
-      if (!j) return;
-      var a = (j.assets || []).filter(function(a){ return EXT.test(a.name); })[0];
-      if (a) main.href = a.browser_download_url;
-      document.getElementById('ver').textContent = (en ? 'version ' : 'версия ') + String(j.tag_name || '').replace(/^v/, '');
-    }).catch(function(){});
+
+  function latest(key){
+    return fetch('https://api.github.com/repos/VAnatoliyV/' + OS[key].repo + '/releases/latest')
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){
+        if (!j) return null;
+        var a = (j.assets || []).filter(function(a){ return OS[key].ext.test(a.name); })[0];
+        return a ? {url:a.browser_download_url, ver:String(j.tag_name || '').replace(/^v/, '')} : null;
+      }).catch(function(){ return null; });
+  }
+  // Маленькие кнопки тоже ведут прямо на файл (пока API не ответил — на страницу выпуска).
+  ['mac','win'].forEach(function(k){
+    latest(k).then(function(f){
+      if (f) document.getElementById(k).href = f.url;
+      if (k !== os) return;
+      if (f) {
+        main.href = f.url;
+        document.getElementById('ver').textContent = (en ? 'version ' : 'версия ') + f.ver;
+        if (auto) { location.href = f.url; document.getElementById('started').style.display = 'block'; }
+      } else if (auto) {
+        location.href = main.href; // API недоступен — хотя бы страница выпуска
+      }
+    });
+  });
+  if (!os) return; // телефон и прочее: две кнопки ниже
+  main.href = 'https://github.com/VAnatoliyV/' + OS[os].repo + '/releases/latest';
+  document.getElementById('os').textContent = en ? OS[os].en : OS[os].ru;
 })();
 </script>
 </body>
