@@ -839,6 +839,8 @@ body.pix tbody tr:last-child td{background-image:none}
       <span class="proOnly">Сколько стоит любая вещь или ресурс: цены по всем семи городам и качествам, бай-ордера (за сколько сдать сразу) и средние сделок на чёрном рынке.</span><span class="liteOnly">Посмотреть, сколько стоит любая вещь во всех городах.</span></div>
     <div class="card" onclick="enterApp('roads')"><b>🛡 Дороги в Карлеон <span class="badge b-warn" style="vertical-align:2px">бета</span></b>
       <span class="proOnly">Стоит ли везти сейчас: живой светофор по убийствам транспортников (киллборд Europe), классификатор «кто вёз на ЧР» и окна Bandit Assault. Раздел дорабатывается.</span><span class="liteOnly">Опасно ли сейчас везти товар в Карлеон.</span></div>
+    <div class="card" onclick="enterApp('map')"><b>🗺 Карта Авалона <span class="badge b-warn" style="vertical-align:2px">бета</span></b>
+      <span class="proOnly">Общая живая карта Дорог Авалона: связи присылают игроки из Albion Journal, у каждой — сколько осталось до закрытия. Поиск пути между зонами.</span><span class="liteOnly">Живая карта Дорог Авалона и поиск пути.</span></div>
   </div>
   <div id="dl" class="card">
     <div class="dlt"><b>💾 Приложение для Mac</b>
@@ -1058,6 +1060,7 @@ body.pix tbody tr:last-child td{background-image:none}
   <b>Значки.</b> Колонка «Данные» показывает возраст самой старой цены в строке. Значок ⚠ значит, что маржа выше 300% или выше 100% при продажах меньше 10 штук в день. Обычно это один случайный ордер или кривые данные, и в «Золотую середину» такое не попадает.
   </div>
 </footer>
+<script src="avalon-core.js"></script>
 <script>
 let DATA = null; // загружается из items.json;
 
@@ -4596,6 +4599,12 @@ function renderCore(){
     wireCalc();
     return;
   }
+  if(S.tab==='map'){
+    wrap.innerHTML = mapHTML();
+    paintSadBun();
+    wireMap();
+    return;
+  }
   if(S.tab==='roads'){
     wrap.innerHTML = roadsHTML();
     const rb=$('roadsReload'); if(rb) rb.onclick=()=>{ S.roads.loaded=false; loadRoads(); };
@@ -6777,6 +6786,198 @@ function backBtnHTML(){
   return S.itemFrom ? `<button onclick="backFromItem()" title="Вернуться в раздел, из которого ты открыл эту карточку">← <span>${TAB_NAMES[S.itemFrom]||'назад'}</span></button>` : '';
 }
 
+// ── Карта Авалона ─────────────────────────────────────────────────────────
+// Связи присылает Albion Journal на наш сервер (тот же, что живые цены),
+// здесь только показ. Ядро без DOM — avalon-core.js, у него свои тесты.
+const MAP={links:new Map(), since:0, pos:new Map(), zones:null, here:'', sel:null,
+  from:'', to:'', onlyConf:false, q:'', timer:null, down:false, err:'', key:'',
+  shape:'', view:{x:0,y:0,k:1}};
+try{ MAP.key=localStorage.getItem('acp_mapkey')||''; }catch(e){}
+const mapEsc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+function mapRoute(id){
+  if(id.startsWith('here=')) mapSetHere(decodeURIComponent(id.slice(5)));
+  if(id.startsWith('key=')){
+    MAP.key=decodeURIComponent(id.slice(4));
+    try{ localStorage.setItem('acp_mapkey', MAP.key); }catch(e){}
+    history.replaceState(null,'','#map');
+  }
+}
+// «Я здесь» от приложения: обвести зону и подвинуть к ней карту.
+function mapSetHere(code){
+  MAP.here=code||'';
+  const p=MAP.pos.get(MAP.here); if(p){ MAP.view.x=-p.x; MAP.view.y=-p.y; }
+}
+window.avalonHere=code=>{ mapSetHere(code); if(S.tab==='map') mapPaint(); };
+async function mapLoadZones(){
+  if(MAP.zones) return;
+  const j=await fetch('zones.json').then(r=>r.json());
+  MAP.zones=new Map(j.zones.map(z=>[z.c,z]));
+}
+async function mapPoll(){
+  const was=MAP.err, size=MAP.links.size;
+  let changed=false;
+  try{
+    await mapLoadZones();
+    const r=await fetch(LIVE_URL+'/roads.json?since='+MAP.since, {cache:'no-store'});
+    if(!r.ok) throw new Error(r.status);
+    const d=await r.json();
+    changed = !!(d.full || (d.links&&d.links.length) || (d.gone&&d.gone.length));
+    MAP.links=AvalonCore.merge(MAP.links, d); MAP.since=d.now; MAP.err='';
+    mapRelayout();
+  }catch(e){ MAP.err='Карта сейчас недоступна: сервер не отвечает. Попробуем ещё раз через полминуты.'; }
+  if(S.tab!=='map') return;
+  // Пустой опрос раз в полминуты не перестраивает раздел: иначе закрывался бы
+  // открытый список «Откуда» и терялся бы курсор в поиске. Хватает перерисовки.
+  if(!changed && was===MAP.err && size===MAP.links.size && $('mapCv')){ mapPaint(); return; }
+  const a=document.activeElement, qf=a&&a.id==='mapQ' ? a.selectionStart : null;
+  render();
+  if(qf!=null){ const q=$('mapQ'); if(q){ q.focus(); q.setSelectionRange(qf,qf); } }
+}
+function mapStart(){ if(!MAP.timer){ mapPoll(); MAP.timer=setInterval(mapPoll, 30000); } }
+function mapStop(){ clearInterval(MAP.timer); MAP.timer=null; }
+// Раскладка дорогая (каждый узел с каждым), поэтому считаем её только когда
+// поменялся сам набор связей, а не на каждом опросе.
+function mapRelayout(){
+  const ls=[...MAP.links.values()];
+  const shape=[...MAP.links.keys()].sort().join(',');
+  if(shape===MAP.shape) return;
+  MAP.shape=shape;
+  const nodes=[...new Set(ls.flatMap(l=>[l.a,l.b]))].sort();
+  const first=!MAP.pos.size;
+  MAP.pos=AvalonCore.layout(nodes, ls.map(l=>[l.a,l.b]), MAP.pos, 7);
+  if(first && MAP.here) mapSetHere(MAP.here);
+}
+async function mapAdmin(action, link){
+  try{
+    const r=await fetch(LIVE_URL+'/roads/admin',{method:'POST', headers:{'content-type':'application/json'},
+      body:JSON.stringify({key:MAP.key, action, link})});
+    if(r.status===403){ MAP.key=''; try{ localStorage.removeItem('acp_mapkey'); }catch(e){} }
+  }catch(e){}
+  MAP.since=0; mapPoll();
+}
+const MAP_COLOR={road:'#7c5cff', black:'#2b2b2b', red:'#c0392b', yellow:'#e1b12c', blue:'#2e86de', city:'#27ae60'};
+function mapColor(z){
+  if(!z) return '#666';
+  if(z.r) return MAP_COLOR.road;
+  return MAP_COLOR[z.q]||'#666';
+}
+function mapName(c){ const z=MAP.zones&&MAP.zones.get(c); return z ? z.n : c; }
+function mapHTML(){
+  const now=Date.now()/1000, ls=[...MAP.links.values()].filter(l=>!MAP.onlyConf||l.confirmed);
+  const p = MAP.from&&MAP.to ? AvalonCore.path(ls, MAP.from, MAP.to, MAP.onlyConf) : null;
+  const opts=[...new Set(ls.flatMap(l=>[l.a,l.b]))].sort((a,b)=>mapName(a).localeCompare(mapName(b)))
+    .map(c=>`<option value="${mapEsc(c)}">${mapEsc(mapName(c))}</option>`).join('');
+  const soon=AvalonCore.soon(ls, now, 1).slice(0,8).map(l=>
+    `<div class="fresh">${mapEsc(mapName(l.a))} ↔ ${mapEsc(mapName(l.b))} · ${tr(AvalonCore.left(l.closesAt, now))}</div>`).join('')
+    || '<div class="fresh">Ничего не закрывается в ближайший час.</div>';
+  const ctls=`<div class="secCtls">
+    <label class="ctl">Найти зону <input type="text" id="mapQ" value="${mapEsc(MAP.q)}" placeholder="название"></label>
+    <label class="ctl">Откуда <select id="mapFrom"><option value="">—</option>${opts}</select></label>
+    <label class="ctl">Куда <select id="mapTo"><option value="">—</option>${opts}</select></label>
+    <label class="ctl toggle"><input type="checkbox" id="mapConf"${MAP.onlyConf?' checked':''}> Только подтверждённые</label>
+    <div class="ctl"><b>Скоро закроются</b>${soon}</div>
+  </div>`;
+  let main;
+  if(MAP.err && !MAP.links.size) main=sadBunHTML('Карта сейчас недоступна', 'Сервер не отвечает. Попробуем ещё раз через полминуты.');
+  else if(!MAP.links.size) main=sadBunHTML('Пока ни одной связи', 'Связи присылают игроки из Albion Journal: наведись в игре на портал дорог и нажми кнопку карточки зоны.');
+  else main=`<canvas id="mapCv" style="width:100%;height:70vh;display:block;touch-action:none"></canvas>
+    <div class="fresh" id="mapInfo">${p ? 'Путь: '+p.map(c=>mapEsc(mapName(c))).join(' → ')+' ('+(p.length-1)+' перех.)' : (MAP.from&&MAP.to?'Пути нет':'')}</div>
+    <div id="mapCard"></div>`;
+  return `<div class="panel"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <b>🗺 Карта Авалона</b>${backBtnHTML()}<span class="fresh">${MAP.links.size} связей · пунктир — не проверена</span></div>${ctls}${main}</div>`;
+}
+function mapPaint(){
+  const cv=$('mapCv'); if(!cv) return;
+  const dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
+  cv.width=W*dpr; cv.height=H*dpr;
+  const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+  const now=Date.now()/1000, v=MAP.view;
+  const ls=[...MAP.links.values()].filter(l=>!MAP.onlyConf||l.confirmed);
+  const path=MAP.from&&MAP.to ? AvalonCore.path(ls,MAP.from,MAP.to,MAP.onlyConf) : null;
+  const onPath=new Set(); if(path) for(let i=1;i<path.length;i++) onPath.add(AvalonCore.key(path[i-1],path[i]));
+  const P=c=>{ const p=MAP.pos.get(c)||{x:0,y:0}; return {x:W/2+(p.x+v.x)*v.k, y:H/2+(p.y+v.y)*v.k}; };
+  g.font='11px system-ui';
+  for(const l of ls){
+    const a=P(l.a), b=P(l.b), s=l.closesAt-now;
+    g.setLineDash(l.confirmed?[]:[6,5]);
+    g.strokeStyle = onPath.has(AvalonCore.key(l.a,l.b)) ? '#f1c40f' : s<3600 ? '#e74c3c' : '#8a8fa3';
+    g.lineWidth = onPath.has(AvalonCore.key(l.a,l.b)) ? 3 : 1.5;
+    g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke();
+    g.setLineDash([]); g.fillStyle='#cfd3e0';
+    g.fillText(tr(AvalonCore.left(l.closesAt,now))+(l.size?' · '+l.size:''), (a.x+b.x)/2+4, (a.y+b.y)/2-4);
+  }
+  const q=MAP.q.trim().toLowerCase();
+  for(const [c] of MAP.pos){
+    const z=MAP.zones&&MAP.zones.get(c), p=P(c);
+    g.beginPath(); g.arc(p.x,p.y,c===MAP.here?14:10,0,7); g.fillStyle=mapColor(z); g.fill();
+    if(c===MAP.here || c===MAP.sel || (q && mapName(c).toLowerCase().includes(q))){ g.strokeStyle='#fff'; g.lineWidth=2; g.stroke(); }
+    g.fillStyle='#fff'; g.fillText(z?'T'+z.t:'?', p.x-6, p.y+4);
+    g.fillStyle='#e6e8ef'; g.fillText(mapName(c), p.x+(c===MAP.here?17:13), p.y+4);
+  }
+}
+function mapHit(x,y){
+  const cv=$('mapCv'), W=cv.clientWidth, H=cv.clientHeight, v=MAP.view;
+  for(const [c,p] of MAP.pos){
+    const sx=W/2+(p.x+v.x)*v.k, sy=H/2+(p.y+v.y)*v.k;
+    if(Math.hypot(sx-x,sy-y)<14) return c;
+  }
+  return null;
+}
+function mapCardHTML(c){
+  const z=MAP.zones&&MAP.zones.get(c); if(!z) return '';
+  const res=Object.entries(z.res||{}).map(([k,t])=>k.toLowerCase()+' T'+t).join(', ')||'—';
+  const ch=Object.entries(z.ch||{}).map(([k,n])=>n+'× '+k.toLowerCase()).join(', ')||'—';
+  const dg=Object.entries(z.dg||{}).map(([k,n])=>n+'× '+k.toLowerCase()).join(', ')||'—';
+  const links=[...MAP.links.values()].filter(l=>l.a===c||l.b===c);
+  const adm = MAP.key ? links.map(l=>{ const k=mapEsc(AvalonCore.key(l.a,l.b));
+    return `<div class="fresh">${mapEsc(mapName(l.a===c?l.b:l.a))}: <button class="btn" data-mdel="${k}">удалить</button> <button class="btn" data-mban="${k}">забанить автора</button></div>`; }).join('') : '';
+  return `<div class="panel"><b>${mapEsc(z.n)}</b> · T${z.t} · ${z.r?'дорога':z.q}<div class="fresh">Ресурсы: ${res}</div>
+    <div class="fresh">Сундуки: ${ch}</div><div class="fresh">Подземелья: ${dg}</div>${adm}</div>`;
+}
+function wireMap(){
+  const q=$('mapQ'); if(q) q.oninput=()=>{ MAP.q=q.value; mapPaint(); };
+  const f=$('mapFrom'), t=$('mapTo');
+  if(f){ f.value=MAP.from; f.onchange=()=>{ MAP.from=f.value; render(); }; }
+  if(t){ t.value=MAP.to; t.onchange=()=>{ MAP.to=t.value; render(); }; }
+  const cf=$('mapConf'); if(cf) cf.onchange=()=>{ MAP.onlyConf=cf.checked; render(); };
+  const cv=$('mapCv'); if(!cv) return;
+  // Мышь и палец: один указатель тащит карту, два — щипок меняет масштаб.
+  let drag=null, pinch=null;
+  const pts=new Map();
+  const dist=()=>{ const [a,b]=[...pts.values()]; return Math.hypot(a.x-b.x, a.y-b.y)||1; };
+  cv.onpointerdown=e=>{
+    pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    cv.setPointerCapture(e.pointerId);
+    if(pts.size===2){ pinch={d0:dist(), k0:MAP.view.k}; drag=null; return; }
+    if(pts.size===1) drag={x:e.clientX,y:e.clientY,vx:MAP.view.x,vy:MAP.view.y,moved:false};
+  };
+  cv.onpointermove=e=>{
+    if(!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(pinch && pts.size===2){ MAP.view.k=Math.max(.3,Math.min(4,pinch.k0*dist()/pinch.d0)); mapPaint(); return; }
+    if(!drag) return;
+    const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
+    if(Math.abs(dx)+Math.abs(dy)>4) drag.moved=true;
+    MAP.view.x=drag.vx+dx/MAP.view.k; MAP.view.y=drag.vy+dy/MAP.view.k; mapPaint();
+  };
+  const up=e=>{
+    pts.delete(e.pointerId);
+    if(pinch){ if(pts.size<2) pinch=null; drag=null; return; }
+    const r=cv.getBoundingClientRect();
+    if(drag && !drag.moved && e.type==='pointerup'){ MAP.sel=mapHit(e.clientX-r.left, e.clientY-r.top);
+      $('mapCard').innerHTML = MAP.sel ? mapCardHTML(MAP.sel) : ''; mapPaint(); }
+    drag=null;
+  };
+  cv.onpointerup=up; cv.onpointercancel=up;
+  cv.onwheel=e=>{ e.preventDefault(); MAP.view.k=Math.max(.3,Math.min(4,MAP.view.k*(e.deltaY<0?1.1:0.9))); mapPaint(); };
+  $('mapCard').onclick=e=>{
+    const d=e.target.dataset; if(d.mdel) mapAdmin('delete', d.mdel); if(d.mban) mapAdmin('ban', d.mban);
+  };
+  if(MAP.sel) $('mapCard').innerHTML=mapCardHTML(MAP.sel);
+  mapPaint();
+}
+window.addEventListener('resize', ()=>{ if(S.tab==='map') mapPaint(); });
+
 // ─── События ───
 try{ const v=localStorage.getItem(PREM_KEY); if(v!==null) $('premChk').checked = v==='1'; }catch(e){}
 $('premChk').addEventListener('change', ()=>{ savePrem(); paintPremBtn(); });
@@ -6849,7 +7050,7 @@ const TAB_TASK={
 // строки без недельной истории и с наценкой меньше 10%, а выгодные окна там как раз свежие.
 const TAB_TIP={
   flip:'💡 Здесь лучше выключить «Золотую середину»: она прячет свежие строки без истории, а во флипе выгодные окна как раз такие. И перед покупкой сверь обе цены со сборщиком цен в игре: наценка держится считанные минуты.'};
-const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', cons:'🧪 Зелья и еда', isl:'🏝 Острова', calc:'🧮 Калькулятор', item:'🔍 Цены предмета', roads:'🛡 Дороги в Карлеон · БЕТА'};
+const TAB_NAMES={craft:'🛠 Крафт', flip:'🖤 Флиппинг → ЧР', cityflip:'🐂 Флиппинг между городами', ref:'♻️ Переработка', ench:'💎 Рунофикация', cons:'🧪 Зелья и еда', isl:'🏝 Острова', calc:'🧮 Калькулятор', item:'🔍 Цены предмета', roads:'🛡 Дороги в Карлеон · БЕТА', map:'🗺 Карта Авалона'};
 // какие контролы нужны на каждой вкладке (премиум, возраст данных, обновление и поиск, всегда)
 const TAB_CONTROLS={
   craft:   ['wrapCity','wrapFocus','wrapSelfRef','wrapQual','wrapFee','wrapCat','wrapSafeCraft','wrapLocal','wrapBmMode'],
@@ -6862,6 +7063,7 @@ const TAB_CONTROLS={
   calc:    [],
   item:    [],
   roads:   [],
+  map:     [],
 };
 const ALL_WRAPS=['wrapCity','wrapRoute','wrapFocus','wrapSafe','wrapSafeCraft','wrapLocal','wrapSelfRef','wrapQual','wrapFee','wrapCat','refModeWrap','routeCityWrap','wrapBmMode'];
 // ── счётчик разделов ──
@@ -6870,16 +7072,16 @@ const ALL_WRAPS=['wrapCity','wrapRoute','wrapFocus','wrapSafe','wrapSafeCraft','
 // языке интерфейса. Если скрипт счётчика заблокирован (а у игроков блокировщики частые),
 // window.umami просто нет — тогда молча ничего не делаем, на работу сайта это не влияет.
 const TRACK_NAMES = {craft:'Crafting', ref:'Refining', flip:'Flipping to BM', cityflip:'City flipping',
-  ench:'Enchanting', cons:'Potions and food', item:'Item prices', roads:'Roads to Caerleon'};
+  ench:'Enchanting', cons:'Potions and food', item:'Item prices', roads:'Roads to Caerleon', map:'Avalon map'};
 function trackSection(t){
   try{ if(window.umami) umami.track(p=>({...p, url:'/'+t, title:TRACK_NAMES[t]||t})); }catch(e){}
 }
 // Порядок разделов в рельсе. «Цены предмета» сюда не ставим: это карточка,
 // в которую проваливаются из других разделов, а не самостоятельный раздел.
-const RAIL_TABS=['craft','flip','cityflip','ref','ench','cons','isl','calc','roads'];
+const RAIL_TABS=['craft','flip','cityflip','ref','ench','cons','isl','calc','roads','map'];
 const RAIL_SHORT={craft:'Крафт', flip:'Флип → ЧР', cityflip:'Между городами',
   ref:'Переработка', ench:'Рунофикация', cons:'Зелья и еда', isl:'Острова',
-  calc:'Калькулятор', roads:'Дороги'};
+  calc:'Калькулятор', roads:'Дороги', map:'Авалон'};
 
 function toggleDrawer(открыть){
   const sh=$('appShell'); if(!sh) return;
@@ -7000,7 +7202,7 @@ function setTab(t){
   paintCityHint();   // только после того, как решено, что на этой вкладке видно
   paintMoreBtn();
   syncBmMode();
-  const flt=$('filters'); if(flt) flt.style.display = (t==='roads'||t==='item'||t==='calc'||t==='isl')?'none':'';
+  const flt=$('filters'); if(flt) flt.style.display = (t==='roads'||t==='item'||t==='calc'||t==='isl'||t==='map')?'none':'';
   // в Переработке города маршрута нужны только когда включён сам маршрут
   const rcw=$('routeCityWrap');
   if(rcw && t==='ref' && refMode()!=='route') rcw.style.display='none';
@@ -7009,7 +7211,8 @@ function setTab(t){
   if(gr) gr.style.display = ((TAB_CONTROLS[t]||[]).includes('wrapCat') || TAB_GROUPS[t]) ? 'flex' : 'none';
   if(t==='roads' && !S.roads.loaded && !S.roads.loading) loadRoads(); // ленивая загрузка при входе
   S.limit = 0; // сбросить порцию строк
-  if(S.loaded && t!=='roads' && t!=='calc' && t!=='isl') compute();
+  if(S.loaded && t!=='roads' && t!=='calc' && t!=='isl' && t!=='map') compute();
+  if(t==='map') mapStart(); else mapStop();
   render();
 }
 $('refModeSel').onchange=()=>{ setTab(S.tab); compute(); render(); };
@@ -7181,6 +7384,7 @@ function routeParse(){
   if(!TAB_NAMES[tab]) return {view:'home'};       // чужой или устаревший якорь — на главную
   const id = i<0 ? '' : h.slice(i+1);
   if(tab==='isl') return id ? {view:'isl', tab, id} : {view:'tab', tab};
+  if(tab==='map') return {view:'tab', tab, id};
   return id ? {view:'item', tab, id} : {view:'tab', tab};
 }
 // Четыре числа на главной берём из тех же мест, что и плашки в шапке:
@@ -7268,6 +7472,7 @@ function paintHeroStats(){
 }
 
 function showHome(){
+  mapStop();   // на главной карту не опрашиваем
   $('home').style.display='flex';
   $('appHeader').style.display='none';
   $('appMain').style.display='none';
@@ -7291,6 +7496,7 @@ function applyRoute(){
     const r = routeParse();
     if(r.view==='home'){ showHome(); return; }
     showApp();
+    if(r.tab==='map') mapRoute(r.id||'');
     if(r.view==='isl'){                                   // #isl/martlock — экран одного острова
       islInit();
       const k = ISL_CITY.findIndex(x=>x.img===r.id);
@@ -7313,6 +7519,12 @@ function nav(hash){
   applyRoute();
 }
 window.addEventListener('popstate', applyRoute);
+// Приложение для Mac, когда окно уже открыто, грузит тот же адрес с новым якорем
+// (#map/here=…). Обычно это popstate, но на случай, если придёт только hashchange,
+// слушаем и его; если popstate этот якорь уже применил, второй раз не применяем.
+let ROUTE_SEEN = null;
+window.addEventListener('popstate', ()=>{ ROUTE_SEEN=location.hash; });
+window.addEventListener('hashchange', ()=>{ if(ROUTE_SEEN!==location.hash) applyRoute(); ROUTE_SEEN=null; });
 
 window.enterApp = (tab)=>{ S.itemFrom=null; nav(tab); };   // зашли из меню, возвращаться внутри некуда
 window.goHome   = ()=> nav('');
