@@ -2893,9 +2893,35 @@ const icoOk=new Set();
 const ICO_DPR=(window.devicePixelRatio||1)>1.25 ? 2 : 1;
 const ICO_STEPS=ICO_DPR>1 ? [96,128,217] : [48,64,128];
 const icoStep=sz=>ICO_STEPS.find(x=>x>=(sz||40)*ICO_DPR) || ICO_STEPS[ICO_STEPS.length-1];
-const icoSrc=(id,sz)=>'https://render.albiononline.com/v1/item/'+enc(id)+'.png?size='+icoStep(sz);
+// Откуда брать иконки. render.albiononline.com обслуживает G-Core, а он из
+// России без VPN не открывается — запрос просто висит, и таблицы стоят без
+// картинок. На такой случай копия всех иконок лежит рядом с сайтом, в ico/
+// (её качает tools/icons.mjs). При заходе один раз пробуем render: ответил за
+// четыре секунды — берём его, нет — копию, и помним это шесть часов, чтобы
+// не ждать проверку на каждом заходе.
+const ICO_RENDER='https://render.albiononline.com/v1/item/';
+let icoLocal=null;                                   // null — ещё не проверили
+const icoReady=new Promise(done=>{
+  const set=v=>{ if(icoLocal!==null) return; icoLocal=v; done(v);
+    try{ localStorage.setItem('acp_ico', JSON.stringify({local:v, t:Date.now()})); }catch(e){} };
+  try{ const m=JSON.parse(localStorage.getItem('acp_ico')||'null');
+       if(m && m.local && Date.now()-m.t<6*3.6e6){ icoLocal=true; done(true); return; } }catch(e){}
+  // Мгновенный отказ бывает и у живого render — он так режет частоту, — поэтому
+  // на ошибке пробуем ещё дважды. Блокировка же обычно не отвечает вовсе: её
+  // ловит общий срок в четыре секунды.
+  const try1=n=>{ const im=new Image();
+    im.onload=()=>set(false);
+    im.onerror=()=>n<3 ? setTimeout(()=>try1(n+1), 700) : set(true);
+    im.src=ICO_RENDER+'T4_BAG.png?size=48&t='+Math.floor(Date.now()/3.6e6)+'-'+n; };
+  try1(1);
+  setTimeout(()=>set(true), 4000);
+});
+icoReady.then(()=>icoPump());
+const icoCopy=id=>'ico/'+enc(id)+'.webp';
+const icoSrc=(id,sz,copy)=>(icoLocal||copy) ? icoCopy(id) : ICO_RENDER+enc(id)+'.png?size='+icoStep(sz);
 const icoKey=(id,sz)=>id+'|'+icoStep(sz);
 function icoFast(root){
+  if(icoLocal===null) return;
   (root||document).querySelectorAll('img[data-ico]:not([src])').forEach(el=>{
     const id=el.dataset.ico, sz=+el.dataset.sz||40;
     if(!icoOk.has(icoKey(id,sz))) return;
@@ -2908,23 +2934,34 @@ function icoFast(root){
   });
 }
 function icoPump(){
-  while(icoBusy<ICO_MAX && icoQ.length){
+  if(icoLocal===null) return;                        // ждём проверку render
+  // копия лежит на том же сервере, что и сайт, лимита у неё нет
+  const max=icoLocal ? ICO_MAX*3 : ICO_MAX;
+  while(icoBusy<max && icoQ.length){
     const j=icoQ.shift();
     if(!j.el.isConnected || j.el.getAttribute('src')) continue;   // строку перерисовали
     icoBusy++;
+    // Заблокированный адрес не отвечает ошибкой, а висит минутами — и пять
+    // таких зависших загрузок навсегда занимали всю очередь. Не дождались за
+    // восемь секунд — считаем осечкой.
+    let done=false;
+    const kill=setTimeout(()=>fin(false), 8000);
     const fin=ok=>{
+      if(done) return; done=true; clearTimeout(kill);
       icoBusy--;
       if(ok) icoOk.add(icoKey(j.id,j.sz));
       if(!ok){
         if(j.n<ICO_TRIES){
           j.el.removeAttribute('src');
+          // render дважды не отдал — дальше пробуем копию
+          if(j.n>=2) j.copy=true;
           setTimeout(()=>{ j.n++; icoQ.push(j); icoPump(); }, ICO_WAIT[Math.min(j.n-1,ICO_WAIT.length-1)]);
         } else j.el.classList.add('icoFail');
       }
       icoPump();
     };
     j.el.onload=()=>fin(true); j.el.onerror=()=>fin(false);
-    j.el.src=icoSrc(j.id,j.sz);
+    j.el.src=icoSrc(j.id,j.sz,j.copy);
   }
 }
 // Наблюдатель видимости даёт приоритет тому, что на экране, но полагаться
@@ -7161,6 +7198,9 @@ const DRIFT_ITEMS=['T4_BAG','T5_2H_BOW','T6_MAIN_SWORD','T5_HEAD_PLATE_SET1','T4
 function paintDrift(){
   const box=$('drift'); if(!box || box.dataset.готово) return;
   box.dataset.готово='1';
+  icoReady.then(()=>paintDriftNow(box));
+}
+function paintDriftNow(box){
   // В концепте значки лежали на экране во всю высоту, у нас главная короче,
   // поэтому той же горсти хватало только на углы. Кладём гуще и раскладываем
   // по сетке с разбросом, иначе они сбиваются в кучки.
@@ -7183,7 +7223,7 @@ function paintDrift(){
       const y=(стр+0.5)/Math.ceil(L.n/L.кол)*100 + ((i*53+li*17)%16) - 8;
       const d=L.d[0]+((i*13+li*5)%(L.d[1]-L.d[0]));
       const dx=((i%2?1:-1)*(18+li*10))+'px', dy=((i%3?-1:1)*(26+li*12))+'px';
-      html+=`<img src="https://render.albiononline.com/v1/item/${id}.png?size=${L.s<80?109:217}&quality=1"
+      html+=`<img src="${icoLocal ? icoCopy(id) : ICO_RENDER+id+'.png?size='+(L.s<80?109:217)+'&quality=1'}"
         alt="" loading="lazy" style="--s:${L.s}px;--o:${L.o};--d:${d}s;--t:-${i*2.3}s;
         --dx:${dx};--dy:${dy};--r1:${(i%2?-4:3)}deg;--r2:${(i%2?5:-6)}deg;left:${x}%;top:${y}%">`;
     }

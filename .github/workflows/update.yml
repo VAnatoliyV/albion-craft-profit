@@ -98,6 +98,17 @@ jobs:
             "https://vanatoliyv.github.io/albion-craft-profit/data-stats.json" || true
           if [ -s data.json ]; then echo "Взят прежний снимок ($(wc -c < data.json) байт)"; else echo "Прежнего снимка нет"; fi
 
+      # Запасные иконки для тех, у кого не открывается render.albiononline.com
+      # (Россия без VPN). Основная масса лежит в репозитории в ico/, здесь
+      # дотягиваем только то, что появилось с патчем и ещё не закоммичено.
+      - name: Дотянуть недостающие иконки
+        continue-on-error: true
+        timeout-minutes: 10
+        run: |
+          if ! node tools/icons.mjs --count; then
+            sudo apt-get install -y -qq webp >/dev/null && node tools/icons.mjs
+          fi
+
       - name: Собрать сайт
         run: |
           mkdir -p public
@@ -113,6 +124,8 @@ jobs:
           # Языки сверх встроенных (польский, немецкий и т.д.): подписи сайта в i18n/,
           # названия предметов из файлов игры в names/. Грузятся, только если выбран язык.
           cp -r i18n names public/
+          # Копия иконок предметов — на случай, если render у человека не открывается.
+          cp -r ico public/
           [ -f data.json ] && cp data.json public/ || echo "data.json отсутствует — сайт уйдёт в режим прямого опроса API"
           [ -f data-stats.json ] && cp data-stats.json public/ || true
           touch public/.nojekyll
