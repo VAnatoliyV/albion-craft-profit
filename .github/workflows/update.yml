@@ -126,6 +126,10 @@ jobs:
           cp -r i18n names public/
           # Копия иконок предметов — на случай, если render у человека не открывается.
           cp -r ico public/
+          # Номера предметов для значка оружия в Albion Journal: свежие из
+          # ao-bin-dumps (сдвигаются с патчами), при сбое — копия из репозитория.
+          node tools/items-by-id.mjs items_by_id.json
+          cp items_by_id.json public/
           [ -f data.json ] && cp data.json public/ || echo "data.json отсутствует — сайт уйдёт в режим прямого опроса API"
           [ -f data-stats.json ] && cp data-stats.json public/ || true
           touch public/.nojekyll
