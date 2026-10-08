@@ -36,7 +36,21 @@
 
 <!-- Счётчик посетителей: Umami, без куков и без баннера про cookies. Собирает страну, раздел и
      сколько людей на сайте прямо сейчас. Личных данных не пишет. -->
-<script defer src="https://cloud.umami.is/script.js" data-website-id="8aa89c23-eef0-4571-8c09-53268ccf1797"></script>
+<!-- Ключ админа карты (#map/key=…) убираем из адреса до того, как загрузится счётчик:
+     иначе он ушёл бы в Umami вместе с адресом страницы. Сам ключ — в localStorage. -->
+<script>
+(function(){
+  var h=location.hash||'';
+  if(h.indexOf('#map/key=')!==0) return;
+  var k=h.slice(9);
+  try{ k=decodeURIComponent(k); }catch(e){}
+  try{ if(k) localStorage.setItem('acp_mapkey', k); }catch(e){}
+  try{ history.replaceState(null,'',location.pathname+location.search+'#map'); }catch(e){}
+})();
+</script>
+<!-- data-exclude-hash: якорь в Umami не уходит ни в адресе, ни в referrer. Разделы
+     счётчик всё равно получает явным umami.track из trackSection. -->
+<script defer src="https://cloud.umami.is/script.js" data-website-id="8aa89c23-eef0-4571-8c09-53268ccf1797" data-exclude-hash="true"></script>
 <style>
 :root{
   --bg:#0b0d12; --bg2:#0f1219; --panel:#151924; --panel2:#1c2130; --panel3:#232a3d;
@@ -6796,8 +6810,11 @@ try{ MAP.key=localStorage.getItem('acp_mapkey')||''; }catch(e){}
 const mapEsc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 function mapRoute(id){
   if(id.startsWith('here=')) mapSetHere(decodeURIComponent(id.slice(5)));
+  // Прямую загрузку с #map/key=… разбирает скрипт в <head> ещё до счётчика.
+  // Сюда ключ доходит только при переходе внутри открытой вкладки.
   if(id.startsWith('key=')){
-    MAP.key=decodeURIComponent(id.slice(4));
+    let k=id.slice(4); try{ k=decodeURIComponent(k); }catch(e){}
+    MAP.key=k;
     try{ localStorage.setItem('acp_mapkey', MAP.key); }catch(e){}
     history.replaceState(null,'','#map');
   }
@@ -6828,7 +6845,10 @@ async function mapPoll(){
   if(S.tab!=='map') return;
   // Пустой опрос раз в полминуты не перестраивает раздел: иначе закрывался бы
   // открытый список «Откуда» и терялся бы курсор в поиске. Хватает перерисовки.
-  if(!changed && was===MAP.err && size===MAP.links.size && $('mapCv')){ mapPaint(); return; }
+  if(!changed && was===MAP.err && size===MAP.links.size && $('mapCv')){
+    const sb=$('mapSoon'); if(sb) sb.innerHTML=mapSoonHTML();   // время до закрытия идёт и без новых связей
+    mapPaint(); return;
+  }
   const a=document.activeElement, qf=a&&a.id==='mapQ' ? a.selectionStart : null;
   render();
   if(qf!=null){ const q=$('mapQ'); if(q){ q.focus(); q.setSelectionRange(qf,qf); } }
@@ -6855,27 +6875,30 @@ async function mapAdmin(action, link){
   }catch(e){}
   MAP.since=0; mapPoll();
 }
-const MAP_COLOR={road:'#7c5cff', black:'#2b2b2b', red:'#c0392b', yellow:'#e1b12c', blue:'#2e86de', city:'#27ae60'};
+const MAP_COLOR={road:'#7c5cff', black:'#2b2b2b', red:'#c0392b', yellow:'#e1b12c', blue:'#2e86de', safe:'#2e86de', city:'#27ae60'};
 function mapColor(z){
   if(!z) return '#666';
   if(z.r) return MAP_COLOR.road;
   return MAP_COLOR[z.q]||'#666';
 }
 function mapName(c){ const z=MAP.zones&&MAP.zones.get(c); return z ? z.n : c; }
+function mapSoonHTML(){
+  const now=Date.now()/1000, ls=[...MAP.links.values()].filter(l=>!MAP.onlyConf||l.confirmed);
+  return AvalonCore.soon(ls, now, 1).slice(0,8).map(l=>
+    `<div class="fresh">${mapEsc(mapName(l.a))} ↔ ${mapEsc(mapName(l.b))} · ${tr(AvalonCore.left(l.closesAt, now))}</div>`).join('')
+    || '<div class="fresh">Ничего не закрывается в ближайший час.</div>';
+}
 function mapHTML(){
   const now=Date.now()/1000, ls=[...MAP.links.values()].filter(l=>!MAP.onlyConf||l.confirmed);
   const p = MAP.from&&MAP.to ? AvalonCore.path(ls, MAP.from, MAP.to, MAP.onlyConf) : null;
   const opts=[...new Set(ls.flatMap(l=>[l.a,l.b]))].sort((a,b)=>mapName(a).localeCompare(mapName(b)))
     .map(c=>`<option value="${mapEsc(c)}">${mapEsc(mapName(c))}</option>`).join('');
-  const soon=AvalonCore.soon(ls, now, 1).slice(0,8).map(l=>
-    `<div class="fresh">${mapEsc(mapName(l.a))} ↔ ${mapEsc(mapName(l.b))} · ${tr(AvalonCore.left(l.closesAt, now))}</div>`).join('')
-    || '<div class="fresh">Ничего не закрывается в ближайший час.</div>';
   const ctls=`<div class="secCtls">
     <label class="ctl">Найти зону <input type="text" id="mapQ" value="${mapEsc(MAP.q)}" placeholder="название"></label>
     <label class="ctl">Откуда <select id="mapFrom"><option value="">—</option>${opts}</select></label>
     <label class="ctl">Куда <select id="mapTo"><option value="">—</option>${opts}</select></label>
     <label class="ctl toggle"><input type="checkbox" id="mapConf"${MAP.onlyConf?' checked':''}> Только подтверждённые</label>
-    <div class="ctl"><b>Скоро закроются</b>${soon}</div>
+    <div class="ctl"><b>Скоро закроются</b><div id="mapSoon">${mapSoonHTML()}</div></div>
   </div>`;
   let main;
   if(MAP.err && !MAP.links.size) main=sadBunHTML('Карта сейчас недоступна', 'Сервер не отвечает. Попробуем ещё раз через полминуты.');
