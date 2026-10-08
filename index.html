@@ -2334,6 +2334,7 @@ for(const [k,v] of Object.entries({
   "Обнови страницу.": ["Refresh the page.", "Recarga la página."]
 })) if(!(k in T_UI)) T_UI[k]=v;   // готовые переводы не перебиваем
 Object.assign(T_UI, {"Общие настройки": ["General settings", "Ajustes generales"]});
+Object.assign(T_UI, {"🗺 Карта Авалона": ["🗺 Avalon map", "🗺 Mapa de Avalon"], "Авалон": ["Avalon", "Avalon"], "Общая живая карта Дорог Авалона: связи присылают игроки из Albion Journal, у каждой — сколько осталось до закрытия. Поиск пути между зонами.": ["A shared live map of the Roads of Avalon: links are sent in by players using Albion Journal, each with the time left until it closes. Pathfinding between zones.", "Mapa común en vivo de los Caminos de Avalon: los enlaces los envían jugadores con Albion Journal, cada uno con el tiempo que queda hasta que se cierre. Búsqueda de ruta entre zonas."], "Живая карта Дорог Авалона и поиск пути.": ["Live map of the Roads of Avalon and pathfinding.", "Mapa en vivo de los Caminos de Avalon y búsqueda de ruta."], "Живая карта Дорог Авалона от игроков с Albion Journal: таймеры порталов и путь между зонами.": ["A live map of the Roads of Avalon from players using Albion Journal: portal timers and a path between zones.", "Mapa en vivo de los Caminos de Avalon hecha por jugadores con Albion Journal: temporizadores de portales y ruta entre zonas."], "Найти зону": ["Find a zone", "Buscar zona"], "название": ["name", "nombre"], "Откуда": ["From", "Desde"], "Куда": ["To", "Hasta"], "Только подтверждённые": ["Confirmed only", "Solo confirmadas"], "Скоро закроются": ["Closing soon", "Se cerrarán pronto"], "Ничего не закрывается в ближайший час.": ["Nothing closes within the next hour.", "No se cierra nada en la próxima hora."], "Карта сейчас недоступна": ["The map is unavailable right now", "El mapa no está disponible ahora"], "Сервер не отвечает. Попробуем ещё раз через полминуты.": ["The server isn't responding. We'll try again in half a minute.", "El servidor no responde. Lo intentaremos de nuevo en medio minuto."], "Пока ни одной связи": ["No links yet", "Aún no hay ningún enlace"], "Связи присылают игроки из Albion Journal: наведись в игре на портал дорог и нажми кнопку карточки зоны.": ["Links are sent in by Albion Journal players: point at a roads portal in the game and press the button on the zone card.", "Los enlaces los envían jugadores de Albion Journal: apunta en el juego a un portal de los caminos y pulsa el botón de la ficha de zona."], "Путь:": ["Path:", "Ruta:"], "(перех.: {})": ["({} jumps)", "({} saltos)"], "Пути нет": ["No path", "No hay ruta"], "связей: {} · пунктир — не проверена": ["links: {} · dashed means not verified", "enlaces: {} · la línea discontinua significa sin verificar"], "Ресурсы:": ["Resources:", "Recursos:"], "Сундуки:": ["Chests:", "Cofres:"], "Подземелья:": ["Dungeons:", "Mazmorras:"], "синяя": ["blue", "azul"], "жёлтая": ["yellow", "amarilla"], "красная": ["red", "roja"], "чёрная": ["black", "negra"], "дорога": ["road", "camino"], "подземелье": ["dungeon", "mazmorra"], "остров": ["island", "isla"], "другое": ["other", "otro"], "волокно": ["fiber", "fibra"], "шкуры": ["hide", "pieles"], "руда": ["ore", "mineral"], "дерево": ["wood", "madera"], "камень": ["stone", "piedra"], "малый": ["small", "pequeño"], "малый элитный": ["small elite", "pequeño de élite"], "средний ветеранский": ["medium veteran", "mediano de veterano"], "средний элитный": ["medium elite", "mediano de élite"], "одиночное": ["solo", "en solitario"], "групповое": ["group", "de grupo"], "рейдовое": ["raid", "de incursión"], "удалить": ["delete", "eliminar"], "забанить автора": ["ban the author", "vetar al autor"], "закрыт": ["closed", "cerrado"], "{} ч {} м": ["{}h {}m", "{} h {} min"], "{} м": ["{}m", "{} min"], "<{} м": ["<{}m", "<{} min"]});   // Карта Авалона
 Object.assign(T_UI, {"💡 Здесь лучше выключить «Золотую середину»: она прячет свежие строки без истории, а во флипе выгодные окна как раз такие. И перед покупкой сверь обе цены со сборщиком цен в игре: наценка держится считанные минуты.": ["💡 Better turn off Sweet spot here: it hides fresh rows with no history, and that is exactly what good flips look like. Before buying, check both prices in game with the data client running: the margin lasts only minutes.", "💡 Aquí conviene desactivar Punto justo: oculta las filas recientes sin historial, y los buenos flips son justo así. Antes de comprar, comprueba ambos precios en el juego con el recolector de datos: el margen dura solo minutos."]});
 Object.assign(T_UI, {
   "🖤 Флиппинг → ЧР": ["🖤 Flipping → BM", "🖤 Reventa → MN"],
@@ -6904,10 +6905,10 @@ function mapHTML(){
   if(MAP.err && !MAP.links.size) main=sadBunHTML('Карта сейчас недоступна', 'Сервер не отвечает. Попробуем ещё раз через полминуты.');
   else if(!MAP.links.size) main=sadBunHTML('Пока ни одной связи', 'Связи присылают игроки из Albion Journal: наведись в игре на портал дорог и нажми кнопку карточки зоны.');
   else main=`<canvas id="mapCv" style="width:100%;height:70vh;display:block;touch-action:none"></canvas>
-    <div class="fresh" id="mapInfo">${p ? 'Путь: '+p.map(c=>mapEsc(mapName(c))).join(' → ')+' ('+(p.length-1)+' перех.)' : (MAP.from&&MAP.to?'Пути нет':'')}</div>
+    <div class="fresh" id="mapInfo">${p ? '<span>Путь:</span> '+p.map(c=>mapEsc(mapName(c))).join(' → ')+' <span>(перех.: '+(p.length-1)+')</span>' : (MAP.from&&MAP.to?'<span>Пути нет</span>':'')}</div>
     <div id="mapCard"></div>`;
   return `<div class="panel"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <b>🗺 Карта Авалона</b>${backBtnHTML()}<span class="fresh">${MAP.links.size} связей · пунктир — не проверена</span></div>${ctls}${main}</div>`;
+    <b>🗺 Карта Авалона</b>${backBtnHTML()}<span class="fresh">связей: ${MAP.links.size} · пунктир — не проверена</span></div>${ctls}${main}</div>`;
 }
 function mapPaint(){
   const cv=$('mapCv'); if(!cv) return;
@@ -6946,16 +6947,26 @@ function mapHit(x,y){
   }
   return null;
 }
+// Сырые слова справочника -> русские слова, которые переводит tr. Незнакомое
+// показываем как есть (строчными, без подчёркиваний): оно английское.
+const MAP_ZQ={safe:'синяя', yellow:'жёлтая', red:'красная', black:'чёрная', city:'город', roads:'дорога', instance:'подземелье', island:'остров', other:'другое'};
+const MAP_RES={fiber:'волокно', hide:'шкуры', ore:'руда', wood:'дерево', rock:'камень'};
+const MAP_CHEST={small:'малый', small_elite:'малый элитный', medium_veteran:'средний ветеранский', medium_elite:'средний элитный'};
+const MAP_DUNGEON={solo:'одиночное', group:'групповое', raid:'рейдовое'};
+function mapWord(tab,k){
+  const key=String(k).toLowerCase();
+  return tab[key] ? '<span>'+tab[key]+'</span>' : mapEsc(key.replace(/_/g,' '));
+}
 function mapCardHTML(c){
   const z=MAP.zones&&MAP.zones.get(c); if(!z) return '';
-  const res=Object.entries(z.res||{}).map(([k,t])=>k.toLowerCase()+' T'+t).join(', ')||'—';
-  const ch=Object.entries(z.ch||{}).map(([k,n])=>n+'× '+k.toLowerCase()).join(', ')||'—';
-  const dg=Object.entries(z.dg||{}).map(([k,n])=>n+'× '+k.toLowerCase()).join(', ')||'—';
+  const res=Object.entries(z.res||{}).map(([k,t])=>mapWord(MAP_RES,k)+' T'+mapEsc(t)).join(', ')||'—';
+  const ch=Object.entries(z.ch||{}).map(([k,n])=>mapEsc(n)+'× '+mapWord(MAP_CHEST,k)).join(', ')||'—';
+  const dg=Object.entries(z.dg||{}).map(([k,n])=>mapEsc(n)+'× '+mapWord(MAP_DUNGEON,k)).join(', ')||'—';
   const links=[...MAP.links.values()].filter(l=>l.a===c||l.b===c);
   const adm = MAP.key ? links.map(l=>{ const k=mapEsc(AvalonCore.key(l.a,l.b));
     return `<div class="fresh">${mapEsc(mapName(l.a===c?l.b:l.a))}: <button class="btn" data-mdel="${k}">удалить</button> <button class="btn" data-mban="${k}">забанить автора</button></div>`; }).join('') : '';
-  return `<div class="panel"><b>${mapEsc(z.n)}</b> · T${z.t} · ${z.r?'дорога':z.q}<div class="fresh">Ресурсы: ${res}</div>
-    <div class="fresh">Сундуки: ${ch}</div><div class="fresh">Подземелья: ${dg}</div>${adm}</div>`;
+  return `<div class="panel"><b>${mapEsc(z.n)}</b> · T${mapEsc(z.t)} · ${mapWord(MAP_ZQ, z.r?'roads':z.q)}<div class="fresh"><span>Ресурсы:</span> ${res}</div>
+    <div class="fresh"><span>Сундуки:</span> ${ch}</div><div class="fresh"><span>Подземелья:</span> ${dg}</div>${adm}</div>`;
 }
 function wireMap(){
   const q=$('mapQ'); if(q) q.oninput=()=>{ MAP.q=q.value; mapPaint(); };
@@ -7068,7 +7079,8 @@ const TAB_TASK={
   isl:'Что посадить на острове и кого держать на пастбище, чтобы остров приносил больше.',
   calc:'Ручной счёт одной позиции: свои цены, свой возврат, своя плата за станок.',
   item:'Сколько стоит любая вещь или ресурс во всех семи городах и на чёрном рынке.',
-  roads:'Стоит ли сейчас везти товар: живая сводка по убийствам транспортников и окна бандитов.'};
+  roads:'Стоит ли сейчас везти товар: живая сводка по убийствам транспортников и окна бандитов.',
+  map:'Живая карта Дорог Авалона от игроков с Albion Journal: таймеры порталов и путь между зонами.'};
 // Совет под описанием, только где он правда нужен. Во флипе «Золотая середина» прячет
 // строки без недельной истории и с наценкой меньше 10%, а выгодные окна там как раз свежие.
 const TAB_TIP={

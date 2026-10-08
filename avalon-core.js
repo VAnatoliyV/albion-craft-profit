@@ -73,7 +73,7 @@
   function left(closesAt, now){
     const s=closesAt-now; if(s<=0) return 'закрыт';
     const h=Math.floor(s/3600), m=Math.floor(s%3600/60);
-    return h ? `${h} ч ${m} м` : `${m} м`;
+    return h ? `${h} ч ${m} м` : m ? `${m} м` : '<1 м';
   }
 
   function soon(links, now, hours){

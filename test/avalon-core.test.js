@@ -36,6 +36,7 @@ test('left и soon', ()=>{
   assert.equal(C.left(1000+5*3600+12*60, 1000), '5 ч 12 м');
   assert.equal(C.left(1000+23*60+5, 1000), '23 м');
   assert.equal(C.left(900, 1000), 'закрыт');
+  assert.equal(C.left(1000+30, 1000), '<1 м');
   const s=C.soon([L('A','B',1000+7200), L('C','D',1000+600), L('E','F',1000+90000)], 1000, 3);
   assert.deepEqual(s.map(x=>x.a), ['C','A']);
 });
