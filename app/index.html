@@ -3,25 +3,31 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Albion Journal — скачать</title>
-<meta name="description" content="Albion Journal для Mac и Windows: карточка зоны Авалона по кнопке, общая карта дорог, уведомления, цены и фейм.">
+<title>Albion Journal — для Mac и Windows</title>
+<meta name="description" content="Albion Journal для Mac и Windows: свои цены из клиента, фейм и серебро за сессию, общая карта дорог Авалона и заметка о зоне по кнопке. Бесплатно.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://vanatoliyv.github.io/albion-craft-profit/app/">
 <meta property="og:title" content="Albion Journal — Mac & Windows">
-<meta property="og:description" content="Карточка зоны Авалона по кнопке, общая карта дорог, уведомления, цены и фейм. Бесплатно.">
-<meta property="og:image" content="https://vanatoliyv.github.io/albion-craft-profit/og-image.png">
+<meta property="og:description" content="Свои цены из клиента, фейм и серебро за сессию, общая карта дорог Авалона. Бесплатно.">
+<meta property="og:image" content="https://vanatoliyv.github.io/albion-craft-profit/app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://vanatoliyv.github.io/albion-craft-profit/app/og.png">
 <meta name="theme-color" content="#0b0d12">
 <link rel="icon" type="image/png" sizes="32x32" href="../img/icon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0b0d12;--panel:#151924;--panel3:#232a3d;--border:#2a3147;--text:#dde2ec;--muted:#8b93a8;--accent:#eebc4e;--accent2:#f5d47e}
+:root{--bg:#0b0d12;--panel:#151924;--panel3:#232a3d;--border:#2a3147;--text:#dde2ec;--muted:#8b93a8;--accent:#eebc4e;--accent2:#f5d47e;
+  --pix:'Pixelify Sans',ui-monospace,'SF Mono',monospace}
 *{box-sizing:border-box}
-body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;
-  font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--text);
+body{margin:0;min-height:100vh;padding:40px 16px 32px;
+  font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--text);
   background:radial-gradient(1200px 600px at 70% -10%,#171d2e 0%,var(--bg) 55%) fixed,var(--bg)}
-main{width:100%;max-width:520px;text-align:center}
+.narrow{width:100%;max-width:520px;margin:0 auto;text-align:center}
 img.logo{width:150px;height:188px;image-rendering:pixelated}
-h1{margin:10px 0 4px;font-size:28px;color:var(--accent)}
+h1{margin:10px 0 4px;font:600 34px/1.15 var(--pix);letter-spacing:.5px;color:var(--accent)}
 p.sub{margin:0 0 26px;color:var(--muted)}
 a.big{display:block;padding:16px 20px;border-radius:12px;background:var(--accent);color:#1a1405;
   font-weight:700;font-size:18px;text-decoration:none;transition:background .15s}
@@ -30,23 +36,47 @@ a.big small{display:block;font-weight:500;font-size:13px;opacity:.75}
 .other{margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .other a{color:var(--text);text-decoration:none;padding:8px 14px;border:1px solid var(--border);border-radius:10px;background:var(--panel)}
 .other a:hover{border-color:var(--accent)}
-ul{list-style:none;padding:0;margin:28px 0 0;text-align:left;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 18px}
-li{margin:6px 0}
-.req{margin-top:16px;text-align:left;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 18px;font-size:14px}
+#started{display:none;margin-top:12px;color:var(--muted);font-size:14px}
+
+/* что умеет программа */
+.feats{max-width:980px;margin:72px auto 0;display:flex;flex-direction:column;gap:64px}
+.feat{display:flex;align-items:center;gap:48px}
+.feat:nth-child(even){flex-direction:row-reverse}
+.feat .pic{flex:0 0 52%;display:flex;justify-content:center}
+.feat .pic img{display:block;max-width:100%;height:auto;border-radius:12px}
+.feat .pic img.tall{width:420px}
+.feat .txt{flex:1;min-width:0}
+.feat h2{margin:0 0 8px;font-size:22px;line-height:1.25;color:var(--accent)}
+.feat p{margin:0;color:var(--text)}
+.feat p + p{margin-top:8px}
+.feat a.more{display:inline-block;margin-top:12px;color:var(--accent);text-decoration:none;font-weight:600}
+.feat a.more:hover{text-decoration:underline}
+
+.req{max-width:520px;margin:72px auto 0;text-align:left;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 18px;font-size:14px}
 .req h2{margin:0 0 6px;font-size:15px;color:var(--accent)}
 .req h2:not(:first-child){margin-top:14px}
 .req p{margin:3px 0;color:var(--text)}
 .req p.note{color:var(--muted)}
-#started{display:none;margin-top:12px;color:var(--muted);font-size:14px}
-footer{margin-top:20px;font-size:13px;color:var(--muted)}
+.again{max-width:520px;margin:20px auto 0}
+footer{margin-top:24px;font-size:13px;color:var(--muted);text-align:center}
 footer a{color:var(--muted)}
+
+@media (max-width:760px){
+  body{padding-top:28px}
+  .feats{margin-top:52px;gap:44px}
+  .feat,.feat:nth-child(even){flex-direction:column;align-items:stretch;gap:16px}
+  .feat .pic{flex:none}
+  .feat .pic img.tall{width:100%;max-width:420px;margin:0 auto}
+  .feat h2{font-size:20px}
+  .req{margin-top:52px}
+}
 </style>
 </head>
 <body>
-<main>
+<header class="narrow">
   <img class="logo" src="rabbit.gif" alt="">
   <h1>Albion Journal</h1>
-  <p class="sub" data-t="sub">Бесплатно · Mac и Windows</p>
+  <p class="sub" data-t="sub">Бесплатный помощник для Albion Online · Mac и Windows</p>
 
   <a class="big" id="main" href="https://github.com/VAnatoliyV/albion-craft-profit/releases/latest">
     <span data-t="dl">Скачать</span> <span id="os"></span><small id="ver"></small>
@@ -56,46 +86,106 @@ footer a{color:var(--muted)}
     <a id="mac" href="https://github.com/VAnatoliyV/albion-craft-profit/releases/latest"> Mac</a>
     <a id="win" href="https://github.com/VAnatoliyV/albion-zone-fix/releases/latest">⊞ Windows</a>
   </div>
+</header>
 
-  <ul>
-    <li data-t="f1">🗺 Кнопка мыши на портал Авалона — карточка зоны: тир, ресурсы, сундуки, данжи, время до закрытия</li>
-    <li data-t="f2">🌐 Общая карта дорог Авалона — дороги добавляются сами</li>
-    <li data-t="f3">🔔 Уведомления о нужных ресурсах и сундуках</li>
-    <li data-t="f4">💰 Цены рынка, фейм и урон за сессию</li>
-  </ul>
+<main class="feats">
+  <section class="feat">
+    <div class="pic"><img src="img/prices.webp" width="860" height="1021" class="tall" loading="lazy" data-ta="a1"
+      alt="Окно Albion Journal на Mac: вкладка «Свои» со свежими ценами, пойманными в игре"></div>
+    <div class="txt">
+      <h2 data-t="h1">Свои цены и выгодный крафт</h2>
+      <p data-t="p1">Программа берёт цены прямо из твоего клиента игры. На сайте с крафтом сразу видно свежие цифры и твои ордера: что выгодно сделать и где продать.</p>
+      <a class="more" href="../" data-t="m1">Сайт с крафтом →</a>
+    </div>
+  </section>
 
-  <div class="req">
-    <h2 data-t="rm"> Mac</h2>
-    <p data-t="rm1">• Mac на Apple M1 и новее (на Intel не работает)</p>
-    <p data-t="rm2">• macOS 13 Ventura или новее</p>
-    <p class="note" data-t="rm3">Первый запуск: «Системные настройки → Конфиденциальность и безопасность → Всё равно открыть». Для карточки зоны — разрешить «Запись экрана».</p>
-    <h2 data-t="rw">⊞ Windows</h2>
-    <p data-t="rw1">• Windows 10 или 11, 64-бит</p>
-    <p data-t="rw2">• Права администратора (программа читает трафик игры)</p>
-    <p class="note" data-t="rw3">SmartScreen: «Подробнее → Выполнить в любом случае». Для карточки зоны в русском клиенте нужен русский языковой пакет Windows (распознавание текста).</p>
-  </div>
+  <section class="feat">
+    <div class="pic"><img src="img/session.webp" width="860" height="889" class="tall" loading="lazy" data-ta="a2"
+      alt="Вкладка «Сессия»: фейм, добытое серебро и кошелёк за вылазку"></div>
+    <div class="txt">
+      <h2 data-t="h2">Фейм и серебро за сессию</h2>
+      <p data-t="p2">Сколько фейма и серебра принесла вылазка — считается само, пока ты играешь. Сбросил — и новая сессия с нуля.</p>
+    </div>
+  </section>
 
-  <footer><a href="../" data-t="site">Сайт с крафтом</a> · <a href="https://discord.gg/5pV9ZqZMve">Discord</a></footer>
+  <section class="feat">
+    <div class="pic"><img src="img/map.webp" width="1200" height="858" loading="lazy" data-ta="a3"
+      alt="Общая карта дорог Авалона на сайте: зоны, связи между ними и сколько каждой осталось"></div>
+    <div class="txt">
+      <h2 data-t="h3">Общая карта дорог Авалона</h2>
+      <p data-t="p3">Карту собирают сами игроки: дороги приходят из Albion Journal, у каждой видно, сколько ей осталось. На сайте можно найти путь между зонами.</p>
+      <a class="more" href="../#map" data-t="m3">Открыть карту →</a>
+    </div>
+  </section>
+
+  <section class="feat">
+    <div class="pic"><img src="img/zone.webp" width="1000" height="330" loading="lazy" data-ta="a4"
+      alt="Заметка о зоне Авалона в Albion Journal: название, вид и тир"></div>
+    <div class="txt">
+      <h2 data-t="h4">Заметка о дороге по одной кнопке</h2>
+      <p data-t="p4">Наведись на портал и нажми одну кнопку — программа покажет короткую заметку о дороге: название, вид зоны и тир. Так проще планировать походы по Авалону.</p>
+    </div>
+  </section>
+
+  <section class="feat">
+    <div class="pic"><img src="img/mac-windows.webp" width="1200" height="780" loading="lazy" data-ta="a5"
+      alt="Albion Journal рядом: окно на Mac и окно на Windows"></div>
+    <div class="txt">
+      <h2 data-t="h5">Mac и Windows, бесплатно</h2>
+      <p data-t="p5">Одна программа для обеих систем. Новые версии ставятся сами — заново скачивать ничего не нужно.</p>
+    </div>
+  </section>
 </main>
+
+<div class="req">
+  <h2 data-t="rm"> Mac</h2>
+  <p data-t="rm1">• Mac на Apple M1 и новее (на Intel не работает)</p>
+  <p data-t="rm2">• macOS 13 Ventura или новее</p>
+  <p class="note" data-t="rm3">Первый запуск: «Системные настройки → Конфиденциальность и безопасность → Всё равно открыть». Для заметки о зоне — разрешить «Запись экрана».</p>
+  <h2 data-t="rw">⊞ Windows</h2>
+  <p data-t="rw1">• Windows 10 или 11, 64-бит</p>
+  <p data-t="rw2">• Права администратора (программа читает трафик игры)</p>
+  <p class="note" data-t="rw3">SmartScreen: «Подробнее → Выполнить в любом случае». Для заметки о зоне нужен Microsoft Visual C++ Redistributable x64 (обычно уже стоит; если нет — программа подскажет).</p>
+</div>
+
+<div class="again"><a class="big" id="main2" href="#"><span data-t="dl">Скачать</span> <span id="os2"></span></a></div>
+
+<footer><a href="../" data-t="site">Сайт с крафтом</a> · <a href="https://discord.gg/5pV9ZqZMve" data-t="disc">Поддержка в Discord</a><br>
+  <span data-t="fan">Фан-проект, не связан с Sandbox Interactive.</span></footer>
 <script>
 (function(){
   var en = !/^ru|^uk|^be/i.test(navigator.language || 'ru');
   if (en) {
     document.documentElement.lang = 'en';
-    var T = {sub:'Free · Mac & Windows', dl:'Download', site:'Crafting site',
+    var T = {sub:'Free helper for Albion Online · Mac & Windows', dl:'Download', site:'Crafting site', disc:'Support on Discord',
+      fan:'Fan project, not affiliated with Sandbox Interactive.',
       started:'Download started. If not — press the button above.',
-      f1:'🗺 Mouse button on an Avalon portal — zone card: tier, resources, chests, dungeons, time left',
-      f2:'🌐 Shared Avalon roads map — roads are added automatically',
-      f3:'🔔 Notifications for resources and chests you want',
-      f4:'💰 Market prices, fame and damage per session',
+      h1:'Your own prices and profitable crafting',
+      p1:'The app reads prices straight from your game client. The crafting site then shows fresh numbers and your own orders: what is worth making and where to sell it.',
+      m1:'Crafting site →',
+      h2:'Fame and silver per session',
+      p2:'How much fame and silver a run brought in — counted on its own while you play. Reset it, and a new session starts from zero.',
+      h3:'Shared Avalon roads map',
+      p3:'The map is built by the players themselves: roads come in from Albion Journal, each with the time it has left. On the site you can find a path between zones.',
+      m3:'Open the map →',
+      h4:'A road note at one button',
+      p4:'Point at a portal and press one button — the app shows a short note about the road: its name, zone type and tier. It makes planning trips through Avalon easier.',
+      h5:'Mac and Windows, free',
+      p5:'One app for both systems. New versions install themselves — nothing to download again.',
+      a1:'Albion Journal on Mac: the Mine tab with fresh prices caught in the game',
+      a2:'The Session tab: fame, silver looted and wallet for a run',
+      a3:'The shared Avalon roads map on the site: zones, links between them and the time each has left',
+      a4:'An Avalon zone note in Albion Journal: name, type and tier',
+      a5:'Albion Journal side by side: a window on Mac and a window on Windows',
       rm1:'• Mac with Apple M1 or newer (Intel is not supported)',
       rm2:'• macOS 13 Ventura or newer',
-      rm3:'First launch: System Settings → Privacy & Security → Open Anyway. For the zone card allow “Screen Recording”.',
+      rm3:'First launch: System Settings → Privacy & Security → Open Anyway. For the zone note allow “Screen Recording”.',
       rw1:'• Windows 10 or 11, 64-bit',
       rw2:'• Administrator rights (the app reads the game traffic)',
-      rw3:'SmartScreen: More info → Run anyway.'};
+      rw3:'SmartScreen: More info → Run anyway. The zone note needs Microsoft Visual C++ Redistributable x64 (usually already installed; the app tells you if not).'};
     document.querySelectorAll('[data-t]').forEach(function(e){ if (T[e.dataset.t]) e.textContent = T[e.dataset.t]; });
-    document.title = 'Albion Journal — download';
+    document.querySelectorAll('[data-ta]').forEach(function(e){ if (T[e.dataset.ta]) e.alt = T[e.dataset.ta]; });
+    document.title = 'Albion Journal — for Mac & Windows';
   }
   var OS = {
     mac: {repo:'albion-craft-profit', ext:/\.dmg$/i, ru:'для Mac', en:'for Mac'},
@@ -106,7 +196,9 @@ footer a{color:var(--muted)}
   var want = /(^|&)(mac|win)(=|&|$)/.exec(q), auto = !!want;
   var ua = navigator.userAgent;
   var os = want ? want[2] : /Windows/i.test(ua) ? 'win' : (/Macintosh|Mac OS X/i.test(ua) && !/iPhone|iPad/i.test(ua)) ? 'mac' : '';
-  var main = document.getElementById('main');
+  var main = document.getElementById('main'), main2 = document.getElementById('main2');
+  // Нижняя кнопка повторяет верхнюю; на телефоне (система неизвестна) ведёт наверх к выбору.
+  main2.href = os ? main.href : '#';
 
   function latest(key){
     return fetch('https://api.github.com/repos/VAnatoliyV/' + OS[key].repo + '/releases/latest')
@@ -123,7 +215,7 @@ footer a{color:var(--muted)}
       if (f) document.getElementById(k).href = f.url;
       if (k !== os) return;
       if (f) {
-        main.href = f.url;
+        main.href = main2.href = f.url;
         document.getElementById('ver').textContent = (en ? 'version ' : 'версия ') + f.ver;
         if (auto) { location.href = f.url; document.getElementById('started').style.display = 'block'; }
       } else if (auto) {
@@ -132,8 +224,8 @@ footer a{color:var(--muted)}
     });
   });
   if (!os) return; // телефон и прочее: две кнопки ниже
-  main.href = 'https://github.com/VAnatoliyV/' + OS[os].repo + '/releases/latest';
-  document.getElementById('os').textContent = en ? OS[os].en : OS[os].ru;
+  main.href = main2.href = 'https://github.com/VAnatoliyV/' + OS[os].repo + '/releases/latest';
+  document.getElementById('os').textContent = document.getElementById('os2').textContent = en ? OS[os].en : OS[os].ru;
 })();
 </script>
 </body>
