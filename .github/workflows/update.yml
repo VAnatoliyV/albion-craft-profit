@@ -126,6 +126,8 @@ jobs:
           cp -r i18n names public/
           # Копия иконок предметов — на случай, если render у человека не открывается.
           cp -r ico public/
+          # Страница скачивания приложения: …/albion-craft-profit/app/
+          cp -r app public/
           # Номера предметов для значка оружия в Albion Journal: свежие из
           # ao-bin-dumps (сдвигаются с патчами), при сбое — копия из репозитория.
           node tools/items-by-id.mjs items_by_id.json

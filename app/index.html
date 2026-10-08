@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Albion Journal — скачать</title>
+<meta name="description" content="Albion Journal для Mac и Windows: карточка зоны Авалона по кнопке, общая карта дорог, уведомления, цены и фейм.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://vanatoliyv.github.io/albion-craft-profit/app/">
+<meta property="og:title" content="Albion Journal — Mac & Windows">
+<meta property="og:description" content="Карточка зоны Авалона по кнопке, общая карта дорог, уведомления, цены и фейм. Бесплатно.">
+<meta property="og:image" content="https://vanatoliyv.github.io/albion-craft-profit/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0b0d12">
+<link rel="icon" type="image/png" sizes="32x32" href="../img/icon-32.png">
+<style>
+:root{--bg:#0b0d12;--panel:#151924;--panel3:#232a3d;--border:#2a3147;--text:#dde2ec;--muted:#8b93a8;--accent:#eebc4e;--accent2:#f5d47e}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;
+  font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--text);
+  background:radial-gradient(1200px 600px at 70% -10%,#171d2e 0%,var(--bg) 55%) fixed,var(--bg)}
+main{width:100%;max-width:520px;text-align:center}
+img.logo{width:96px;height:96px;image-rendering:pixelated}
+h1{margin:10px 0 4px;font-size:28px;color:var(--accent)}
+p.sub{margin:0 0 26px;color:var(--muted)}
+a.big{display:block;padding:16px 20px;border-radius:12px;background:var(--accent);color:#1a1405;
+  font-weight:700;font-size:18px;text-decoration:none;transition:background .15s}
+a.big:hover{background:var(--accent2)}
+a.big small{display:block;font-weight:500;font-size:13px;opacity:.75}
+.other{margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.other a{color:var(--text);text-decoration:none;padding:8px 14px;border:1px solid var(--border);border-radius:10px;background:var(--panel)}
+.other a:hover{border-color:var(--accent)}
+ul{list-style:none;padding:0;margin:28px 0 0;text-align:left;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 18px}
+li{margin:6px 0}
+footer{margin-top:20px;font-size:13px;color:var(--muted)}
+footer a{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <img class="logo" src="../img/icon-192.png" alt="">
+  <h1>Albion Journal</h1>
+  <p class="sub" data-t="sub">Бесплатно · Mac и Windows</p>
+
+  <a class="big" id="main" href="https://github.com/VAnatoliyV/albion-craft-profit/releases/latest">
+    <span data-t="dl">Скачать</span> <span id="os"></span><small id="ver"></small>
+  </a>
+  <div class="other">
+    <a id="mac" href="https://github.com/VAnatoliyV/albion-craft-profit/releases/latest"> Mac</a>
+    <a id="win" href="https://github.com/VAnatoliyV/albion-zone-fix/releases/latest">⊞ Windows</a>
+  </div>
+
+  <ul>
+    <li data-t="f1">🗺 Кнопка мыши на портал Авалона — карточка зоны: тир, ресурсы, сундуки, данжи, время до закрытия</li>
+    <li data-t="f2">🌐 Общая карта дорог Авалона — дороги добавляются сами</li>
+    <li data-t="f3">🔔 Уведомления о нужных ресурсах и сундуках</li>
+    <li data-t="f4">💰 Цены рынка, фейм и урон за сессию</li>
+  </ul>
+  <footer><a href="../" data-t="site">Сайт с крафтом</a> · <a href="https://discord.gg/5pV9ZqZMve">Discord</a></footer>
+</main>
+<script>
+(function(){
+  var en = !/^ru|^uk|^be/i.test(navigator.language || 'ru');
+  if (en) {
+    document.documentElement.lang = 'en';
+    var T = {sub:'Free · Mac & Windows', dl:'Download', site:'Crafting site',
+      f1:'🗺 Mouse button on an Avalon portal — zone card: tier, resources, chests, dungeons, time left',
+      f2:'🌐 Shared Avalon roads map — roads are added automatically',
+      f3:'🔔 Notifications for resources and chests you want',
+      f4:'💰 Market prices, fame and damage per session'};
+    document.querySelectorAll('[data-t]').forEach(function(e){ if (T[e.dataset.t]) e.textContent = T[e.dataset.t]; });
+    document.title = 'Albion Journal — download';
+  }
+  var ua = navigator.userAgent, isWin = /Windows/i.test(ua), isMac = /Macintosh|Mac OS X/i.test(ua) && !/iPhone|iPad/i.test(ua);
+  var REPO = isWin ? 'albion-zone-fix' : 'albion-craft-profit', EXT = isWin ? /Setup.*\.exe$/i : /\.dmg$/i;
+  var main = document.getElementById('main');
+  if (!isWin && !isMac) return; // телефон и прочее: кнопка ведёт на страницу выпуска Mac, ниже — обе
+  document.getElementById('os').textContent = isWin ? 'для Windows' : 'для Mac';
+  if (en) document.getElementById('os').textContent = isWin ? 'for Windows' : 'for Mac';
+  main.href = 'https://github.com/VAnatoliyV/' + REPO + '/releases/latest';
+  // Прямая ссылка на файл последней версии; не ответил API — остаётся страница выпуска.
+  fetch('https://api.github.com/repos/VAnatoliyV/' + REPO + '/releases/latest')
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      if (!j) return;
+      var a = (j.assets || []).filter(function(a){ return EXT.test(a.name); })[0];
+      if (a) main.href = a.browser_download_url;
+      document.getElementById('ver').textContent = (en ? 'version ' : 'версия ') + String(j.tag_name || '').replace(/^v/, '');
+    }).catch(function(){});
+})();
+</script>
+</body>
+</html>
