@@ -53,3 +53,18 @@ test('layout: на 200 узлах добавление листа не сдви�
   assert.ok(med<10,'медиана '+med);
   assert.ok(max<40,'максимум '+max);
 });
+
+test('prune: закрывшиеся связи убираются на месте, живые остаются', ()=>{
+  const s = C.merge(new Map(), {full:true, links:[L('A','B',100), L('B','C',200), L('C','D',300)], gone:[]});
+  const p = C.prune(s, 200);
+  assert.deepEqual([...p.keys()], ['C|D']);
+  assert.equal(s.size, 3, 'исходная карта не меняется');
+  assert.equal(C.prune(p, 200), p, 'ничего не закрылось — та же карта');
+});
+
+test('backoff: после неудач ждём дольше, но не больше 10 минут', ()=>{
+  assert.equal(C.backoff(1), 30000);
+  assert.equal(C.backoff(2), 60000);
+  assert.ok(C.backoff(5) > C.backoff(4));
+  assert.equal(C.backoff(20), 600000);
+});

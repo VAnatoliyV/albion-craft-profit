@@ -80,5 +80,20 @@
     return links.filter(l=>l.closesAt-now<hours*3600 && l.closesAt>now).sort((a,b)=>a.closesAt-b.closesAt);
   }
 
-  g.AvalonCore={key, merge, path, layout, left, soon};
+  // Связь, у которой вышло время, убираем сами, не дожидаясь сервера: вкладка
+  // могла не достучаться до него, а мёртвый портал на карте хуже пустоты.
+  function prune(state, now){
+    let gone=false;
+    for(const l of state.values()) if(l.closesAt<=now){ gone=true; break; }
+    if(!gone) return state;
+    const s=new Map();
+    for(const [k,l] of state) if(l.closesAt>now) s.set(k,l);
+    return s;
+  }
+
+  // Пауза перед следующим опросом после fails неудач подряд: 30 с, 1 мин,
+  // 2 мин… но не больше 10 минут, чтобы починенный сервер подхватился сам.
+  function backoff(fails){ return Math.min(600000, 15000*2**fails); }
+
+  g.AvalonCore={key, merge, path, layout, left, soon, prune, backoff};
 })(typeof globalThis!=='undefined'?globalThis:this);
