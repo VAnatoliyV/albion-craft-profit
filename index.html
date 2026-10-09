@@ -6840,7 +6840,7 @@ function backBtnHTML(){
 // Связи присылает Albion Journal на наш сервер (тот же, что живые цены),
 // здесь только показ. Ядро без DOM — avalon-core.js, у него свои тесты.
 const MAP={links:new Map(), since:0, pos:new Map(), dims:new Map(), zones:null, here:'', sel:null, hover:null,
-  touched:false, fit:false, tip:true,
+  touched:false, fit:false, tip:true, edges:[], deg:new Map(), alpha:0, held:null, raf:null, fitLive:true,
   from:'', to:'', onlyConf:false, q:'', timer:null, down:false, err:'', key:'',
   shape:'', view:{x:0,y:0,k:1}, seq:0, busy:false, fail:0, pause:0, admMsg:''};
 try{ MAP.key=localStorage.getItem('acp_mapkey')||''; }catch(e){}
@@ -6923,23 +6923,35 @@ function mapStop(){ clearInterval(MAP.timer); MAP.timer=null; }
 // поменялся сам набор связей, а не на каждом опросе.
 function mapRelayout(){
   const ls=[...MAP.links.values()];
-  const shape=[...MAP.links.keys()].sort().join(',')+'#'+(MAP.zones?1:0);
+  const shape=[...MAP.links.keys()].sort().join(',');
   if(shape===MAP.shape) return;
   MAP.shape=shape;
   const nodes=[...new Set(ls.flatMap(l=>[l.a,l.b]))].sort();
-  const first=!MAP.pos.size, edges=ls.map(l=>[l.a,l.b]);
-  MAP.dims=new Map(nodes.map(c=>[c,mapBoxSize(c)]));
-  MAP.pos=AvalonCore.tidy(AvalonCore.layout(nodes, edges, MAP.pos, 7), edges, MAP.dims);
+  const first=!MAP.pos.size;
+  MAP.edges=ls.map(l=>[l.a,l.b]);
+  MAP.pos=AvalonCore.simNodes(nodes, MAP.edges, MAP.pos);
+  MAP.deg=new Map(nodes.map(c=>[c,0]));
+  for(const [x,y] of MAP.edges){ MAP.deg.set(x,MAP.deg.get(x)+1); MAP.deg.set(y,MAP.deg.get(y)+1); }
+  if(first){ for(let i=0;i<220;i++) MAP.alpha=AvalonCore.step(MAP.pos, MAP.edges, i?MAP.alpha:1, null); MAP.alpha=Math.max(MAP.alpha,.15); }
+  else MAP.alpha=Math.max(MAP.alpha,.5);
   if(!MAP.touched) MAP.fit=true;
   if(first && MAP.here) mapSetHere(MAP.here);
+  mapRun();
 }
-// Плашка зоны: значок тира слева, имя справа.
-const MAP_FONT='600 12px system-ui, -apple-system, sans-serif', MAP_BOX_H=26, MAP_BADGE=30;
-let mapMeasureCtx=null;
-function mapBoxSize(c){
-  mapMeasureCtx=mapMeasureCtx||document.createElement('canvas').getContext('2d');
-  mapMeasureCtx.font=MAP_FONT;
-  return {w:Math.ceil(mapMeasureCtx.measureText(mapName(c)).width)+MAP_BADGE+16, h:MAP_BOX_H};
+// Узел крупнее, если у зоны больше дорог.
+function mapR(c){ return 6+Math.min(10, 3*Math.sqrt(MAP.deg&&MAP.deg.get(c)||1)); }
+// Физика крутится, пока граф не успокоится; потом кадры только по событиям.
+function mapRun(){
+  if(MAP.raf) return;
+  const tick=()=>{
+    MAP.raf=null;
+    if(!$('mapCv')){ return; }
+    MAP.alpha=AvalonCore.step(MAP.pos, MAP.edges||[], MAP.alpha, MAP.held);
+    if(MAP.fitLive && !MAP.touched) MAP.fit=true;
+    mapPaint();
+    if(MAP.alpha>0.004 || MAP.held) MAP.raf=requestAnimationFrame(tick);
+  };
+  MAP.raf=requestAnimationFrame(tick);
 }
 async function mapAdmin(action, link){
   const ask = action==='ban'
@@ -6990,95 +7002,109 @@ function mapHTML(){
   let main;
   if(MAP.err && !MAP.links.size) main=sadBunHTML('Карта сейчас недоступна', 'Сервер не отвечает. Попробуем ещё раз через полминуты.');
   else if(!MAP.links.size) main=sadBunHTML('Пока ни одной связи', 'Связи присылают игроки из Albion Journal: наведись в игре на портал дорог и нажми кнопку карточки зоны.');
-  else main=`<div style="position:relative"><canvas id="mapCv" style="width:100%;height:70vh;display:block;touch-action:none;border-radius:10px;background:radial-gradient(ellipse at 50% 40%, #1b2030 0%, #12151e 75%)"></canvas><div id="mapTip" class="mapTip" hidden></div></div>
+  else main=`<div style="position:relative"><canvas id="mapCv" style="width:100%;height:70vh;display:block;touch-action:none;border-radius:10px;background:radial-gradient(ellipse at 50% 45%, #1a1f2e 0%, #11141c 70%)"></canvas><div id="mapTip" class="mapTip" hidden></div></div>
     <div class="fresh" id="mapInfo">${p ? '<span>Путь:</span> '+p.map(c=>mapEsc(mapName(c))).join(' → ')+' <span>(перех.: '+(p.length-1)+')</span>' : (MAP.from&&MAP.to?'<span>Пути нет</span>':'')}</div>
     <div id="mapCard"></div>`;
   return `<div class="panel"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
     <b>🗺 Карта Авалона</b>${backBtnHTML()}<span class="fresh">связей: ${MAP.links.size} · пунктир — не проверена</span>${MAP.err&&MAP.links.size?'<span class="fresh" id="mapDown">Карта сейчас недоступна</span>':''}</div>${ctls}${main}</div>`;
 }
 // Цвет дороги по оставшемуся времени: долго — спокойный, скоро — тревожный.
-function mapTimeColor(sec){ return sec<3600 ? '#ef5b4c' : sec<6*3600 ? '#e8b339' : '#55c08a'; }
-function mapFitView(W,H){
+function mapTimeColor(sec){ return sec<3600 ? '#ef5b4c' : sec<6*3600 ? '#e8b339' : '#4fb985'; }
+function mapZoneColor(c){
+  const z=MAP.zones&&MAP.zones.get(c);
+  return z ? (z.r ? '#8b6cff' : (MAP_ZCOLOR[z.q]||'#7c8499')) : '#7c8499';
+}
+// Вписать граф в холст плавно: вид подтягивается к цели, а не прыгает.
+function mapFitView(W,H, smooth){
   if(!MAP.pos.size) return;
   let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
-  for(const [c,p] of MAP.pos){ const d=MAP.dims.get(c)||{w:60,h:26}; x0=Math.min(x0,p.x-d.w/2); x1=Math.max(x1,p.x+d.w/2); y0=Math.min(y0,p.y-d.h/2); y1=Math.max(y1,p.y+d.h/2); }
-  const k=Math.max(.3, Math.min(1.25, (W-40)/(x1-x0||1), (H-40)/(y1-y0||1)));
-  MAP.view={x:-(x0+x1)/2, y:-(y0+y1)/2, k};
+  for(const p of MAP.pos.values()){ x0=Math.min(x0,p.x-70); x1=Math.max(x1,p.x+70); y0=Math.min(y0,p.y-30); y1=Math.max(y1,p.y+40); }
+  const k=Math.max(.35, Math.min(1.6, W/(x1-x0||1), H/(y1-y0||1)));
+  const t={x:-(x0+x1)/2, y:-(y0+y1)/2, k}, v=MAP.view, f=smooth?0.12:1;
+  MAP.view={x:v.x+(t.x-v.x)*f, y:v.y+(t.y-v.y)*f, k:v.k+(t.k-v.k)*f};
 }
 function mapPaint(){
   const cv=$('mapCv'); if(!cv) return;
   const dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
-  cv.width=W*dpr; cv.height=H*dpr;
-  if(MAP.fit){ MAP.fit=false; mapFitView(W,H); }
+  if(cv.width!==W*dpr || cv.height!==H*dpr){ cv.width=W*dpr; cv.height=H*dpr; }
+  if(MAP.fit){ MAP.fit=false; mapFitView(W,H, MAP.fitted); MAP.fitted=true; }
   const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
   const now=Date.now()/1000, v=MAP.view, k=v.k;
   const ls=[...MAP.links.values()].filter(l=>!MAP.onlyConf||l.confirmed);
   const path=MAP.from&&MAP.to ? AvalonCore.path(ls,MAP.from,MAP.to,MAP.onlyConf) : null;
   const onPath=new Set(); if(path) for(let i=1;i<path.length;i++) onPath.add(AvalonCore.key(path[i-1],path[i]));
   const P=c=>{ const p=MAP.pos.get(c)||{x:0,y:0}; return {x:W/2+(p.x+v.x)*k, y:H/2+(p.y+v.y)*k}; };
-  const D=c=>{ const d=MAP.dims.get(c)||{w:60,h:MAP_BOX_H}; return {w:d.w*k, h:d.h*k}; };
-  const rr=(x,y,w,h,r)=>{ g.beginPath(); g.roundRect ? g.roundRect(x,y,w,h,r) : g.rect(x,y,w,h); };
-  const q=MAP.q.trim().toLowerCase(), hot=MAP.hover||MAP.sel;
-  // Линии: цвет — сколько осталось, пунктир — не подтверждена, путь — золотом.
-  const labels=[];
+  const hot=MAP.hover||MAP.sel, near=new Set(hot?[hot]:[]);
+  if(hot) for(const l of ls){ if(l.a===hot) near.add(l.b); if(l.b===hot) near.add(l.a); }
+  const q=MAP.q.trim().toLowerCase();
+  // Дороги: тонкие линии; цвет — сколько осталось, пунктир — не подтверждена.
+  g.lineCap='round';
   for(const l of ls){
-    const a=P(l.a), b=P(l.b), sec=l.closesAt-now, kk=AvalonCore.key(l.a,l.b), on=onPath.has(kk);
-    const lit=!hot || l.a===hot || l.b===hot;
-    const col=on ? '#f4c542' : mapTimeColor(sec);
-    g.globalAlpha=lit?1:.25;
-    g.setLineDash(l.confirmed?[]:[7,6]);
-    g.strokeStyle=col; g.lineWidth=(on?4:2.5)*Math.min(1,k+.2); g.lineCap='round';
+    const a=P(l.a), b=P(l.b), on=onPath.has(AvalonCore.key(l.a,l.b)), lit=!hot||l.a===hot||l.b===hot;
+    g.globalAlpha=lit ? (hot?1:.75) : .12;
+    g.setLineDash(l.confirmed?[]:[5,5]);
+    g.strokeStyle=on?'#f4c542':mapTimeColor(l.closesAt-now);
+    g.lineWidth=on?3.5:(hot&&lit?2.2:1.4);
     g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke();
-    // Время — на середине видимого куска линии, между плашками.
-    const dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||1, ux=dx/d, uy=dy/d;
-    const ra=AvalonCore.reach(D(l.a),ux,uy), rb=AvalonCore.reach(D(l.b),ux,uy), t=(ra+(d-rb))/2;
-    labels.push({x:a.x+ux*t, y:a.y+uy*t, text:tr(AvalonCore.left(l.closesAt,now))+(l.size?' · '+l.size:''), col, lit});
   }
-  g.setLineDash([]); g.globalAlpha=1;
-  const fs=Math.max(9, Math.min(12, 11*k));
-  g.font=`600 ${fs}px system-ui, -apple-system, sans-serif`; g.textAlign='center'; g.textBaseline='middle';
-  for(const L of labels){
-    if(L.x<-60||L.y<-20||L.x>W+60||L.y>H+20) continue;
-    const w=g.measureText(L.text).width+12, h=fs+8;
-    g.globalAlpha=1;
-    rr(L.x-w/2, L.y-h/2, w, h, h/2); g.fillStyle='#141824'; g.fill();
-    g.globalAlpha=L.lit?1:.3;
-    g.lineWidth=1.5; g.strokeStyle=L.col; g.stroke();
-    g.fillStyle=L.col; g.fillText(L.text, L.x, L.y+.5);
-  }
-  g.globalAlpha=1;
-  // Плашки зон.
-  const nf=Math.max(8, 12*k);
+  g.setLineDash([]);
+  // Узлы: светящиеся кружки цвета зоны, имя под кружком.
+  const nf=Math.max(9, Math.min(13, 12*Math.sqrt(k)));
+  const busy=[]; // занятые места: кружки и подписи узлов, потом — время
+  g.textAlign='center'; g.textBaseline='middle';
   for(const [c] of MAP.pos){
-    const p=P(c), d=D(c), z=MAP.zones&&MAP.zones.get(c), nm=mapName(c);
-    if(p.x+d.w/2<-10||p.x-d.w/2>W+10||p.y+d.h/2<-10||p.y-d.h/2>H+10) continue;
-    const col=z ? (z.r ? '#8A5ABF' : (MAP_ZCOLOR[z.q]||'#6b7286')) : '#6b7286';
-    const mark=c===MAP.here || c===MAP.sel || c===MAP.hover || (q && nm.toLowerCase().includes(q));
-    const dim=hot && c!==hot && ![...MAP.links.values()].some(l=>(l.a===hot&&l.b===c)||(l.b===hot&&l.a===c));
-    const x=p.x-d.w/2, y=p.y-d.h/2, r=d.h/2, bw=MAP_BADGE*k;
-    g.globalAlpha=1;
-    if(mark){ g.shadowColor=c===MAP.here?'#f4c542':'#ffffff'; g.shadowBlur=12; }
-    rr(x,y,d.w,d.h,r); g.fillStyle='#1c2131'; g.fill();
+    const p=P(c), r=mapR(c)*Math.max(.7,Math.min(1.3,k));
+    if(p.x<-80||p.x>W+80||p.y<-40||p.y>H+40) continue;
+    const col=mapZoneColor(c), nm=mapName(c);
+    const mark=c===MAP.here||c===MAP.sel||c===MAP.hover||(q&&nm.toLowerCase().includes(q));
+    const dim=hot && !near.has(c);
+    g.globalAlpha=dim?.18:1;
+    g.shadowColor=col; g.shadowBlur=mark?22:12;
+    g.beginPath(); g.arc(p.x,p.y,r,0,7); g.fillStyle=col; g.fill();
     g.shadowBlur=0;
-    g.globalAlpha=dim?.35:1;
-    g.lineWidth=mark?2:1.25; g.strokeStyle=mark?(c===MAP.here?'#f4c542':'#ffffff'):col; g.stroke();
-    // Значок тира в цвет зоны.
-    rr(x+2*k, y+2*k, bw-4*k, d.h-4*k, (d.h-4*k)/2); g.fillStyle=col; g.fill();
-    g.font=`700 ${nf*0.92}px system-ui, -apple-system, sans-serif`; g.fillStyle='#fff'; g.textAlign='center';
-    g.fillText(z&&z.t?'T'+z.t:'?', x+bw/2, p.y+.5);
-    g.font=`600 ${nf}px system-ui, -apple-system, sans-serif`; g.fillStyle='#e9ecf4'; g.textAlign='left';
-    g.fillText(nm, x+bw+5*k, p.y+.5);
+    // светлое ядро — как у Obsidian-подобных графов
+    g.beginPath(); g.arc(p.x,p.y,r*.42,0,7); g.fillStyle='rgba(255,255,255,.85)'; g.fill();
+    if(mark){ g.beginPath(); g.arc(p.x,p.y,r+3.5,0,7); g.lineWidth=2; g.strokeStyle=c===MAP.here?'#f4c542':'#ffffff'; g.stroke(); }
+    busy.push({x:p.x, y:p.y, w:r*2+4, h:r*2+4});
+    if(k>=.5 || mark || near.has(c)){
+      const z=MAP.zones&&MAP.zones.get(c), label=(z&&z.t?'T'+z.t+' ':'')+nm;
+      g.font=`${mark?700:600} ${nf}px system-ui, -apple-system, sans-serif`;
+      busy.push({x:p.x, y:p.y+r+nf*.9, w:g.measureText(label).width+6, h:nf+4});
+      g.lineWidth=3.5; g.strokeStyle='#12151e'; g.strokeText(label, p.x, p.y+r+nf*.9);
+      g.fillStyle=mark?'#ffffff':'#d5d9e6'; g.fillText(label, p.x, p.y+r+nf*.9);
+    }
+  }
+  // Время на линии — мелко, без рамки, там, где не мешает названиям;
+  // нет места — прячем (при наведении на зону время её дорог видно всегда).
+  const tf=Math.max(9, Math.min(11, 10*k));
+  g.font=`600 ${tf}px system-ui, -apple-system, sans-serif`; g.globalAlpha=1;
+  const free=r=>!busy.some(o=>Math.abs(o.x-r.x)<(o.w+r.w)/2 && Math.abs(o.y-r.y)<(o.h+r.h)/2);
+  const order=hot ? ls.filter(l=>l.a===hot||l.b===hot) : ls;
+  for(const l of order){
+    if(k<.45 && !hot) break;
+    const a=P(l.a), b=P(l.b), t=tr(AvalonCore.left(l.closesAt,now))+(l.size?' · '+l.size:'');
+    const w=g.measureText(t).width+4, h=tf+2;
+    let spot=null;
+    for(const f of [.5,.4,.6,.32,.68]){
+      const r={x:a.x+(b.x-a.x)*f, y:a.y+(b.y-a.y)*f, w, h};
+      if(free(r)){ spot=r; break; }
+    }
+    if(!spot && hot) spot={x:(a.x+b.x)/2, y:(a.y+b.y)/2, w, h};
+    if(!spot || spot.x<-40||spot.y<-20||spot.x>W+40||spot.y>H+20) continue;
+    busy.push(spot);
+    g.lineWidth=3; g.strokeStyle='#12151e'; g.strokeText(t,spot.x,spot.y);
+    g.fillStyle=mapTimeColor(l.closesAt-now); g.fillText(t,spot.x,spot.y);
   }
   g.globalAlpha=1; g.textAlign='left'; g.textBaseline='alphabetic';
 }
 function mapHit(x,y){
   const cv=$('mapCv'), W=cv.clientWidth, H=cv.clientHeight, v=MAP.view;
+  let best=null, bd=Infinity;
   for(const [c,p] of MAP.pos){
-    const d=MAP.dims.get(c)||{w:60,h:MAP_BOX_H};
-    const sx=W/2+(p.x+v.x)*v.k, sy=H/2+(p.y+v.y)*v.k;
-    if(Math.abs(sx-x)<=d.w*v.k/2+3 && Math.abs(sy-y)<=d.h*v.k/2+3) return c;
+    const sx=W/2+(p.x+v.x)*v.k, sy=H/2+(p.y+v.y)*v.k, d=Math.hypot(sx-x,sy-y);
+    if(d<Math.max(14,mapR(c)*v.k+6) && d<bd){ best=c; bd=d; }
   }
-  return null;
+  return best;
 }
 // Короткая подсказка при наведении: что за зона, что в ней, куда ведёт.
 function mapTipHTML(c){
@@ -7194,7 +7220,11 @@ function wireMap(){
     pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
     cv.setPointerCapture(e.pointerId);
     if(pts.size===2){ pinch={d0:dist(), k0:MAP.view.k}; drag=null; MAP.touched=true; return; }
-    if(pts.size===1) drag={x:e.clientX,y:e.clientY,vx:MAP.view.x,vy:MAP.view.y,moved:false};
+    if(pts.size===1){
+      const r=cv.getBoundingClientRect(), hit=mapHit(e.clientX-r.left, e.clientY-r.top);
+      drag={x:e.clientX,y:e.clientY,vx:MAP.view.x,vy:MAP.view.y,moved:false,node:hit};
+      if(hit){ const p=MAP.pos.get(hit); drag.px=p.x; drag.py=p.y; }
+    }
   };
   cv.onpointermove=e=>{
     if(!pts.has(e.pointerId)){
@@ -7205,11 +7235,18 @@ function wireMap(){
     if(pinch && pts.size===2){ MAP.view.k=Math.max(.3,Math.min(4,pinch.k0*dist()/pinch.d0)); mapPaint(); return; }
     if(!drag) return;
     const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
-    if(Math.abs(dx)+Math.abs(dy)>4){ drag.moved=true; MAP.touched=true; mapHover(null); }
+    if(Math.abs(dx)+Math.abs(dy)>4){ drag.moved=true; MAP.touched=true; if(!drag.node) mapHover(null); }
+    if(drag.node && drag.moved){
+      const tip=$('mapTip'); if(tip) tip.hidden=true;
+      const p=MAP.pos.get(drag.node); if(p){ p.x=drag.px+dx/MAP.view.k; p.y=drag.py+dy/MAP.view.k; }
+      MAP.held=drag.node; MAP.alpha=Math.max(MAP.alpha,.3); mapRun(); return;
+    }
+    if(drag.node) return;
     MAP.view.x=drag.vx+dx/MAP.view.k; MAP.view.y=drag.vy+dy/MAP.view.k; mapPaint();
   };
   const up=e=>{
     pts.delete(e.pointerId);
+    if(MAP.held){ MAP.held=null; MAP.alpha=Math.max(MAP.alpha,.25); mapRun(); }
     if(pinch){ if(pts.size<2) pinch=null; drag=null; return; }
     const r=cv.getBoundingClientRect();
     if(drag && !drag.moved && e.type==='pointerup'){ MAP.sel=mapHit(e.clientX-r.left, e.clientY-r.top);
@@ -7223,7 +7260,8 @@ function wireMap(){
     const d=e.target.dataset; if(d.mdel) mapAdmin('delete', d.mdel); if(d.mban) mapAdmin('ban', d.mban);
   };
   if(MAP.sel) $('mapCard').innerHTML=mapCardHTML(MAP.sel);
-  mapPaint();
+  MAP.fitted=false; if(!MAP.touched) MAP.fit=true;
+  mapPaint(); mapRun();
 }
 window.addEventListener('resize', ()=>{ if(S.tab==='map'){ if(!MAP.touched) MAP.fit=true; mapPaint(); } });
 // Наведение мышью: подсветить зону с её дорогами и показать короткую плашку.

@@ -162,89 +162,58 @@
     return out;
   }
 
-  // Плашки зон вместо точек: раскладка layout() считает узлы точками, а имя
-  // зоны длинное — соседние плашки налезают друг на друга. tidy() раздвигает
-  // плашки (dims: узел -> {w,h}), оставляет на каждом ребре место под
-  // подпись времени и укладывает цепочки (связные куски сети) рядами, чтобы
-  // каждая была отдельной аккуратной группой. Возвращает новые центры.
-  const BOX_GX=26, BOX_GY=18, EDGE_FREE=100, PACK_GAP=70;
-  function tidy(pos, edges, dims){
-    const nodes=[...pos.keys()], P=new Map(nodes.map(n=>[n,{...pos.get(n)}]));
-    const D=n=>dims.get(n)||{w:20,h:20};
-    // Связные куски — через объединение множеств.
-    const up=new Map(nodes.map(n=>[n,n]));
-    const root=n=>{ while(up.get(n)!==n){ up.set(n,up.get(up.get(n))); n=up.get(n); } return n; };
-    for(const [a,b] of edges) if(P.has(a)&&P.has(b)) up.set(root(a),root(b));
-    const comps=new Map();
-    for(const n of nodes){ const r=root(n); if(!comps.has(r)) comps.set(r,[]); comps.get(r).push(n); }
-    const groups=[...comps.values()].map(c=>c.sort());
-    for(const g of groups){
-      const inG=new Set(g), E=edges.filter(([a,b])=>inG.has(a)&&inG.has(b)&&a!==b);
-      // Кусок кладём длинной стороной вдоль экрана: экраны широкие, а плашки
-      // с именами тоже вытянуты по горизонтали.
-      if(g.length>1){
-        let mx=0,my=0; for(const n of g){ mx+=P.get(n).x; my+=P.get(n).y; } mx/=g.length; my/=g.length;
-        let sxx=0,syy=0,sxy=0; for(const n of g){ const p=P.get(n), x=p.x-mx, y=p.y-my; sxx+=x*x; syy+=y*y; sxy+=x*y; }
-        const th=-0.5*Math.atan2(2*sxy, sxx-syy), c=Math.cos(th), sn=Math.sin(th);
-        for(const n of g){ const p=P.get(n), x=p.x-mx, y=p.y-my; p.x=mx+x*c-y*sn; p.y=my+x*sn+y*c; }
-      }
-      for(let it=0; it<400; it++){
-        let moved=false;
-        // Плашки не перекрываются: расталкиваем по оси меньшего налезания.
-        for(let i=0;i<g.length;i++) for(let j=i+1;j<g.length;j++){
-          const a=P.get(g[i]), b=P.get(g[j]), da=D(g[i]), db=D(g[j]);
-          const ox=(da.w+db.w)/2+BOX_GX-Math.abs(a.x-b.x), oy=(da.h+db.h)/2+BOX_GY-Math.abs(a.y-b.y);
-          if(ox<=0||oy<=0) continue;
-          moved=true;
-          if(ox/(da.w+db.w) < oy/(da.h+db.h)){ const sx=(a.x<=b.x?-1:1)*ox/2; a.x+=sx; b.x-=sx; }
-          else { const sy=(a.y<=b.y?-1:1)*oy/2; a.y+=sy; b.y-=sy; }
+  // Живой граф (как в Obsidian): узлы — частицы, которые расталкиваются,
+  // дороги — пружины, а слабая тяга к центру собирает все цепочки в одно
+  // облако. step() — один шаг: N — Map узел -> {x,y,vx,vy}, alpha —
+  // «температура» (1 — только начали, к нулю всё успокаивается), held —
+  // узел, который держит мышь (его не двигаем). Возвращает новую alpha.
+  const SIM={charge:-700, linkDist:150, linkK:0.3, gravity:0.03, gapX:150, gapY:52, damp:0.6, decay:0.0228};
+  function step(N, edges, alpha, held){
+    const A=[...N.entries()];
+    for(let i=0;i<A.length;i++){
+      const a=A[i][1];
+      for(let j=i+1;j<A.length;j++){
+        const b=A[j][1]; let dx=b.x-a.x, dy=b.y-a.y, d2=dx*dx+dy*dy;
+        if(d2<1e-6){ dx=(i-j)*0.01; dy=0.01; d2=dx*dx+dy*dy; }
+        if(d2<400*400){
+          const w=SIM.charge*alpha/Math.max(d2, 30*30);
+          a.vx+=dx*w; a.vy+=dy*w; b.vx-=dx*w; b.vy-=dy*w;
         }
-        // Между плашками на ребре — свободный кусок линии под время.
-        for(const [x,y] of E){
-          const a=P.get(x), b=P.get(y), dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||1;
-          const free=d-reach(D(x),dx/d,dy/d)-reach(D(y),dx/d,dy/d);
-          if(free>=EDGE_FREE) continue;
-          moved=true;
-          const m=(EDGE_FREE-free)/2*0.5;
-          a.x-=dx/d*m; a.y-=dy/d*m; b.x+=dx/d*m; b.y+=dy/d*m;
+        // Узлы не слипаются: под ними подписи, а они широкие — поэтому зазор
+        // по горизонтали больше, чем по вертикали (эллипс).
+        const ex=dx/SIM.gapX, ey=dy/SIM.gapY, e=Math.hypot(ex,ey);
+        if(e<1){
+          const m=(1-e)/(e||1e-3)*0.35;
+          a.vx-=dx*m*0.5; a.vy-=dy*m*0.5; b.vx+=dx*m*0.5; b.vy+=dy*m*0.5;
         }
-        if(!moved) break;
       }
     }
-    // Укладка кусков рядами: крупные первыми, ширина ряда ~ под экран 16:9.
-    const box=g=>{
-      let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
-      for(const n of g){ const p=P.get(n), d=D(n); x0=Math.min(x0,p.x-d.w/2); x1=Math.max(x1,p.x+d.w/2); y0=Math.min(y0,p.y-d.h/2); y1=Math.max(y1,p.y+d.h/2); }
-      return {g,x0,y0,w:x1-x0,h:y1-y0};
-    };
-    const bs=groups.map(box).sort((a,b)=>b.w*b.h-a.w*a.h || (a.g[0]<b.g[0]?-1:1));
-    const area=bs.reduce((s,b)=>s+(b.w+PACK_GAP)*(b.h+PACK_GAP),0);
-    const rowW=Math.max(...bs.map(b=>b.w), Math.sqrt(area*16/9));
-    let x=0, y=0, rowH=0; const rows=[[]];
-    for(const b of bs){
-      if(x>0 && x+b.w>rowW){ x=0; y+=rowH+PACK_GAP; rowH=0; rows.push([]); }
-      b.ox=x-b.x0; b.oy=y-b.y0; b.rowY=y; x+=b.w+PACK_GAP; rowH=Math.max(rowH,b.h); rows[rows.length-1].push(b);
+    for(const [x,y] of edges){
+      const a=N.get(x), b=N.get(y); if(!a||!b||a===b) continue;
+      const dx=b.x+b.vx-a.x-a.vx, dy=b.y+b.vy-a.y-a.vy, d=Math.hypot(dx,dy)||1;
+      const k=(d-SIM.linkDist)/d*alpha*SIM.linkK;
+      a.vx+=dx*k*0.5; a.vy+=dy*k*0.5; b.vx-=dx*k*0.5; b.vy-=dy*k*0.5;
     }
-    // Ряд центрируем по ширине, куски в ряду — по высоте ряда.
-    for(const r of rows){
-      const w=r.reduce((s,b)=>s+b.w,0)+PACK_GAP*(r.length-1), h=Math.max(...r.map(b=>b.h));
-      const sx=(rowW-w)/2;
-      for(const b of r){ b.ox+=sx; b.oy+=(h-b.h)/2; }
+    for(const [c,p] of A){
+      p.vx-=p.x*SIM.gravity*alpha; p.vy-=p.y*SIM.gravity*alpha;
+      if(c===held){ p.vx=0; p.vy=0; continue; }
+      p.vx*=SIM.damp; p.vy*=SIM.damp; p.x+=p.vx; p.y+=p.vy;
     }
-    const out=new Map();
-    let X0=Infinity,Y0=Infinity,X1=-Infinity,Y1=-Infinity;
-    for(const b of bs) for(const n of b.g){
-      const p=P.get(n), q={x:p.x+b.ox, y:p.y+b.oy}; out.set(n,q);
-      X0=Math.min(X0,q.x); X1=Math.max(X1,q.x); Y0=Math.min(Y0,q.y); Y1=Math.max(Y1,q.y);
-    }
-    const cx=(X0+X1)/2, cy=(Y0+Y1)/2;
-    for(const q of out.values()){ q.x-=cx; q.y-=cy; }
-    return out;
+    return alpha*(1-SIM.decay);
   }
-  // Сколько линии под углом (ux,uy) от центра прячется внутри плашки d.
-  function reach(d, ux, uy){
-    const ax=Math.abs(ux), ay=Math.abs(uy);
-    return Math.min(ax ? d.w/2/ax : Infinity, ay ? d.h/2/ay : Infinity);
+  // Узлы для живого графа: прежние места сохраняем, новые ставим рядом с
+  // соседом (или по спирали, если соседа ещё нет), чтобы граф не прыгал.
+  function simNodes(nodes, edges, prev){
+    const N=new Map(); let k=0;
+    for(const n of nodes) if(prev && prev.has(n)){ const p=prev.get(n); N.set(n,{x:p.x,y:p.y,vx:0,vy:0}); }
+    for(const n of nodes){
+      if(N.has(n)) continue;
+      const e=edges.find(([a,b])=>(a===n&&N.has(b))||(b===n&&N.has(a)));
+      const o=e ? N.get(e[0]===n?e[1]:e[0]) : null, ang=k*2.39996, r=o?40:60*Math.sqrt(++k);
+      N.set(n,{x:(o?o.x:0)+Math.cos(ang)*r, y:(o?o.y:0)+Math.sin(ang)*r, vx:0, vy:0});
+      if(o) k++;
+    }
+    return N;
   }
 
   function left(closesAt, now){
@@ -272,5 +241,5 @@
   // 2 мин… но не больше 10 минут, чтобы починенный сервер подхватился сам.
   function backoff(fails){ return Math.min(600000, 15000*2**fails); }
 
-  g.AvalonCore={key, merge, path, layout, tidy, reach, labels, left, soon, prune, backoff};
+  g.AvalonCore={key, merge, path, layout, step, simNodes, labels, left, soon, prune, backoff};
 })(typeof globalThis!=='undefined'?globalThis:this);

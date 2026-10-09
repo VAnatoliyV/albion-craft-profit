@@ -130,34 +130,25 @@ test('backoff: после неудач ждём дольше, но не боль
   assert.equal(C.backoff(20), 600000);
 });
 
-test('tidy: плашки не перекрываются и на каждом ребре есть место под время', ()=>{
-  const names=['Peritos-Oconun','Settun-Tersom','Quaent-Qintis','Fones-Opavun','Setent-Al-Duosas','Xiros-Aiirom','Qiient-Oc-Odetum','Secent-Et-Qinsas','Cynos-Oxaeaum','Qiitun-Et-Vynsom','Settun-Al-Tersom'];
-  const edges=[['Settun-Tersom','Peritos-Oconun'],['Settun-Tersom','Quaent-Qintis'],['Fones-Opavun','Setent-Al-Duosas'],['Fones-Opavun','Xiros-Aiirom'],['Fones-Opavun','Qiient-Oc-Odetum'],['Fones-Opavun','Secent-Et-Qinsas'],['Cynos-Oxaeaum','Qiitun-Et-Vynsom'],['Cynos-Oxaeaum','Settun-Al-Tersom']];
-  const dims=new Map(names.map(n=>[n,{w:40+n.length*7,h:24}]));
-  for(const seed of [1,7,42]){
-    const pos=C.tidy(C.layout(names.slice().sort(), edges, new Map(), seed), edges, dims);
-    for(let i=0;i<names.length;i++) for(let j=i+1;j<names.length;j++){
-      const a=pos.get(names[i]), b=pos.get(names[j]), da=dims.get(names[i]), db=dims.get(names[j]);
-      const apart=Math.abs(a.x-b.x)>=(da.w+db.w)/2 || Math.abs(a.y-b.y)>=(da.h+db.h)/2;
-      assert.ok(apart, `${names[i]} и ${names[j]} налезают (зерно ${seed})`);
-    }
-    for(const [x,y] of edges){
-      const a=pos.get(x), b=pos.get(y), dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy);
-      const free=d-C.reach(dims.get(x),dx/d,dy/d)-C.reach(dims.get(y),dx/d,dy/d);
-      assert.ok(free>=60, `${x}–${y}: под время только ${free.toFixed(0)} px`);
-    }
-  }
+test('step: граф успокаивается, связанные ближе несвязанных, узлы не слипаются', ()=>{
+  const edges=[['A','B'],['B','C'],['C','A'],['D','E'],['F','G'],['G','H']];
+  const nodes=[...new Set(edges.flat())].sort();
+  const run=()=>{ const N=C.simNodes(nodes, edges, null); let a=1; for(let i=0;i<400;i++) a=C.step(N,edges,a,null); return N; };
+  const N=run(), M=run();
+  assert.deepEqual([...N].map(([k,p])=>[k,p.x.toFixed(6)]), [...M].map(([k,p])=>[k,p.x.toFixed(6)]), 'не детерминирован');
+  const d=(a,b)=>Math.hypot(N.get(a).x-N.get(b).x, N.get(a).y-N.get(b).y);
+  for(let i=0;i<nodes.length;i++) for(let j=i+1;j<nodes.length;j++) assert.ok(d(nodes[i],nodes[j])>=34, `${nodes[i]}–${nodes[j]} слиплись: ${d(nodes[i],nodes[j]).toFixed(0)}`);
+  const linked=edges.reduce((s,[a,b])=>s+d(a,b),0)/edges.length;
+  assert.ok(linked<d('A','H') && linked<d('D','F'), 'связанные не ближе');
+  // Все цепочки — одним облаком, а не разлетелись.
+  for(const n of nodes) assert.ok(Math.hypot(N.get(n).x, N.get(n).y)<600, n+' улетел');
+  // Успокоился: скорости почти нулевые.
+  for(const p of N.values()) assert.ok(Math.hypot(p.vx,p.vy)<0.5);
 });
 
-test('tidy: разные цепочки не перемешиваются — их рамки не пересекаются', ()=>{
-  const edges=[['A','B'],['B','C'],['D','E'],['F','G'],['G','H'],['H','F']];
-  const nodes=[...new Set(edges.flat())].sort();
-  const dims=new Map(nodes.map(n=>[n,{w:120,h:24}]));
-  const pos=C.tidy(C.layout(nodes, edges, new Map(), 7), edges, dims);
-  const rect=g=>{ const xs=g.map(n=>pos.get(n).x), ys=g.map(n=>pos.get(n).y); return {x0:Math.min(...xs)-60,x1:Math.max(...xs)+60,y0:Math.min(...ys)-12,y1:Math.max(...ys)+12}; };
-  const R=[rect(['A','B','C']), rect(['D','E']), rect(['F','G','H'])];
-  for(let i=0;i<R.length;i++) for(let j=i+1;j<R.length;j++){
-    const a=R[i], b=R[j];
-    assert.ok(a.x1<=b.x0||b.x1<=a.x0||a.y1<=b.y0||b.y1<=a.y0, `цепочки ${i} и ${j} пересекаются`);
-  }
+test('simNodes: прежние места сохраняются, новый узел — рядом с соседом', ()=>{
+  const prev=new Map([['A',{x:100,y:50}]]);
+  const N=C.simNodes(['A','B'], [['A','B']], prev);
+  assert.deepEqual([N.get('A').x, N.get('A').y], [100,50]);
+  assert.ok(Math.hypot(N.get('B').x-100, N.get('B').y-50)<=41);
 });
