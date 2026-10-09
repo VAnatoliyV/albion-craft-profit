@@ -182,12 +182,15 @@
           const w=SIM.charge*alpha/Math.max(d2, 30*30);
           a.vx+=dx*w; a.vy+=dy*w; b.vx-=dx*w; b.vy-=dy*w;
         }
-        // Узлы не слипаются: под ними подписи, а они широкие — поэтому зазор
-        // по горизонтали больше, чем по вертикали (эллипс).
-        const ex=dx/SIM.gapX, ey=dy/SIM.gapY, e=Math.hypot(ex,ey);
-        if(e<1){
-          const m=(1-e)/(e||1e-3)*0.35;
-          a.vx-=dx*m*0.5; a.vy-=dy*m*0.5; b.vx+=dx*m*0.5; b.vy+=dy*m*0.5;
+        // Узлы не слипаются: под каждым подпись, а подписи разной длины —
+        // поэтому зазор по горизонтали считаем по их ширине (w), если она
+        // известна, по вертикали — кружок плюс строка.
+        const gx=(a.w!=null&&b.w!=null) ? (a.w+b.w)/2+16 : SIM.gapX, gy=SIM.gapY;
+        const ox=gx-Math.abs(dx), oy=gy-Math.abs(dy);
+        if(ox>0 && oy>0){
+          // Раздвигаем по той оси, где налезание меньше (так быстрее разойдутся).
+          if(ox/gx < oy/gy){ const m=(dx>=0?1:-1)*ox*0.25; a.vx-=m; b.vx+=m; }
+          else { const m=(dy>=0?1:-1)*oy*0.25; a.vy-=m; b.vy+=m; }
         }
       }
     }
@@ -217,7 +220,8 @@
       }
     }
     for(const [c,p] of A){
-      p.vx-=p.x*SIM.gravity*alpha; p.vy-=p.y*SIM.gravity*alpha;
+      // По вертикали тянем сильнее: экраны широкие, сеть ложится вширь.
+      p.vx-=p.x*SIM.gravity*alpha; p.vy-=p.y*SIM.gravity*1.8*alpha;
       if(c===held){ p.vx=0; p.vy=0; continue; }
       p.vx*=SIM.damp; p.vy*=SIM.damp; p.x+=p.vx; p.y+=p.vy;
     }
@@ -225,7 +229,7 @@
   }
   // Узлы для живого графа: прежние места сохраняем, новые ставим рядом с
   // соседом (или по спирали, если соседа ещё нет), чтобы граф не прыгал.
-  function simNodes(nodes, edges, prev, seed){
+  function simNodes(nodes, edges, prev, seed, widths){
     const N=new Map(); let k=0;
     // Разные зёрна — разный порядок и поворот спирали: разные стартовые раскладки.
     if(seed){ const R=rnd(seed); nodes=nodes.map(n=>[R(),n]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]); k=Math.floor(R()*7); }
@@ -237,6 +241,7 @@
       N.set(n,{x:(o?o.x:0)+Math.cos(ang)*r, y:(o?o.y:0)+Math.sin(ang)*r, vx:0, vy:0});
       if(o) k++;
     }
+    if(widths) for(const [n,p] of N) p.w=widths.get(n);
     return N;
   }
 
@@ -256,16 +261,116 @@
   }
   // Первая раскладка: несколько стартов, берём ту, где меньше всего
   // пересечений дорог (при равенстве — первую). Большие сети — один старт.
-  function settle(nodes, edges, tries, steps){
+  function settle(nodes, edges, tries, steps, widths){
     let best=null, bestN=Infinity;
     const T=nodes.length<=80 ? tries : 1;
     for(let s=0;s<T;s++){
-      const N=simNodes(nodes, edges, null, s); let a=1;
+      const N=simNodes(nodes, edges, null, s, widths); let a=1;
       for(let i=0;i<steps;i++) a=step(N,edges,a,null);
       const c=crossings(N,edges);
       if(c<bestN){ best=N; bestN=c; if(!c) break; }
     }
     return best;
+  }
+  // Распутывание после физики: зоны, чьи дороги пересекаются, пробуют встать
+  // на другие места (вместе со своими «листьями» — соседями без других
+  // дорог) и остаются там, где цена меньше: пересечение дорог — дорого,
+  // налезшие подписи — дешевле, далеко от прежнего места — чуть-чуть.
+  // Сети дорог почти всегда деревья, у них раскладка без пересечений есть.
+  function untangle(N, edges, rounds){
+    const deg=new Map(), adj=new Map();
+    for(const [a,b] of edges){
+      for(const [x,y] of [[a,b],[b,a]]){ deg.set(x,(deg.get(x)||0)+1); if(!adj.has(x)) adj.set(x,[]); adj.get(x).push(y); }
+    }
+    const nodes=[...N.keys()];
+    // Ветка за дорогой u–v со стороны v; null — если по кругу можно вернуться к u.
+    const branch=(v,u)=>{
+      const seen=new Set([v]), q=[v];
+      while(q.length){ const x=q.pop(); for(const y of adj.get(x)||[]){ if(x===v&&y===u) continue; if(y===u) return null; if(!seen.has(y)){ seen.add(y); q.push(y); } } }
+      return [...seen];
+    };
+    const overlaps=()=>{
+      let n=0;
+      for(let i=0;i<nodes.length;i++) for(let j=i+1;j<nodes.length;j++){
+        const a=N.get(nodes[i]), b=N.get(nodes[j]);
+        const gx=(a.w!=null&&b.w!=null)?(a.w+b.w)/2+8:SIM.gapX, gy=SIM.gapY-6;
+        if(Math.abs(a.x-b.x)<gx && Math.abs(a.y-b.y)<gy) n++;
+      }
+      return n;
+    };
+    // Дорога, проходящая через чужую зону (ближе 16 px к кружку), выглядит
+    // так, будто ведёт через неё, — почти так же плохо, как пересечение.
+    const cuts=()=>{
+      let n=0;
+      for(const [a,b] of edges){
+        const A=N.get(a), B=N.get(b);
+        for(const c of nodes){
+          if(c===a||c===b) continue;
+          const p=N.get(c); if(outBox(p,A,B,16)) continue;
+          const sg=toSeg(p,A,B); if(sg.d<16 && sg.t>0 && sg.t<1) n++;
+        }
+      }
+      return n;
+    };
+    const cost=()=>crossings(N,edges)*1000+cuts()*700+overlaps()*60;
+    const pairs=()=>{
+      const out=[];
+      const cr=(p,q,r,t)=>{ const d=(a,b,c)=>(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x); return d(p,q,r)*d(p,q,t)<0 && d(r,t,p)*d(r,t,q)<0; };
+      for(let i=0;i<edges.length;i++) for(let j=i+1;j<edges.length;j++){
+        const [a,b]=edges[i], [c,e]=edges[j];
+        if(a===c||a===e||b===c||b===e) continue;
+        if(cr(N.get(a),N.get(b),N.get(c),N.get(e))) out.push([edges[i],edges[j]]);
+      }
+      return out;
+    };
+    let cur=cost();
+    const cutters=()=>{
+      const out=new Set();
+      for(const [a,b] of edges){ const A=N.get(a), B=N.get(b);
+        for(const c of nodes){ if(c===a||c===b) continue; const p=N.get(c); if(outBox(p,A,B,16)) continue;
+          const sg=toSeg(p,A,B); if(sg.d<16 && sg.t>0 && sg.t<1){ out.add(a); out.add(b); out.add(c); } } }
+      return out;
+    };
+    for(let r=0; r<(rounds||40) && cur>=600; r++){
+      const ps=pairs(), cs=cutters(); if(!ps.length && !cs.size) break;
+      const movers=[...new Set([...ps.flat(2), ...cs])].sort((a,b)=>(deg.get(a)||0)-(deg.get(b)||0));
+      let improved=false;
+      for(const v of movers){
+        // Ходы: (1) узел с листьями-соседями — сдвиг по кругам; (2) вся ветка
+        // за дорогой u–v (то, что отвалится, если её убрать) — поворот вокруг u.
+        const moves=[];
+        const leafGroup=[v, ...(adj.get(v)||[]).filter(u=>deg.get(u)===1)];
+        const p=N.get(v);
+        if(deg.get(v)===1){
+          const u=N.get(adj.get(v)[0]);
+          for(let k=1;k<24;k++) moves.push({group:[v], rot:{c:u, t:k*Math.PI/12}});
+        } else {
+          for(const R of [90,180,280]) for(let k=0;k<16;k++){ const t=k*Math.PI/8; moves.push({group:leafGroup, dx:Math.cos(t)*R, dy:Math.sin(t)*R}); }
+        }
+        for(const u of adj.get(v)||[]){
+          const side=branch(v,u);
+          if(!side || side.length>nodes.length/2+1) continue;
+          for(let k=1;k<12;k++) moves.push({group:side, rot:{c:N.get(u), t:k*Math.PI/6}});
+        }
+        let best=null, bestC=cur;
+        for(const m of moves){
+          const home=m.group.map(g=>{ const q=N.get(g); return [q, q.x, q.y]; });
+          let shift=0;
+          for(const [q,x,y] of home){
+            if(m.rot){ const c=m.rot.c, cs=Math.cos(m.rot.t), sn=Math.sin(m.rot.t), rx=x-c.x, ry=y-c.y; q.x=c.x+rx*cs-ry*sn; q.y=c.y+rx*sn+ry*cs; }
+            else { q.x=x+m.dx; q.y=y+m.dy; }
+            shift+=Math.hypot(q.x-x,q.y-y);
+          }
+          const cc=cost()+shift*0.01/m.group.length;
+          if(cc<bestC-0.5){ best=home.map(([q])=>[q,q.x,q.y]); bestC=cc; }
+          for(const [q,x,y] of home){ q.x=x; q.y=y; }
+        }
+        if(best){ for(const [q,x,y] of best){ q.x=x; q.y=y; } cur=cost(); improved=true; }
+      }
+      if(!improved) break;
+    }
+    for(const p of N.values()){ p.vx=0; p.vy=0; }
+    return N;
   }
   function left(closesAt, now){
     const s=closesAt-now; if(s<=0) return 'закрыт';
@@ -292,5 +397,5 @@
   // 2 мин… но не больше 10 минут, чтобы починенный сервер подхватился сам.
   function backoff(fails){ return Math.min(600000, 15000*2**fails); }
 
-  g.AvalonCore={key, merge, path, layout, step, simNodes, crossings, settle, labels, left, soon, prune, backoff};
+  g.AvalonCore={key, merge, path, layout, step, simNodes, crossings, settle, untangle, labels, left, soon, prune, backoff};
 })(typeof globalThis!=='undefined'?globalThis:this);

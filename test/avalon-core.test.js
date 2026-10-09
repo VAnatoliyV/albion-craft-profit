@@ -178,3 +178,49 @@ test('crossings: считает только настоящие пересече
   assert.equal(C.crossings(N,[['A','B'],['C','D']]),1);
   assert.equal(C.crossings(N,[['A','B'],['B','E']]),0);
 });
+
+test('settle: на карте 9 октября (42 дороги) подписи зон не налезают друг на друга', ()=>{
+  const edges=require('./roads-2026-10-09.json'), labels=require('./labels-2026-10-09.json');
+  const nodes=[...new Set(edges.flat())].sort();
+  // Ширина подписи ~7 px на букву (12px system-ui), высота строки 16.
+  const W=new Map(nodes.map(c=>[c, labels[c].length*7]));
+  const N=C.settle(nodes, edges, 8, 400, W);
+  const bad=[];
+  for(let i=0;i<nodes.length;i++) for(let j=i+1;j<nodes.length;j++){
+    const a=N.get(nodes[i]), b=N.get(nodes[j]);
+    // подпись — прямоугольник под кружком: центр (x, y+24), ширина W, высота 16
+    if(Math.abs(a.x-b.x)<(W.get(nodes[i])+W.get(nodes[j]))/2 && Math.abs(a.y-b.y)<16+28) bad.push(labels[nodes[i]]+' / '+labels[nodes[j]]);
+  }
+  assert.deepEqual(bad, [], 'налезают: '+bad.join('; '));
+});
+
+test('untangle: на картах 8 и 9 октября дороги не пересекаются, подписи не налезают', ()=>{
+  for(const day of ['08','09']){
+    const edges=require(`./roads-2026-10-${day}.json`), nodes=[...new Set(edges.flat())].sort();
+    const W=new Map(nodes.map(c=>[c, 120]));
+    if(day==='09'){ const L=require('./labels-2026-10-09.json'); for(const c of nodes) W.set(c, L[c].length*7); }
+    const N=C.untangle(C.settle(nodes, edges, 8, 400, W), edges);
+    assert.equal(C.crossings(N,edges), 0, `${day}: пересечений ${C.crossings(N,edges)}`);
+    const bad=[];
+    for(let i=0;i<nodes.length;i++) for(let j=i+1;j<nodes.length;j++){
+      const a=N.get(nodes[i]), b=N.get(nodes[j]);
+      if(Math.abs(a.x-b.x)<(W.get(nodes[i])+W.get(nodes[j]))/2 && Math.abs(a.y-b.y)<44) bad.push(nodes[i]+'/'+nodes[j]);
+    }
+    assert.deepEqual(bad, [], `${day}: подписи налезают`);
+  }
+});
+
+test('untangle: дороги не проходят через чужие зоны (карта 9 октября)', ()=>{
+  const edges=require('./roads-2026-10-09.json'), L=require('./labels-2026-10-09.json');
+  const nodes=[...new Set(edges.flat())].sort();
+  const W=new Map(nodes.map(c=>[c, L[c].length*7]));
+  const N=C.untangle(C.settle(nodes, edges, 8, 400, W), edges);
+  const bad=[];
+  for(const [x,y] of edges) for(const n of nodes){
+    if(n===x||n===y) continue;
+    const p=N.get(n), A=N.get(x), B=N.get(y), dx=B.x-A.x, dy=B.y-A.y, l2=dx*dx+dy*dy;
+    const t=((p.x-A.x)*dx+(p.y-A.y)*dy)/l2; if(t<=0||t>=1) continue;
+    if(Math.hypot(p.x-A.x-t*dx, p.y-A.y-t*dy)<16) bad.push(`${L[n]} на ${L[x]}–${L[y]}`);
+  }
+  assert.deepEqual(bad, []);
+});

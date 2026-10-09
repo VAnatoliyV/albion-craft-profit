@@ -6931,7 +6931,13 @@ function mapRelayout(){
   MAP.edges=ls.map(l=>[l.a,l.b]);
   // Первый раз — лучший из нескольких стартов (меньше всего пересечений),
   // дальше — прежние места, новые зоны рядом с соседями.
-  MAP.pos=first ? AvalonCore.settle(nodes, MAP.edges, 8, 400) : AvalonCore.simNodes(nodes, MAP.edges, MAP.pos);
+  // Ширина подписи — чтобы зоны расступались по длине своих названий.
+  mapMeasureCtx=mapMeasureCtx||document.createElement('canvas').getContext('2d');
+  mapMeasureCtx.font='600 12px system-ui, -apple-system, sans-serif';
+  const W=new Map(nodes.map(c=>{ const z=MAP.zones&&MAP.zones.get(c); return [c, Math.ceil(mapMeasureCtx.measureText((z&&z.t?'T'+z.t+' ':'')+mapName(c)).width)]; }));
+  MAP.pos=first ? AvalonCore.settle(nodes, MAP.edges, 8, 400, W) : AvalonCore.simNodes(nodes, MAP.edges, MAP.pos, 0, W);
+  // Дороги не пересекаются там, где этого можно избежать.
+  AvalonCore.untangle(MAP.pos, MAP.edges);
   MAP.deg=new Map(nodes.map(c=>[c,0]));
   for(const [x,y] of MAP.edges){ MAP.deg.set(x,MAP.deg.get(x)+1); MAP.deg.set(y,MAP.deg.get(y)+1); }
   MAP.alpha=first ? .05 : Math.max(MAP.alpha,.5);
@@ -6939,6 +6945,7 @@ function mapRelayout(){
   if(first && MAP.here) mapSetHere(MAP.here);
   mapRun();
 }
+let mapMeasureCtx=null;
 // Узел крупнее, если у зоны больше дорог.
 function mapR(c){ return 6+Math.min(10, 3*Math.sqrt(MAP.deg&&MAP.deg.get(c)||1)); }
 // Физика крутится, пока граф не успокоится; потом кадры только по событиям.
@@ -6951,6 +6958,9 @@ function mapRun(){
     if(MAP.fitLive && !MAP.touched) MAP.fit=true;
     mapPaint();
     if(MAP.alpha>0.004 || MAP.held) MAP.raf=requestAnimationFrame(tick);
+    // Успокоился — проверить, не легли ли дороги крест-накрест (после
+    // перетаскивания или новых дорог), и распутать.
+    else if(AvalonCore.crossings(MAP.pos, MAP.edges||[])){ AvalonCore.untangle(MAP.pos, MAP.edges); mapPaint(); }
   };
   MAP.raf=requestAnimationFrame(tick);
 }
@@ -7051,7 +7061,7 @@ function mapPaint(){
   g.setLineDash([]);
   // Узлы: светящиеся кружки цвета зоны, имя под кружком.
   const nf=Math.max(9, Math.min(13, 12*Math.sqrt(k)));
-  const busy=[]; // занятые места: кружки и подписи узлов, потом — время
+  const busy=[], labs=[]; // занятые места: кружки и подписи узлов, потом — время
   g.textAlign='center'; g.textBaseline='middle';
   for(const [c] of MAP.pos){
     const p=P(c), r=mapR(c)*Math.max(.7,Math.min(1.3,k));
@@ -7066,15 +7076,26 @@ function mapPaint(){
     // светлое ядро — как у Obsidian-подобных графов
     g.beginPath(); g.arc(p.x,p.y,r*.42,0,7); g.fillStyle='rgba(255,255,255,.85)'; g.fill();
     if(mark){ g.beginPath(); g.arc(p.x,p.y,r+3.5,0,7); g.lineWidth=2; g.strokeStyle=c===MAP.here?'#f4c542':'#ffffff'; g.stroke(); }
-    busy.push({x:p.x, y:p.y, w:r*2+4, h:r*2+4});
-    if(k>=.5 || mark || near.has(c)){
-      const z=MAP.zones&&MAP.zones.get(c), label=(z&&z.t?'T'+z.t+' ':'')+nm;
-      g.font=`${mark?700:600} ${nf}px system-ui, -apple-system, sans-serif`;
-      busy.push({x:p.x, y:p.y+r+nf*.9, w:g.measureText(label).width+6, h:nf+4});
-      g.lineWidth=3.5; g.strokeStyle='#12151e'; g.strokeText(label, p.x, p.y+r+nf*.9);
-      g.fillStyle=mark?'#ffffff':'#d5d9e6'; g.fillText(label, p.x, p.y+r+nf*.9);
-    }
+    const own={x:p.x, y:p.y, w:r*2+4, h:r*2+4};
+    busy.push(own);
+    labs.push({c, p, r, nm, mark, near:near.has(c), dim, own});
   }
+  // Подписи: сначала отмеченные и соседи наведённой, потом зоны с большим
+  // числом дорог. Налезающую на уже поставленную — прячем (покажется при
+  // приближении или наведении), отмеченные и соседи — всегда.
+  labs.sort((a,b)=>(b.mark-a.mark)||(b.near-a.near)||((MAP.deg.get(b.c)||0)-(MAP.deg.get(a.c)||0))||(a.nm<b.nm?-1:1));
+  for(const L of labs){
+    const z=MAP.zones&&MAP.zones.get(L.c), label=(z&&z.t?'T'+z.t+' ':'')+L.nm;
+    g.font=`${L.mark?700:600} ${nf}px system-ui, -apple-system, sans-serif`;
+    const R={x:L.p.x, y:L.p.y+L.r+nf*.9, w:g.measureText(label).width+6, h:nf+4};
+    const free=!busy.some(o=>o!==L.own && Math.abs(o.x-R.x)<(o.w+R.w)/2 && Math.abs(o.y-R.y)<(o.h+R.h)/2);
+    if(!(L.mark||L.near) && (k<.3 || !free)) continue;
+    busy.push(R);
+    g.globalAlpha=L.dim?.18:1;
+    g.lineWidth=3.5; g.strokeStyle='#12151e'; g.strokeText(label, R.x, R.y);
+    g.fillStyle=L.mark?'#ffffff':'#d5d9e6'; g.fillText(label, R.x, R.y);
+  }
+  g.globalAlpha=1;
   // Время на линии — мелко, без рамки, там, где не мешает названиям;
   // нет места — прячем (при наведении на зону время её дорог видно всегда).
   const tf=Math.max(9, Math.min(11, 10*k));
