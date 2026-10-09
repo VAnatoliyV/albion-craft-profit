@@ -7114,6 +7114,8 @@ function mapTipHTML(c){
   if(z.r){ const nm=MAP_ROAD[z.ty]; head.push(nm ? tr(nm)+(z.g>0&&MAP_ROMAN[z.g]?' '+MAP_ROMAN[z.g]:'') : tr('дорога')); }
   else head.push(tr(mapWord(MAP_ZQ, z.q).replace(/<[^>]*>/g,'')));
   if(z.t>0) head.push('T'+mapEsc(z.t));
+  // Качество (1–6) в игре есть только у чёрных зон.
+  if(!z.r && z.g>0) head.push(mapEsc(tr('качество '+z.g)));
   const res=(z.rb&&z.rb.length ? z.rb : Object.keys(z.res||{})).map(k=>
     `<img ${icoAttr(mapEsc('T'+Math.max(z.t||4,4)+'_'+k),22)} alt="" title="${mapEsc(tr(MAP_RES[String(k).toLowerCase()]||String(k).toLowerCase()))}">`).join('');
   const ch=Object.entries(z.ch||{}).map(([k,n])=>`<span class="mtI">${mapChestSVG(k)}×${mapEsc(n)}</span>`).join('');
