@@ -129,3 +129,35 @@ test('backoff: после неудач ждём дольше, но не боль
   assert.ok(C.backoff(5) > C.backoff(4));
   assert.equal(C.backoff(20), 600000);
 });
+
+test('tidy: плашки не перекрываются и на каждом ребре есть место под время', ()=>{
+  const names=['Peritos-Oconun','Settun-Tersom','Quaent-Qintis','Fones-Opavun','Setent-Al-Duosas','Xiros-Aiirom','Qiient-Oc-Odetum','Secent-Et-Qinsas','Cynos-Oxaeaum','Qiitun-Et-Vynsom','Settun-Al-Tersom'];
+  const edges=[['Settun-Tersom','Peritos-Oconun'],['Settun-Tersom','Quaent-Qintis'],['Fones-Opavun','Setent-Al-Duosas'],['Fones-Opavun','Xiros-Aiirom'],['Fones-Opavun','Qiient-Oc-Odetum'],['Fones-Opavun','Secent-Et-Qinsas'],['Cynos-Oxaeaum','Qiitun-Et-Vynsom'],['Cynos-Oxaeaum','Settun-Al-Tersom']];
+  const dims=new Map(names.map(n=>[n,{w:40+n.length*7,h:24}]));
+  for(const seed of [1,7,42]){
+    const pos=C.tidy(C.layout(names.slice().sort(), edges, new Map(), seed), edges, dims);
+    for(let i=0;i<names.length;i++) for(let j=i+1;j<names.length;j++){
+      const a=pos.get(names[i]), b=pos.get(names[j]), da=dims.get(names[i]), db=dims.get(names[j]);
+      const apart=Math.abs(a.x-b.x)>=(da.w+db.w)/2 || Math.abs(a.y-b.y)>=(da.h+db.h)/2;
+      assert.ok(apart, `${names[i]} и ${names[j]} налезают (зерно ${seed})`);
+    }
+    for(const [x,y] of edges){
+      const a=pos.get(x), b=pos.get(y), dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy);
+      const free=d-C.reach(dims.get(x),dx/d,dy/d)-C.reach(dims.get(y),dx/d,dy/d);
+      assert.ok(free>=60, `${x}–${y}: под время только ${free.toFixed(0)} px`);
+    }
+  }
+});
+
+test('tidy: разные цепочки не перемешиваются — их рамки не пересекаются', ()=>{
+  const edges=[['A','B'],['B','C'],['D','E'],['F','G'],['G','H'],['H','F']];
+  const nodes=[...new Set(edges.flat())].sort();
+  const dims=new Map(nodes.map(n=>[n,{w:120,h:24}]));
+  const pos=C.tidy(C.layout(nodes, edges, new Map(), 7), edges, dims);
+  const rect=g=>{ const xs=g.map(n=>pos.get(n).x), ys=g.map(n=>pos.get(n).y); return {x0:Math.min(...xs)-60,x1:Math.max(...xs)+60,y0:Math.min(...ys)-12,y1:Math.max(...ys)+12}; };
+  const R=[rect(['A','B','C']), rect(['D','E']), rect(['F','G','H'])];
+  for(let i=0;i<R.length;i++) for(let j=i+1;j<R.length;j++){
+    const a=R[i], b=R[j];
+    assert.ok(a.x1<=b.x0||b.x1<=a.x0||a.y1<=b.y0||b.y1<=a.y0, `цепочки ${i} и ${j} пересекаются`);
+  }
+});

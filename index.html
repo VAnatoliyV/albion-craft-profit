@@ -800,6 +800,14 @@ body.pix th{background-color:var(--panel2)}
 body.pix .plab{font-family:var(--pix);letter-spacing:.4px}
 body.pix tbody tr:last-child td{background-image:none}
 /* Карточка зоны на карте Авалона — как в приложении Albion Journal */
+.mapTip{position:absolute;z-index:5;pointer-events:none;max-width:280px;background:rgba(20,24,36,.97);border:1px solid #3a4258;border-radius:10px;padding:9px 11px;box-shadow:0 8px 24px rgba(0,0,0,.45);font-size:12px;color:#d9dce6}
+.mapTip .mtName{font-weight:700;font-size:14px;color:var(--accent)}
+.mapTip .mtSub{color:#9aa1b5;margin:1px 0 6px}
+.mapTip .mtRow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:6px}
+.mapTip .mtRow img{width:22px;height:22px}
+.mapTip .mtI{display:inline-flex;align-items:center;gap:2px;color:#cfd3e0}
+.mapTip .mtI svg{width:18px;height:18px}
+.mapTip .mtLinks{border-top:1px solid #2c3346;padding-top:5px;display:grid;gap:2px}
 .mzName{font-size:17px;font-weight:700;color:var(--accent);letter-spacing:.3px}
 .mzSub{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;margin:3px 0 10px}
 .mzSq{width:9px;height:9px;flex:none}
@@ -2361,7 +2369,7 @@ for(const [k,v] of Object.entries({
   "Обнови страницу.": ["Refresh the page.", "Recarga la página."]
 })) if(!(k in T_UI)) T_UI[k]=v;   // готовые переводы не перебиваем
 Object.assign(T_UI, {"Общие настройки": ["General settings", "Ajustes generales"]});
-Object.assign(T_UI, {"🗺 Карта Авалона": ["🗺 Avalon map", "🗺 Mapa de Avalon"], "Авалон": ["Avalon", "Avalon"], "Общая живая карта Дорог Авалона: связи присылают игроки из Albion Journal, у каждой — сколько осталось до закрытия. Поиск пути между зонами.": ["A shared live map of the Roads of Avalon: links are sent in by players using Albion Journal, each with the time left until it closes. Pathfinding between zones.", "Mapa común en vivo de los Caminos de Avalon: los enlaces los envían jugadores con Albion Journal, cada uno con el tiempo que queda hasta que se cierre. Búsqueda de ruta entre zonas."], "Живая карта Дорог Авалона и поиск пути.": ["Live map of the Roads of Avalon and pathfinding.", "Mapa en vivo de los Caminos de Avalon y búsqueda de ruta."], "Живая карта Дорог Авалона от игроков с Albion Journal: таймеры порталов и путь между зонами.": ["A live map of the Roads of Avalon from players using Albion Journal: portal timers and a path between zones.", "Mapa en vivo de los Caminos de Avalon hecha por jugadores con Albion Journal: temporizadores de portales y ruta entre zonas."], "Найти зону": ["Find a zone", "Buscar zona"], "название": ["name", "nombre"], "Откуда": ["From", "Desde"], "Куда": ["To", "Hasta"], "Только подтверждённые": ["Confirmed only", "Solo confirmadas"], "Скоро закроются": ["Closing soon", "Se cerrarán pronto"], "Ничего не закрывается в ближайший час.": ["Nothing closes within the next hour.", "No se cierra nada en la próxima hora."], "Карта сейчас недоступна": ["The map is unavailable right now", "El mapa no está disponible ahora"], "Сервер не отвечает. Попробуем ещё раз через полминуты.": ["The server isn't responding. We'll try again in half a minute.", "El servidor no responde. Lo intentaremos de nuevo en medio minuto."], "Пока ни одной связи": ["No links yet", "Aún no hay ningún enlace"], "Связи присылают игроки из Albion Journal: наведись в игре на портал дорог и нажми кнопку карточки зоны.": ["Links are sent in by Albion Journal players: point at a roads portal in the game and press the button on the zone card.", "Los enlaces los envían jugadores de Albion Journal: apunta en el juego a un portal de los caminos y pulsa el botón de la ficha de zona."], "Путь:": ["Path:", "Ruta:"], "(перех.: {})": ["({} jumps)", "({} saltos)"], "Пути нет": ["No path", "No hay ruta"], "связей: {} · пунктир — не проверена": ["links: {} · dashed means not verified", "enlaces: {} · la línea discontinua significa sin verificar"], "синяя": ["blue", "azul"], "жёлтая": ["yellow", "amarilla"], "красная": ["red", "roja"], "чёрная": ["black", "negra"], "дорога": ["road", "camino"], "подземелье": ["dungeon", "mazmorra"], "остров": ["island", "isla"], "другое": ["other", "otro"], "волокно": ["fiber", "fibra"], "шкуры": ["hide", "pieles"], "руда": ["ore", "mineral"], "дерево": ["wood", "madera"], "камень": ["stone", "piedra"], "малый": ["small", "pequeño"], "малый элитный": ["small elite", "pequeño de élite"], "средний ветеранский": ["medium veteran", "mediano de veterano"], "средний элитный": ["medium elite", "mediano de élite"], "одиночное": ["solo", "en solitario"], "групповое": ["group", "de grupo"], "рейдовое": ["raid", "de incursión"], "удалить": ["delete", "eliminar"], "забанить автора": ["ban the author", "vetar al autor"], "закрыт": ["closed", "cerrado"], "{} ч {} м": ["{}h {}m", "{} h {} min"], "{} м": ["{}m", "{} min"], "<{} м": ["<{}m", "<{} min"], "Удалить эту связь с карты?": ["Remove this link from the map?", "¿Eliminar este enlace del mapa?"], "Забанить автора этой связи? Все связи, где он единственный автор, пропадут с карты.": ["Ban the author of this link? Every link where they are the only author will disappear from the map.", "¿Vetar al autor de este enlace? Todos los enlaces en los que sea el único autor desaparecerán del mapa."], "Готово.": ["Done.", "Hecho."], "Связь уже пропала с карты.": ["The link is already gone from the map.", "El enlace ya no está en el mapa."], "Ключ админа не подошёл, админ-режим выключен.": ["The admin key didn't work, admin mode is off.", "La clave de administrador no ha funcionado, el modo de administrador está desactivado."], "Сервер не ответил, попробуй ещё раз.": ["The server didn't respond, try again.", "El servidor no respondió, inténtalo de nuevo."], "ресурсы": ["resources", "recursos"], "лагеря": ["camps", "campamentos"], "данжи": ["dungeons", "mazmorras"], "основной ресурс биома": ["the biome's main resource", "recurso principal del bioma"], "есть выход в город туманов": ["exit to the Mists city", "salida a la ciudad de las Nieblas"], "качество {}": ["quality {}", "calidad {}"], "портал на {}": ["portal for {}", "portal para {}"], "дорога убежищ": ["hideout road", "camino de refugios"], "глубокая дорога убежищ": ["deep hideout road", "camino de refugios profundo"], "глубокая дорога": ["deep road", "camino profundo"], "глубокая рейдовая дорога": ["deep raid road", "camino profundo de incursión"], "королевская дорога": ["royal road", "camino real"], "королевская красная дорога": ["royal red road", "camino real rojo"], "соло малый": ["small solo", "solo pequeño"], "соло большой": ["big solo", "solo grande"], "групповой": ["group", "grupal"], "рейдовый малый": ["small raid", "incursión pequeña"], "рейдовый большой": ["big raid", "incursión grande"]});   // Карта Авалона
+Object.assign(T_UI, {"🗺 Карта Авалона": ["🗺 Avalon map", "🗺 Mapa de Avalon"], "Авалон": ["Avalon", "Avalon"], "Общая живая карта Дорог Авалона: связи присылают игроки из Albion Journal, у каждой — сколько осталось до закрытия. Поиск пути между зонами.": ["A shared live map of the Roads of Avalon: links are sent in by players using Albion Journal, each with the time left until it closes. Pathfinding between zones.", "Mapa común en vivo de los Caminos de Avalon: los enlaces los envían jugadores con Albion Journal, cada uno con el tiempo que queda hasta que se cierre. Búsqueda de ruta entre zonas."], "Живая карта Дорог Авалона и поиск пути.": ["Live map of the Roads of Avalon and pathfinding.", "Mapa en vivo de los Caminos de Avalon y búsqueda de ruta."], "Живая карта Дорог Авалона от игроков с Albion Journal: таймеры порталов и путь между зонами.": ["A live map of the Roads of Avalon from players using Albion Journal: portal timers and a path between zones.", "Mapa en vivo de los Caminos de Avalon hecha por jugadores con Albion Journal: temporizadores de portales y ruta entre zonas."], "Найти зону": ["Find a zone", "Buscar zona"], "название": ["name", "nombre"], "Откуда": ["From", "Desde"], "Куда": ["To", "Hasta"], "Только подтверждённые": ["Confirmed only", "Solo confirmadas"], "Подсказка при наведении": ["Hover info", "Info al pasar el ratón"], "Скоро закроются": ["Closing soon", "Se cerrarán pronto"], "Ничего не закрывается в ближайший час.": ["Nothing closes within the next hour.", "No se cierra nada en la próxima hora."], "Карта сейчас недоступна": ["The map is unavailable right now", "El mapa no está disponible ahora"], "Сервер не отвечает. Попробуем ещё раз через полминуты.": ["The server isn't responding. We'll try again in half a minute.", "El servidor no responde. Lo intentaremos de nuevo en medio minuto."], "Пока ни одной связи": ["No links yet", "Aún no hay ningún enlace"], "Связи присылают игроки из Albion Journal: наведись в игре на портал дорог и нажми кнопку карточки зоны.": ["Links are sent in by Albion Journal players: point at a roads portal in the game and press the button on the zone card.", "Los enlaces los envían jugadores de Albion Journal: apunta en el juego a un portal de los caminos y pulsa el botón de la ficha de zona."], "Путь:": ["Path:", "Ruta:"], "(перех.: {})": ["({} jumps)", "({} saltos)"], "Пути нет": ["No path", "No hay ruta"], "связей: {} · пунктир — не проверена": ["links: {} · dashed means not verified", "enlaces: {} · la línea discontinua significa sin verificar"], "синяя": ["blue", "azul"], "жёлтая": ["yellow", "amarilla"], "красная": ["red", "roja"], "чёрная": ["black", "negra"], "дорога": ["road", "camino"], "подземелье": ["dungeon", "mazmorra"], "остров": ["island", "isla"], "другое": ["other", "otro"], "волокно": ["fiber", "fibra"], "шкуры": ["hide", "pieles"], "руда": ["ore", "mineral"], "дерево": ["wood", "madera"], "камень": ["stone", "piedra"], "малый": ["small", "pequeño"], "малый элитный": ["small elite", "pequeño de élite"], "средний ветеранский": ["medium veteran", "mediano de veterano"], "средний элитный": ["medium elite", "mediano de élite"], "одиночное": ["solo", "en solitario"], "групповое": ["group", "de grupo"], "рейдовое": ["raid", "de incursión"], "удалить": ["delete", "eliminar"], "забанить автора": ["ban the author", "vetar al autor"], "закрыт": ["closed", "cerrado"], "{} ч {} м": ["{}h {}m", "{} h {} min"], "{} м": ["{}m", "{} min"], "<{} м": ["<{}m", "<{} min"], "Удалить эту связь с карты?": ["Remove this link from the map?", "¿Eliminar este enlace del mapa?"], "Забанить автора этой связи? Все связи, где он единственный автор, пропадут с карты.": ["Ban the author of this link? Every link where they are the only author will disappear from the map.", "¿Vetar al autor de este enlace? Todos los enlaces en los que sea el único autor desaparecerán del mapa."], "Готово.": ["Done.", "Hecho."], "Связь уже пропала с карты.": ["The link is already gone from the map.", "El enlace ya no está en el mapa."], "Ключ админа не подошёл, админ-режим выключен.": ["The admin key didn't work, admin mode is off.", "La clave de administrador no ha funcionado, el modo de administrador está desactivado."], "Сервер не ответил, попробуй ещё раз.": ["The server didn't respond, try again.", "El servidor no respondió, inténtalo de nuevo."], "ресурсы": ["resources", "recursos"], "лагеря": ["camps", "campamentos"], "данжи": ["dungeons", "mazmorras"], "основной ресурс биома": ["the biome's main resource", "recurso principal del bioma"], "есть выход в город туманов": ["exit to the Mists city", "salida a la ciudad de las Nieblas"], "качество {}": ["quality {}", "calidad {}"], "портал на {}": ["portal for {}", "portal para {}"], "дорога убежищ": ["hideout road", "camino de refugios"], "глубокая дорога убежищ": ["deep hideout road", "camino de refugios profundo"], "глубокая дорога": ["deep road", "camino profundo"], "глубокая рейдовая дорога": ["deep raid road", "camino profundo de incursión"], "королевская дорога": ["royal road", "camino real"], "королевская красная дорога": ["royal red road", "camino real rojo"], "соло малый": ["small solo", "solo pequeño"], "соло большой": ["big solo", "solo grande"], "групповой": ["group", "grupal"], "рейдовый малый": ["small raid", "incursión pequeña"], "рейдовый большой": ["big raid", "incursión grande"]});   // Карта Авалона
 Object.assign(T_UI, {"💡 Здесь лучше выключить «Золотую середину»: она прячет свежие строки без истории, а во флипе выгодные окна как раз такие. И перед покупкой сверь обе цены со сборщиком цен в игре: наценка держится считанные минуты.": ["💡 Better turn off Sweet spot here: it hides fresh rows with no history, and that is exactly what good flips look like. Before buying, check both prices in game with the data client running: the margin lasts only minutes.", "💡 Aquí conviene desactivar Punto justo: oculta las filas recientes sin historial, y los buenos flips son justo así. Antes de comprar, comprueba ambos precios en el juego con el recolector de datos: el margen dura solo minutos."]});
 Object.assign(T_UI, {
   "🖤 Флиппинг → ЧР": ["🖤 Flipping → BM", "🖤 Reventa → MN"],
@@ -6831,10 +6839,12 @@ function backBtnHTML(){
 // ── Карта Авалона ─────────────────────────────────────────────────────────
 // Связи присылает Albion Journal на наш сервер (тот же, что живые цены),
 // здесь только показ. Ядро без DOM — avalon-core.js, у него свои тесты.
-const MAP={links:new Map(), since:0, pos:new Map(), zones:null, here:'', sel:null,
+const MAP={links:new Map(), since:0, pos:new Map(), dims:new Map(), zones:null, here:'', sel:null, hover:null,
+  touched:false, fit:false, tip:true,
   from:'', to:'', onlyConf:false, q:'', timer:null, down:false, err:'', key:'',
   shape:'', view:{x:0,y:0,k:1}, seq:0, busy:false, fail:0, pause:0, admMsg:''};
 try{ MAP.key=localStorage.getItem('acp_mapkey')||''; }catch(e){}
+try{ MAP.tip=localStorage.getItem('acp_maptip')!=='0'; }catch(e){}
 const mapEsc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 function mapRoute(id){
   if(id.startsWith('here=')) mapSetHere(decodeURIComponent(id.slice(5)));
@@ -6913,13 +6923,23 @@ function mapStop(){ clearInterval(MAP.timer); MAP.timer=null; }
 // поменялся сам набор связей, а не на каждом опросе.
 function mapRelayout(){
   const ls=[...MAP.links.values()];
-  const shape=[...MAP.links.keys()].sort().join(',');
+  const shape=[...MAP.links.keys()].sort().join(',')+'#'+(MAP.zones?1:0);
   if(shape===MAP.shape) return;
   MAP.shape=shape;
   const nodes=[...new Set(ls.flatMap(l=>[l.a,l.b]))].sort();
-  const first=!MAP.pos.size;
-  MAP.pos=AvalonCore.layout(nodes, ls.map(l=>[l.a,l.b]), MAP.pos, 7);
+  const first=!MAP.pos.size, edges=ls.map(l=>[l.a,l.b]);
+  MAP.dims=new Map(nodes.map(c=>[c,mapBoxSize(c)]));
+  MAP.pos=AvalonCore.tidy(AvalonCore.layout(nodes, edges, MAP.pos, 7), edges, MAP.dims);
+  if(!MAP.touched) MAP.fit=true;
   if(first && MAP.here) mapSetHere(MAP.here);
+}
+// Плашка зоны: значок тира слева, имя справа.
+const MAP_FONT='600 12px system-ui, -apple-system, sans-serif', MAP_BOX_H=26, MAP_BADGE=30;
+let mapMeasureCtx=null;
+function mapBoxSize(c){
+  mapMeasureCtx=mapMeasureCtx||document.createElement('canvas').getContext('2d');
+  mapMeasureCtx.font=MAP_FONT;
+  return {w:Math.ceil(mapMeasureCtx.measureText(mapName(c)).width)+MAP_BADGE+16, h:MAP_BOX_H};
 }
 async function mapAdmin(action, link){
   const ask = action==='ban'
@@ -6964,78 +6984,119 @@ function mapHTML(){
     <label class="ctl">Откуда <select id="mapFrom"><option value="">—</option>${opts}</select></label>
     <label class="ctl">Куда <select id="mapTo"><option value="">—</option>${opts}</select></label>
     <label class="ctl toggle"><input type="checkbox" id="mapConf"${MAP.onlyConf?' checked':''}> Только подтверждённые</label>
+    <label class="ctl toggle"><input type="checkbox" id="mapTipChk"${MAP.tip?' checked':''}> Подсказка при наведении</label>
     <div class="ctl"><b>Скоро закроются</b><div id="mapSoon">${mapSoonHTML()}</div></div>
   </div>`;
   let main;
   if(MAP.err && !MAP.links.size) main=sadBunHTML('Карта сейчас недоступна', 'Сервер не отвечает. Попробуем ещё раз через полминуты.');
   else if(!MAP.links.size) main=sadBunHTML('Пока ни одной связи', 'Связи присылают игроки из Albion Journal: наведись в игре на портал дорог и нажми кнопку карточки зоны.');
-  else main=`<canvas id="mapCv" style="width:100%;height:70vh;display:block;touch-action:none"></canvas>
+  else main=`<div style="position:relative"><canvas id="mapCv" style="width:100%;height:70vh;display:block;touch-action:none;border-radius:10px;background:radial-gradient(ellipse at 50% 40%, #1b2030 0%, #12151e 75%)"></canvas><div id="mapTip" class="mapTip" hidden></div></div>
     <div class="fresh" id="mapInfo">${p ? '<span>Путь:</span> '+p.map(c=>mapEsc(mapName(c))).join(' → ')+' <span>(перех.: '+(p.length-1)+')</span>' : (MAP.from&&MAP.to?'<span>Пути нет</span>':'')}</div>
     <div id="mapCard"></div>`;
   return `<div class="panel"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
     <b>🗺 Карта Авалона</b>${backBtnHTML()}<span class="fresh">связей: ${MAP.links.size} · пунктир — не проверена</span>${MAP.err&&MAP.links.size?'<span class="fresh" id="mapDown">Карта сейчас недоступна</span>':''}</div>${ctls}${main}</div>`;
 }
+// Цвет дороги по оставшемуся времени: долго — спокойный, скоро — тревожный.
+function mapTimeColor(sec){ return sec<3600 ? '#ef5b4c' : sec<6*3600 ? '#e8b339' : '#55c08a'; }
+function mapFitView(W,H){
+  if(!MAP.pos.size) return;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  for(const [c,p] of MAP.pos){ const d=MAP.dims.get(c)||{w:60,h:26}; x0=Math.min(x0,p.x-d.w/2); x1=Math.max(x1,p.x+d.w/2); y0=Math.min(y0,p.y-d.h/2); y1=Math.max(y1,p.y+d.h/2); }
+  const k=Math.max(.3, Math.min(1.25, (W-40)/(x1-x0||1), (H-40)/(y1-y0||1)));
+  MAP.view={x:-(x0+x1)/2, y:-(y0+y1)/2, k};
+}
 function mapPaint(){
   const cv=$('mapCv'); if(!cv) return;
   const dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
   cv.width=W*dpr; cv.height=H*dpr;
+  if(MAP.fit){ MAP.fit=false; mapFitView(W,H); }
   const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
-  const now=Date.now()/1000, v=MAP.view;
+  const now=Date.now()/1000, v=MAP.view, k=v.k;
   const ls=[...MAP.links.values()].filter(l=>!MAP.onlyConf||l.confirmed);
   const path=MAP.from&&MAP.to ? AvalonCore.path(ls,MAP.from,MAP.to,MAP.onlyConf) : null;
   const onPath=new Set(); if(path) for(let i=1;i<path.length;i++) onPath.add(AvalonCore.key(path[i-1],path[i]));
-  const P=c=>{ const p=MAP.pos.get(c)||{x:0,y:0}; return {x:W/2+(p.x+v.x)*v.k, y:H/2+(p.y+v.y)*v.k}; };
-  g.font='11px system-ui';
-  const rad=c=>c===MAP.here?14:10;
+  const P=c=>{ const p=MAP.pos.get(c)||{x:0,y:0}; return {x:W/2+(p.x+v.x)*k, y:H/2+(p.y+v.y)*k}; };
+  const D=c=>{ const d=MAP.dims.get(c)||{w:60,h:MAP_BOX_H}; return {w:d.w*k, h:d.h*k}; };
+  const rr=(x,y,w,h,r)=>{ g.beginPath(); g.roundRect ? g.roundRect(x,y,w,h,r) : g.rect(x,y,w,h); };
+  const q=MAP.q.trim().toLowerCase(), hot=MAP.hover||MAP.sel;
+  // Линии: цвет — сколько осталось, пунктир — не подтверждена, путь — золотом.
+  const labels=[];
   for(const l of ls){
-    const a=P(l.a), b=P(l.b), s=l.closesAt-now;
-    g.setLineDash(l.confirmed?[]:[6,5]);
-    g.strokeStyle = onPath.has(AvalonCore.key(l.a,l.b)) ? '#f1c40f' : s<3600 ? '#e74c3c' : '#8a8fa3';
-    g.lineWidth = onPath.has(AvalonCore.key(l.a,l.b)) ? 3 : 1.5;
+    const a=P(l.a), b=P(l.b), sec=l.closesAt-now, kk=AvalonCore.key(l.a,l.b), on=onPath.has(kk);
+    const lit=!hot || l.a===hot || l.b===hot;
+    const col=on ? '#f4c542' : mapTimeColor(sec);
+    g.globalAlpha=lit?1:.25;
+    g.setLineDash(l.confirmed?[]:[7,6]);
+    g.strokeStyle=col; g.lineWidth=(on?4:2.5)*Math.min(1,k+.2); g.lineCap='round';
     g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke();
+    // Время — на середине видимого куска линии, между плашками.
+    const dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||1, ux=dx/d, uy=dy/d;
+    const ra=AvalonCore.reach(D(l.a),ux,uy), rb=AvalonCore.reach(D(l.b),ux,uy), t=(ra+(d-rb))/2;
+    labels.push({x:a.x+ux*t, y:a.y+uy*t, text:tr(AvalonCore.left(l.closesAt,now))+(l.size?' · '+l.size:''), col, lit});
   }
-  g.setLineDash([]);
-  // Узлы и их имена — препятствия для подписей рёбер: подпись их обходит.
-  const q=MAP.q.trim().toLowerCase(), obs=[], names=[];
+  g.setLineDash([]); g.globalAlpha=1;
+  const fs=Math.max(9, Math.min(12, 11*k));
+  g.font=`600 ${fs}px system-ui, -apple-system, sans-serif`; g.textAlign='center'; g.textBaseline='middle';
+  for(const L of labels){
+    if(L.x<-60||L.y<-20||L.x>W+60||L.y>H+20) continue;
+    const w=g.measureText(L.text).width+12, h=fs+8;
+    g.globalAlpha=1;
+    rr(L.x-w/2, L.y-h/2, w, h, h/2); g.fillStyle='#141824'; g.fill();
+    g.globalAlpha=L.lit?1:.3;
+    g.lineWidth=1.5; g.strokeStyle=L.col; g.stroke();
+    g.fillStyle=L.col; g.fillText(L.text, L.x, L.y+.5);
+  }
+  g.globalAlpha=1;
+  // Плашки зон.
+  const nf=Math.max(8, 12*k);
   for(const [c] of MAP.pos){
-    const p=P(c), r=rad(c), nm=mapName(c), w=g.measureText(nm).width;
-    obs.push({x:p.x, y:p.y, r:r+2});
-    obs.push({x:p.x+r+3+w/2, y:p.y, w:w+2, h:14});
-    names.push([c,p,r,nm]);
+    const p=P(c), d=D(c), z=MAP.zones&&MAP.zones.get(c), nm=mapName(c);
+    if(p.x+d.w/2<-10||p.x-d.w/2>W+10||p.y+d.h/2<-10||p.y-d.h/2>H+10) continue;
+    const col=z ? (z.r ? '#8A5ABF' : (MAP_ZCOLOR[z.q]||'#6b7286')) : '#6b7286';
+    const mark=c===MAP.here || c===MAP.sel || c===MAP.hover || (q && nm.toLowerCase().includes(q));
+    const dim=hot && c!==hot && ![...MAP.links.values()].some(l=>(l.a===hot&&l.b===c)||(l.b===hot&&l.a===c));
+    const x=p.x-d.w/2, y=p.y-d.h/2, r=d.h/2, bw=MAP_BADGE*k;
+    g.globalAlpha=1;
+    if(mark){ g.shadowColor=c===MAP.here?'#f4c542':'#ffffff'; g.shadowBlur=12; }
+    rr(x,y,d.w,d.h,r); g.fillStyle='#1c2131'; g.fill();
+    g.shadowBlur=0;
+    g.globalAlpha=dim?.35:1;
+    g.lineWidth=mark?2:1.25; g.strokeStyle=mark?(c===MAP.here?'#f4c542':'#ffffff'):col; g.stroke();
+    // Значок тира в цвет зоны.
+    rr(x+2*k, y+2*k, bw-4*k, d.h-4*k, (d.h-4*k)/2); g.fillStyle=col; g.fill();
+    g.font=`700 ${nf*0.92}px system-ui, -apple-system, sans-serif`; g.fillStyle='#fff'; g.textAlign='center';
+    g.fillText(z&&z.t?'T'+z.t:'?', x+bw/2, p.y+.5);
+    g.font=`600 ${nf}px system-ui, -apple-system, sans-serif`; g.fillStyle='#e9ecf4'; g.textAlign='left';
+    g.fillText(nm, x+bw+5*k, p.y+.5);
   }
-  // Подписи времени: сбоку от линии, на подложке, расталкиваются между собой.
-  const items=[], texts=[];
-  for(const l of ls){
-    const a=P(l.a), b=P(l.b), dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||1;
-    const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
-    if(mx<-80||my<-40||mx>W+80||my>H+40) continue;
-    const t=tr(AvalonCore.left(l.closesAt,now))+(l.size?' · '+l.size:'');
-    items.push({x:mx, y:my, dx:dx/d, dy:dy/d, len:Math.max(0,d-rad(l.a)-rad(l.b)), w:g.measureText(t).width+8, h:15});
-    texts.push([t, l.closesAt-now<3600]);
-  }
-  AvalonCore.labels(items, obs).forEach((p,i)=>{
-    const it=items[i], [t,hot]=texts[i];
-    g.fillStyle='rgba(21,25,36,.88)';
-    g.beginPath(); g.roundRect ? g.roundRect(p.x-it.w/2, p.y-it.h/2, it.w, it.h, 4) : g.rect(p.x-it.w/2, p.y-it.h/2, it.w, it.h); g.fill();
-    g.fillStyle=hot?'#f08a7e':'#cfd3e0'; g.textAlign='center'; g.textBaseline='middle';
-    g.fillText(t, p.x, p.y+0.5);
-  });
-  g.textAlign='left'; g.textBaseline='alphabetic';
-  for(const [c,p,r,nm] of names){
-    const z=MAP.zones&&MAP.zones.get(c);
-    g.beginPath(); g.arc(p.x,p.y,r,0,7); g.fillStyle=mapColor(z); g.fill();
-    if(c===MAP.here || c===MAP.sel || (q && nm.toLowerCase().includes(q))){ g.strokeStyle='#fff'; g.lineWidth=2; g.stroke(); }
-    g.fillStyle='#fff'; g.fillText(z?'T'+z.t:'?', p.x-6, p.y+4);
-    g.fillStyle='#e6e8ef'; g.fillText(nm, p.x+r+3, p.y+4);
-  }
+  g.globalAlpha=1; g.textAlign='left'; g.textBaseline='alphabetic';
 }
 function mapHit(x,y){
   const cv=$('mapCv'), W=cv.clientWidth, H=cv.clientHeight, v=MAP.view;
   for(const [c,p] of MAP.pos){
+    const d=MAP.dims.get(c)||{w:60,h:MAP_BOX_H};
     const sx=W/2+(p.x+v.x)*v.k, sy=H/2+(p.y+v.y)*v.k;
-    if(Math.hypot(sx-x,sy-y)<14) return c;
+    if(Math.abs(sx-x)<=d.w*v.k/2+3 && Math.abs(sy-y)<=d.h*v.k/2+3) return c;
   }
   return null;
+}
+// Короткая подсказка при наведении: что за зона, что в ней, куда ведёт.
+function mapTipHTML(c){
+  const z=MAP.zones&&MAP.zones.get(c); if(!z) return '';
+  const head=[];
+  if(z.r){ const nm=MAP_ROAD[z.ty]; head.push(nm ? tr(nm)+(z.g>0&&MAP_ROMAN[z.g]?' '+MAP_ROMAN[z.g]:'') : tr('дорога')); }
+  else head.push(tr(mapWord(MAP_ZQ, z.q).replace(/<[^>]*>/g,'')));
+  if(z.t>0) head.push('T'+mapEsc(z.t));
+  const res=(z.rb&&z.rb.length ? z.rb : Object.keys(z.res||{})).map(k=>
+    `<img ${icoAttr(mapEsc('T'+Math.max(z.t||4,4)+'_'+k),22)} alt="" title="${mapEsc(tr(MAP_RES[String(k).toLowerCase()]||String(k).toLowerCase()))}">`).join('');
+  const ch=Object.entries(z.ch||{}).map(([k,n])=>`<span class="mtI">${mapChestSVG(k)}×${mapEsc(n)}</span>`).join('');
+  const dg=Object.values(z.dg||{}).reduce((s,n)=>s+(+n||0),0);
+  const now=Date.now()/1000;
+  const lk=[...MAP.links.values()].filter(l=>l.a===c||l.b===c).sort((a,b)=>a.closesAt-b.closesAt).map(l=>
+    `<div>↔ ${mapEsc(mapName(l.a===c?l.b:l.a))} <b style="color:${mapTimeColor(l.closesAt-now)}">${mapEsc(tr(AvalonCore.left(l.closesAt,now)))}</b></div>`).join('');
+  return `<div class="mtName">${mapEsc(z.n)}</div><div class="mtSub">${head.join(' · ')}</div>
+    ${res||ch||dg?`<div class="mtRow">${res}${ch}${dg?`<span class="mtI">${mapEsc(tr('данжи'))}: ${dg}</span>`:''}</div>`:''}
+    ${lk?`<div class="mtLinks">${lk}</div>`:''}`;
 }
 // Сырые слова справочника -> русские слова, которые переводит tr. Незнакомое
 // показываем как есть (строчными, без подчёркиваний): оно английское.
@@ -7123,6 +7184,7 @@ function wireMap(){
   if(f){ f.value=MAP.from; f.onchange=()=>{ MAP.from=f.value; render(); }; }
   if(t){ t.value=MAP.to; t.onchange=()=>{ MAP.to=t.value; render(); }; }
   const cf=$('mapConf'); if(cf) cf.onchange=()=>{ MAP.onlyConf=cf.checked; render(); };
+  const tc=$('mapTipChk'); if(tc) tc.onchange=()=>{ MAP.tip=tc.checked; try{ localStorage.setItem('acp_maptip', MAP.tip?'1':'0'); }catch(e){} if(!MAP.tip) mapHover(null); };
   const cv=$('mapCv'); if(!cv) return;
   // Мышь и палец: один указатель тащит карту, два — щипок меняет масштаб.
   let drag=null, pinch=null;
@@ -7131,16 +7193,19 @@ function wireMap(){
   cv.onpointerdown=e=>{
     pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
     cv.setPointerCapture(e.pointerId);
-    if(pts.size===2){ pinch={d0:dist(), k0:MAP.view.k}; drag=null; return; }
+    if(pts.size===2){ pinch={d0:dist(), k0:MAP.view.k}; drag=null; MAP.touched=true; return; }
     if(pts.size===1) drag={x:e.clientX,y:e.clientY,vx:MAP.view.x,vy:MAP.view.y,moved:false};
   };
   cv.onpointermove=e=>{
-    if(!pts.has(e.pointerId)) return;
+    if(!pts.has(e.pointerId)){
+      if(e.pointerType==='mouse'){ const r=cv.getBoundingClientRect(); mapHover(mapHit(e.clientX-r.left, e.clientY-r.top), e.clientX-r.left, e.clientY-r.top); }
+      return;
+    }
     pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
     if(pinch && pts.size===2){ MAP.view.k=Math.max(.3,Math.min(4,pinch.k0*dist()/pinch.d0)); mapPaint(); return; }
     if(!drag) return;
     const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
-    if(Math.abs(dx)+Math.abs(dy)>4) drag.moved=true;
+    if(Math.abs(dx)+Math.abs(dy)>4){ drag.moved=true; MAP.touched=true; mapHover(null); }
     MAP.view.x=drag.vx+dx/MAP.view.k; MAP.view.y=drag.vy+dy/MAP.view.k; mapPaint();
   };
   const up=e=>{
@@ -7152,14 +7217,28 @@ function wireMap(){
     drag=null;
   };
   cv.onpointerup=up; cv.onpointercancel=up;
-  cv.onwheel=e=>{ e.preventDefault(); MAP.view.k=Math.max(.3,Math.min(4,MAP.view.k*(e.deltaY<0?1.1:0.9))); mapPaint(); };
+  cv.onpointerleave=()=>mapHover(null);
+  cv.onwheel=e=>{ e.preventDefault(); MAP.touched=true; MAP.view.k=Math.max(.3,Math.min(4,MAP.view.k*(e.deltaY<0?1.1:0.9))); mapPaint(); };
   $('mapCard').onclick=e=>{
     const d=e.target.dataset; if(d.mdel) mapAdmin('delete', d.mdel); if(d.mban) mapAdmin('ban', d.mban);
   };
   if(MAP.sel) $('mapCard').innerHTML=mapCardHTML(MAP.sel);
   mapPaint();
 }
-window.addEventListener('resize', ()=>{ if(S.tab==='map') mapPaint(); });
+window.addEventListener('resize', ()=>{ if(S.tab==='map'){ if(!MAP.touched) MAP.fit=true; mapPaint(); } });
+// Наведение мышью: подсветить зону с её дорогами и показать короткую плашку.
+function mapHover(c, x, y){
+  const tip=$('mapTip'), was=MAP.hover;
+  MAP.hover=c||null;
+  if(was!==MAP.hover) mapPaint();
+  if(!tip) return;
+  if(!MAP.hover || !MAP.tip){ tip.hidden=true; return; }
+  if(was!==MAP.hover){ tip.innerHTML=mapTipHTML(MAP.hover); icoFast(tip); icoWatch(tip); }
+  tip.hidden=false;
+  const cv=$('mapCv'), W=cv.clientWidth, H=cv.clientHeight, tw=tip.offsetWidth, th=tip.offsetHeight;
+  tip.style.left=Math.max(6, Math.min(W-tw-6, x+16))+'px';
+  tip.style.top=Math.max(6, Math.min(H-th-6, y+16))+'px';
+}
 
 // ─── События ───
 try{ const v=localStorage.getItem(PREM_KEY); if(v!==null) $('premChk').checked = v==='1'; }catch(e){}
