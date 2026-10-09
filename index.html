@@ -6929,11 +6929,12 @@ function mapRelayout(){
   const nodes=[...new Set(ls.flatMap(l=>[l.a,l.b]))].sort();
   const first=!MAP.pos.size;
   MAP.edges=ls.map(l=>[l.a,l.b]);
-  MAP.pos=AvalonCore.simNodes(nodes, MAP.edges, MAP.pos);
+  // Первый раз — лучший из нескольких стартов (меньше всего пересечений),
+  // дальше — прежние места, новые зоны рядом с соседями.
+  MAP.pos=first ? AvalonCore.settle(nodes, MAP.edges, 8, 400) : AvalonCore.simNodes(nodes, MAP.edges, MAP.pos);
   MAP.deg=new Map(nodes.map(c=>[c,0]));
   for(const [x,y] of MAP.edges){ MAP.deg.set(x,MAP.deg.get(x)+1); MAP.deg.set(y,MAP.deg.get(y)+1); }
-  if(first){ for(let i=0;i<220;i++) MAP.alpha=AvalonCore.step(MAP.pos, MAP.edges, i?MAP.alpha:1, null); MAP.alpha=Math.max(MAP.alpha,.15); }
-  else MAP.alpha=Math.max(MAP.alpha,.5);
+  MAP.alpha=first ? .05 : Math.max(MAP.alpha,.5);
   if(!MAP.touched) MAP.fit=true;
   if(first && MAP.here) mapSetHere(MAP.here);
   mapRun();

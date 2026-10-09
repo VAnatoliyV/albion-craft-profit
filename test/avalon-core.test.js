@@ -152,3 +152,29 @@ test('simNodes: прежние места сохраняются, новый у�
   assert.deepEqual([N.get('A').x, N.get('A').y], [100,50]);
   assert.ok(Math.hypot(N.get('B').x-100, N.get('B').y-50)<=41);
 });
+
+test('step: чужая дорога не режет ни зону, ни её подпись (карта 8 октября 2026)', ()=>{
+  const edges=require('./roads-2026-10-08.json'), nodes=[...new Set(edges.flat())].sort();
+  const N=C.simNodes(nodes,edges,null); let a=1;
+  for(let i=0;i<700;i++) a=C.step(N,edges,a,null);
+  // Кружок 28×28 и подпись 130×18 под ним (центр на 24 px ниже).
+  const cuts=(A,B,r)=>{ for(let t=0;t<=1;t+=0.01){ const x=A.x+(B.x-A.x)*t, y=A.y+(B.y-A.y)*t; if(Math.abs(x-r.x)<r.w/2 && Math.abs(y-r.y)<r.h/2) return true; } return false; };
+  for(const [x,y] of edges) for(const n of nodes){
+    if(n===x||n===y) continue;
+    const p=N.get(n);
+    assert.ok(!cuts(N.get(x),N.get(y),{x:p.x,y:p.y,w:28,h:28}), `${x}–${y} проходит через зону ${n}`);
+    assert.ok(!cuts(N.get(x),N.get(y),{x:p.x,y:p.y+24,w:130,h:18}), `${x}–${y} проходит через подпись ${n}`);
+  }
+});
+
+test('settle: на карте 8 октября дороги не пересекаются', ()=>{
+  const edges=require('./roads-2026-10-08.json'), nodes=[...new Set(edges.flat())].sort();
+  const one=C.simNodes(nodes,edges,null,0); let a=1; for(let i=0;i<400;i++) a=C.step(one,edges,a,null);
+  const N=C.settle(nodes, edges, 8, 400);
+  assert.equal(C.crossings(N,edges), 0, `пересечений: ${C.crossings(N,edges)} (один старт: ${C.crossings(one,edges)})`);
+});
+test('crossings: считает только настоящие пересечения', ()=>{
+  const N=new Map([['A',{x:0,y:0}],['B',{x:10,y:10}],['C',{x:0,y:10}],['D',{x:10,y:0}],['E',{x:20,y:20}]]);
+  assert.equal(C.crossings(N,[['A','B'],['C','D']]),1);
+  assert.equal(C.crossings(N,[['A','B'],['B','E']]),0);
+});

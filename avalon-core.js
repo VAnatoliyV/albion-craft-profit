@@ -168,6 +168,9 @@
   // «температура» (1 — только начали, к нулю всё успокаивается), held —
   // узел, который держит мышь (его не двигаем). Возвращает новую alpha.
   const SIM={charge:-700, linkDist:150, linkK:0.3, gravity:0.03, gapX:150, gapY:52, damp:0.6, decay:0.0228};
+  // Препятствия зоны для чужих дорог: кружок и подпись под ним (oy — сдвиг
+  // центра вверх от подписи к кружку, sx — сжатие по горизонтали).
+  const AVOID=[{oy:0, sx:1, gap:26}, {oy:-24, sx:5.5, gap:15}];
   function step(N, edges, alpha, held){
     const A=[...N.entries()];
     for(let i=0;i<A.length;i++){
@@ -194,6 +197,25 @@
       const k=(d-SIM.linkDist)/d*alpha*SIM.linkK;
       a.vx+=dx*k*0.5; a.vy+=dy*k*0.5; b.vx-=dx*k*0.5; b.vy-=dy*k*0.5;
     }
+    // Чужая дорога не проходит ни через зону, ни через её подпись: иначе
+    // кажется, что путь ведёт через неё. Подпись — широкий прямоугольник под
+    // кружком; считаем её в сжатых по горизонтали координатах, где она почти
+    // квадрат. Зона отходит от линии, концы линии — в другую сторону. Без
+    // alpha: правило держится и когда граф уже успокоился.
+    for(const [x,y] of edges){
+      const a=N.get(x), b=N.get(y); if(!a||!b||a===b) continue;
+      for(const [c,p] of A){
+        if(c===x||c===y || outBox(p,a,b,80)) continue;
+        for(const o of AVOID){
+          const P={x:p.x/o.sx, y:p.y+o.oy}, sa={x:a.x/o.sx, y:a.y}, sb={x:b.x/o.sx, y:b.y};
+          const sg=toSeg(P,sa,sb); if(sg.d>=o.gap) continue;
+          const n=away(P,sg), m=(o.gap-sg.d)*0.15, nx=n.x*o.sx;
+          p.vx+=nx*m; p.vy+=n.y*m;
+          a.vx-=nx*m*(1-sg.t)*0.5; a.vy-=n.y*m*(1-sg.t)*0.5;
+          b.vx-=nx*m*sg.t*0.5; b.vy-=n.y*m*sg.t*0.5;
+        }
+      }
+    }
     for(const [c,p] of A){
       p.vx-=p.x*SIM.gravity*alpha; p.vy-=p.y*SIM.gravity*alpha;
       if(c===held){ p.vx=0; p.vy=0; continue; }
@@ -203,8 +225,10 @@
   }
   // Узлы для живого графа: прежние места сохраняем, новые ставим рядом с
   // соседом (или по спирали, если соседа ещё нет), чтобы граф не прыгал.
-  function simNodes(nodes, edges, prev){
+  function simNodes(nodes, edges, prev, seed){
     const N=new Map(); let k=0;
+    // Разные зёрна — разный порядок и поворот спирали: разные стартовые раскладки.
+    if(seed){ const R=rnd(seed); nodes=nodes.map(n=>[R(),n]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]); k=Math.floor(R()*7); }
     for(const n of nodes) if(prev && prev.has(n)){ const p=prev.get(n); N.set(n,{x:p.x,y:p.y,vx:0,vy:0}); }
     for(const n of nodes){
       if(N.has(n)) continue;
@@ -216,6 +240,33 @@
     return N;
   }
 
+  // Сколько пар дорог пересекаются (дороги с общей зоной не считаем).
+  function crossings(N, edges){
+    const cr=(p,q,r,s)=>{
+      const d=(a,b,c)=>(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);
+      return d(p,q,r)*d(p,q,s)<0 && d(r,s,p)*d(r,s,q)<0;
+    };
+    let n=0;
+    for(let i=0;i<edges.length;i++) for(let j=i+1;j<edges.length;j++){
+      const [a,b]=edges[i], [c,e]=edges[j];
+      if(a===c||a===e||b===c||b===e) continue;
+      if(cr(N.get(a),N.get(b),N.get(c),N.get(e))) n++;
+    }
+    return n;
+  }
+  // Первая раскладка: несколько стартов, берём ту, где меньше всего
+  // пересечений дорог (при равенстве — первую). Большие сети — один старт.
+  function settle(nodes, edges, tries, steps){
+    let best=null, bestN=Infinity;
+    const T=nodes.length<=80 ? tries : 1;
+    for(let s=0;s<T;s++){
+      const N=simNodes(nodes, edges, null, s); let a=1;
+      for(let i=0;i<steps;i++) a=step(N,edges,a,null);
+      const c=crossings(N,edges);
+      if(c<bestN){ best=N; bestN=c; if(!c) break; }
+    }
+    return best;
+  }
   function left(closesAt, now){
     const s=closesAt-now; if(s<=0) return 'закрыт';
     const h=Math.floor(s/3600), m=Math.floor(s%3600/60);
@@ -241,5 +292,5 @@
   // 2 мин… но не больше 10 минут, чтобы починенный сервер подхватился сам.
   function backoff(fails){ return Math.min(600000, 15000*2**fails); }
 
-  g.AvalonCore={key, merge, path, layout, step, simNodes, labels, left, soon, prune, backoff};
+  g.AvalonCore={key, merge, path, layout, step, simNodes, crossings, settle, labels, left, soon, prune, backoff};
 })(typeof globalThis!=='undefined'?globalThis:this);
