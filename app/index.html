@@ -57,6 +57,9 @@ a.big small{display:block;font-weight:500;font-size:13px;opacity:.75}
 .req h2:not(:first-child){margin-top:14px}
 .req p{margin:3px 0;color:var(--text)}
 .req p.note{color:var(--muted)}
+.langsel{position:absolute;top:14px;right:16px;z-index:5}
+.langsel select{background:#151924;color:#dde2ec;border:1px solid #2a3147;border-radius:8px;padding:6px 8px;font:600 13px system-ui,sans-serif;cursor:pointer}
+.langsel select:focus{outline:2px solid rgba(238,188,78,.5)}
 .again{max-width:520px;margin:20px auto 0}
 footer{margin-top:24px;font-size:13px;color:var(--muted);text-align:center}
 footer a{color:var(--muted)}
@@ -73,6 +76,11 @@ footer a{color:var(--muted)}
 </style>
 </head>
 <body>
+<div class="langsel"><select id="langsel" aria-label="Language">
+<option value="en">English</option><option value="ru">Русский</option><option value="es">Español</option>
+<option value="pl">Polski</option><option value="de">Deutsch</option><option value="tr">Türkçe</option>
+<option value="fr">Français</option><option value="pt">Português</option><option value="it">Italiano</option>
+</select></div>
 <header class="narrow">
   <img class="logo" src="rabbit.gif" alt="">
   <h1>Albion Journal</h1>
@@ -163,6 +171,13 @@ footer a{color:var(--muted)}
     return 'en';
   }
   var lang = pick();
+  // Переключатель: выбор общий с сайтом (acp_lang), страница перерисовывается заново.
+  var sel = document.getElementById('langsel');
+  sel.value = lang;
+  sel.addEventListener('change', function(){
+    try { localStorage.setItem('acp_lang', sel.value); } catch(e){}
+    location.reload();
+  });
   var L = {
    en:{sub:'Free helper for Albion Online · Mac & Windows', dl:'Download', site:'Crafting site', disc:'Support on Discord',
     fan:'Fan project, not affiliated with Sandbox Interactive.', started:'Download started. If not, press the button above.',
