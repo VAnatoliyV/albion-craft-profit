@@ -154,39 +154,114 @@ footer a{color:var(--muted)}
   <span data-t="fan">Фан-проект, не связан с Sandbox Interactive.</span></footer>
 <script>
 (function(){
-  var en = !/^ru|^uk|^be/i.test(navigator.language || 'ru');
-  if (en) {
-    document.documentElement.lang = 'en';
-    var T = {sub:'Free helper for Albion Online · Mac & Windows', dl:'Download', site:'Crafting site', disc:'Support on Discord',
-      fan:'Fan project, not affiliated with Sandbox Interactive.',
-      started:'Download started. If not — press the button above.',
-      h1:'Your own prices and profitable crafting',
-      p1:'The app reads prices straight from your game client. The crafting site then shows fresh numbers and your own orders: what is worth making and where to sell it.',
-      m1:'Crafting site →',
-      h2:'Fame and silver per session',
-      p2:'How much fame and silver a run brought in — counted on its own while you play. Reset it, and a new session starts from zero.',
-      h3:'Shared Avalon roads map',
-      p3:'The map is built by the players themselves: roads come in from Albion Journal, each with the time it has left. On the site you can find a path between zones.',
-      m3:'Open the map →',
-      h4:'A road note at one button',
-      p4:'Point at a portal and press one button — the app shows a short note about the road: its name, zone type and tier. It makes planning trips through Avalon easier.',
-      h5:'Mac and Windows, free',
-      p5:'One app for both systems. New versions install themselves — nothing to download again.',
-      a1:'Albion Journal on Mac: the Mine tab with fresh prices caught in the game',
-      a2:'The Session tab: fame, silver looted and wallet for a run',
-      a3:'The shared Avalon roads map on the site: zones, links between them and the time each has left',
-      a4:'An Avalon zone note in Albion Journal: name, type and tier',
-      a5:'Albion Journal side by side: a window on Mac and a window on Windows',
-      rm1:'• Mac with Apple M1 or newer (Intel is not supported)',
-      rm2:'• macOS 13 Ventura or newer',
-      rm3:'First launch: System Settings → Privacy & Security → Open Anyway. For the zone note allow “Screen Recording”.',
-      rw1:'• Windows 10 or 11, 64-bit',
-      rw2:'• Administrator rights (the app reads the game traffic)',
-      rw3:'SmartScreen: More info → Run anyway. The zone note needs Microsoft Visual C++ Redistributable x64 (usually already installed; the app tells you if not).'};
+  // Язык — тот же, что выбран на сайте (acp_lang), иначе язык системы; русский — в разметке.
+  var LANGS = ['en','ru','es','pl','de','tr','fr','pt','it'];
+  function pick(){
+    try { var s = localStorage.getItem('acp_lang'); if (s && LANGS.indexOf(s) >= 0) return s; } catch(e){}
+    var list = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ''];
+    for (var i = 0; i < list.length; i++) { var c = String(list[i]).toLowerCase().split('-')[0]; if (LANGS.indexOf(c) >= 0) return c; }
+    return 'en';
+  }
+  var lang = pick();
+  var L = {
+   en:{sub:'Free helper for Albion Online · Mac & Windows', dl:'Download', site:'Crafting site', disc:'Support on Discord',
+    fan:'Fan project, not affiliated with Sandbox Interactive.', started:'Download started. If not, press the button above.',
+    h1:'Your own prices and profitable crafting', p1:'The app reads prices straight from your game client. The crafting site then shows fresh numbers and your own orders: what is worth making and where to sell it.', m1:'Crafting site →',
+    h2:'Fame and silver per session', p2:'How much fame and silver a run brought in, counted on its own while you play. Reset it, and a new session starts from zero.',
+    h3:'Shared Avalon roads map', p3:'The map is built by the players themselves: roads come in from Albion Journal, each with the time it has left. On the site you can find a path between zones.', m3:'Open the map →',
+    h4:'A road note at one button', p4:'Point at a portal and press one button: the app shows a short note about the road with its name, zone type and tier. It makes planning trips through Avalon easier.',
+    h5:'Mac and Windows, free', p5:'One app for both systems. New versions install themselves, nothing to download again.',
+    a1:'Albion Journal on Mac: the Mine tab with fresh prices caught in the game', a2:'The Session tab: fame, silver looted and wallet for a run', a3:'The shared Avalon roads map on the site', a4:'An Avalon zone note in Albion Journal: name, type and tier', a5:'Albion Journal side by side on Mac and Windows',
+    rm1:'• Mac with Apple M1 or newer (Intel is not supported)', rm2:'• macOS 13 Ventura or newer', rm3:'First launch: System Settings → Privacy & Security → Open Anyway. For the zone note allow “Screen Recording”.',
+    rw1:'• Windows 10 or 11, 64-bit', rw2:'• Administrator rights (the app reads the game traffic)', rw3:'SmartScreen: More info → Run anyway. The zone note needs Microsoft Visual C++ Redistributable x64 (usually already installed; the app tells you if not).',
+    mac:'for Mac', win:'for Windows', ver:'version ', title:'Albion Journal for Mac & Windows'},
+   es:{sub:'Asistente gratuito para Albion Online · Mac y Windows', dl:'Descargar', site:'Web de crafteo', disc:'Soporte en Discord',
+    fan:'Proyecto de fans, sin relación con Sandbox Interactive.', started:'La descarga ha empezado. Si no, pulsa el botón de arriba.',
+    h1:'Tus propios precios y crafteo rentable', p1:'La app lee los precios directamente de tu cliente del juego. La web de crafteo muestra datos frescos y tus órdenes: qué conviene fabricar y dónde venderlo.', m1:'Web de crafteo →',
+    h2:'Fama y plata por sesión', p2:'Cuánta fama y plata te dejó una salida, contada sola mientras juegas. La reinicias y empieza una sesión nueva desde cero.',
+    h3:'Mapa común de los Caminos de Avalon', p3:'El mapa lo crean los propios jugadores: los caminos llegan desde Albion Journal con el tiempo que les queda. En la web puedes buscar una ruta entre zonas.', m3:'Abrir el mapa →',
+    h4:'Una nota del camino con un botón', p4:'Apunta a un portal y pulsa un botón: la app muestra una nota breve del camino con su nombre, tipo de zona y tier. Así es más fácil planear viajes por Avalon.',
+    h5:'Mac y Windows, gratis', p5:'Una app para los dos sistemas. Las versiones nuevas se instalan solas.',
+    a1:'Albion Journal en Mac: pestaña de precios propios', a2:'Pestaña Sesión: fama, plata y cartera de una salida', a3:'Mapa común de los Caminos de Avalon en la web', a4:'Nota de zona de Avalon en Albion Journal', a5:'Albion Journal en Mac y en Windows',
+    rm1:'• Mac con Apple M1 o posterior (Intel no es compatible)', rm2:'• macOS 13 Ventura o posterior', rm3:'Primer inicio: Ajustes del Sistema → Privacidad y seguridad → Abrir igualmente. Para la nota de zona permite «Grabación de pantalla».',
+    rw1:'• Windows 10 u 11, 64 bits', rw2:'• Permisos de administrador (la app lee el tráfico del juego)', rw3:'SmartScreen: Más información → Ejecutar de todas formas. La nota de zona necesita Microsoft Visual C++ Redistributable x64 (suele estar ya instalado; si no, la app te avisa).',
+    mac:'para Mac', win:'para Windows', ver:'versión ', title:'Albion Journal para Mac y Windows'},
+   pl:{sub:'Darmowy pomocnik do Albion Online · Mac i Windows', dl:'Pobierz', site:'Strona craftingu', disc:'Wsparcie na Discordzie',
+    fan:'Projekt fanowski, niezwiązany z Sandbox Interactive.', started:'Pobieranie rozpoczęte. Jeśli nie, naciśnij przycisk wyżej.',
+    h1:'Własne ceny i opłacalny crafting', p1:'Aplikacja czyta ceny prosto z klienta gry. Strona craftingu pokazuje świeże dane i twoje zlecenia: co warto zrobić i gdzie sprzedać.', m1:'Strona craftingu →',
+    h2:'Sława i srebro za sesję', p2:'Ile sławy i srebra dał wypad, liczone samo podczas gry. Zresetuj, a nowa sesja zacznie się od zera.',
+    h3:'Wspólna mapa Dróg Avalonu', p3:'Mapę tworzą sami gracze: drogi trafiają z Albion Journal razem z czasem, który im został. Na stronie znajdziesz trasę między strefami.', m3:'Otwórz mapę →',
+    h4:'Notatka o drodze jednym przyciskiem', p4:'Wskaż portal i naciśnij jeden przycisk: aplikacja pokaże krótką notatkę o drodze z nazwą, typem strefy i tierem. Łatwiej zaplanować wyprawy po Avalonie.',
+    h5:'Mac i Windows, za darmo', p5:'Jedna aplikacja na oba systemy. Nowe wersje instalują się same.',
+    a1:'Albion Journal na Macu: zakładka z własnymi cenami', a2:'Zakładka Sesja: sława, srebro i portfel z wypadu', a3:'Wspólna mapa Dróg Avalonu na stronie', a4:'Notatka o strefie Avalonu w Albion Journal', a5:'Albion Journal na Macu i Windowsie',
+    rm1:'• Mac z Apple M1 lub nowszym (Intel nie jest obsługiwany)', rm2:'• macOS 13 Ventura lub nowszy', rm3:'Pierwsze uruchomienie: Ustawienia systemowe → Prywatność i ochrona → Otwórz mimo to. Dla notatki o strefie zezwól na „Nagrywanie ekranu”.',
+    rw1:'• Windows 10 lub 11, 64-bit', rw2:'• Uprawnienia administratora (aplikacja czyta ruch gry)', rw3:'SmartScreen: Więcej informacji → Uruchom mimo to. Notatka o strefie wymaga Microsoft Visual C++ Redistributable x64 (zwykle już jest; jeśli nie, aplikacja podpowie).',
+    mac:'na Maca', win:'na Windows', ver:'wersja ', title:'Albion Journal na Maca i Windows'},
+   de:{sub:'Kostenloser Helfer für Albion Online · Mac und Windows', dl:'Herunterladen', site:'Crafting-Seite', disc:'Support auf Discord',
+    fan:'Fanprojekt, nicht mit Sandbox Interactive verbunden.', started:'Download gestartet. Falls nicht, klicke oben auf den Knopf.',
+    h1:'Eigene Preise und lohnendes Crafting', p1:'Die App liest Preise direkt aus deinem Spielclient. Die Crafting-Seite zeigt frische Zahlen und deine Aufträge: was sich lohnt und wo du es verkaufst.', m1:'Crafting-Seite →',
+    h2:'Ruhm und Silber pro Sitzung', p2:'Wie viel Ruhm und Silber ein Ausflug gebracht hat, wird beim Spielen von selbst gezählt. Zurücksetzen, und eine neue Sitzung beginnt bei null.',
+    h3:'Gemeinsame Karte der Avalon-Straßen', p3:'Die Karte bauen die Spieler selbst: Straßen kommen aus Albion Journal mit der verbleibenden Zeit. Auf der Seite findest du einen Weg zwischen Zonen.', m3:'Karte öffnen →',
+    h4:'Eine Straßennotiz per Knopfdruck', p4:'Zeig auf ein Portal und drück einen Knopf: Die App zeigt eine kurze Notiz zur Straße mit Name, Zonentyp und Tier. So lassen sich Touren durch Avalon leichter planen.',
+    h5:'Mac und Windows, kostenlos', p5:'Eine App für beide Systeme. Neue Versionen installieren sich selbst.',
+    a1:'Albion Journal auf dem Mac: Reiter mit eigenen Preisen', a2:'Reiter Sitzung: Ruhm, Silber und Geldbörse eines Ausflugs', a3:'Gemeinsame Karte der Avalon-Straßen auf der Seite', a4:'Avalon-Zonennotiz in Albion Journal', a5:'Albion Journal auf Mac und Windows',
+    rm1:'• Mac mit Apple M1 oder neuer (Intel wird nicht unterstützt)', rm2:'• macOS 13 Ventura oder neuer', rm3:'Erster Start: Systemeinstellungen → Datenschutz & Sicherheit → Trotzdem öffnen. Für die Zonennotiz „Bildschirmaufnahme“ erlauben.',
+    rw1:'• Windows 10 oder 11, 64-Bit', rw2:'• Administratorrechte (die App liest den Spielverkehr)', rw3:'SmartScreen: Weitere Informationen → Trotzdem ausführen. Die Zonennotiz braucht Microsoft Visual C++ Redistributable x64 (meist schon installiert; sonst sagt die App Bescheid).',
+    mac:'für Mac', win:'für Windows', ver:'Version ', title:'Albion Journal für Mac und Windows'},
+   tr:{sub:'Albion Online için ücretsiz yardımcı · Mac ve Windows', dl:'İndir', site:'Üretim sitesi', disc:'Discord desteği',
+    fan:'Hayran projesi, Sandbox Interactive ile bağlantısı yoktur.', started:'İndirme başladı. Başlamadıysa yukarıdaki düğmeye bas.',
+    h1:'Kendi fiyatların ve kârlı üretim', p1:'Uygulama fiyatları doğrudan oyun istemcinden okur. Üretim sitesi taze rakamları ve emirlerini gösterir: ne üretmeye değer, nerede satılır.', m1:'Üretim sitesi →',
+    h2:'Oturum başına şöhret ve gümüş', p2:'Bir çıkışın getirdiği şöhret ve gümüş, sen oynarken kendiliğinden sayılır. Sıfırla, yeni oturum sıfırdan başlasın.',
+    h3:'Ortak Avalon Yolları haritası', p3:'Haritayı oyuncular kendileri oluşturur: yollar Albion Journal\'dan kalan süreleriyle gelir. Sitede bölgeler arasında yol bulabilirsin.', m3:'Haritayı aç →',
+    h4:'Tek tuşla yol notu', p4:'Bir portala gel ve tek tuşa bas: uygulama yolun adını, bölge türünü ve tier\'ını içeren kısa bir not gösterir. Avalon gezilerini planlamak kolaylaşır.',
+    h5:'Mac ve Windows, ücretsiz', p5:'İki sistem için tek uygulama. Yeni sürümler kendiliğinden kurulur.',
+    a1:'Mac\'te Albion Journal: kendi fiyatlar sekmesi', a2:'Oturum sekmesi: şöhret, gümüş ve cüzdan', a3:'Sitedeki ortak Avalon Yolları haritası', a4:'Albion Journal\'da Avalon bölge notu', a5:'Mac ve Windows\'ta Albion Journal',
+    rm1:'• Apple M1 veya daha yenisi olan Mac (Intel desteklenmez)', rm2:'• macOS 13 Ventura veya daha yeni', rm3:'İlk açılış: Sistem Ayarları → Gizlilik ve Güvenlik → Yine de Aç. Bölge notu için “Ekran Kaydı” izni ver.',
+    rw1:'• Windows 10 veya 11, 64 bit', rw2:'• Yönetici izni (uygulama oyun trafiğini okur)', rw3:'SmartScreen: Daha fazla bilgi → Yine de çalıştır. Bölge notu için Microsoft Visual C++ Redistributable x64 gerekir (genelde zaten kurulu; değilse uygulama söyler).',
+    mac:'Mac için', win:'Windows için', ver:'sürüm ', title:'Mac ve Windows için Albion Journal'},
+   fr:{sub:'Assistant gratuit pour Albion Online · Mac et Windows', dl:'Télécharger', site:'Site de craft', disc:'Support sur Discord',
+    fan:'Projet de fan, sans lien avec Sandbox Interactive.', started:'Le téléchargement a commencé. Sinon, clique sur le bouton ci-dessus.',
+    h1:'Tes propres prix et un craft rentable', p1:'L\'app lit les prix directement depuis ton client de jeu. Le site de craft affiche des chiffres frais et tes ordres : quoi fabriquer et où vendre.', m1:'Site de craft →',
+    h2:'Renommée et argent par session', p2:'La renommée et l\'argent rapportés par une sortie, comptés tout seuls pendant que tu joues. Remets à zéro pour une nouvelle session.',
+    h3:'Carte commune des Routes d\'Avalon', p3:'La carte est construite par les joueurs eux-mêmes : les routes arrivent depuis Albion Journal avec le temps qui leur reste. Sur le site, tu peux trouver un chemin entre les zones.', m3:'Ouvrir la carte →',
+    h4:'Une note de route en un bouton', p4:'Vise un portail et appuie sur un bouton : l\'app affiche une courte note sur la route avec son nom, le type de zone et le tier. Planifier tes voyages en Avalon devient plus simple.',
+    h5:'Mac et Windows, gratuit', p5:'Une seule app pour les deux systèmes. Les nouvelles versions s\'installent toutes seules.',
+    a1:'Albion Journal sur Mac : l\'onglet de tes prix', a2:'L\'onglet Session : renommée, argent et bourse d\'une sortie', a3:'La carte commune des Routes d\'Avalon sur le site', a4:'Une note de zone d\'Avalon dans Albion Journal', a5:'Albion Journal sur Mac et Windows',
+    rm1:'• Mac avec Apple M1 ou plus récent (Intel non pris en charge)', rm2:'• macOS 13 Ventura ou plus récent', rm3:'Premier lancement : Réglages Système → Confidentialité et sécurité → Ouvrir quand même. Pour la note de zone, autorise « Enregistrement de l\'écran ».',
+    rw1:'• Windows 10 ou 11, 64 bits', rw2:'• Droits administrateur (l\'app lit le trafic du jeu)', rw3:'SmartScreen : Informations complémentaires → Exécuter quand même. La note de zone nécessite Microsoft Visual C++ Redistributable x64 (souvent déjà installé ; sinon l\'app te le dit).',
+    mac:'pour Mac', win:'pour Windows', ver:'version ', title:'Albion Journal pour Mac et Windows'},
+   pt:{sub:'Ajudante gratuito para Albion Online · Mac e Windows', dl:'Baixar', site:'Site de crafting', disc:'Suporte no Discord',
+    fan:'Projeto de fã, sem vínculo com a Sandbox Interactive.', started:'O download começou. Se não, clique no botão acima.',
+    h1:'Seus próprios preços e crafting lucrativo', p1:'O app lê os preços direto do seu cliente do jogo. O site de crafting mostra números frescos e suas ordens: o que vale fazer e onde vender.', m1:'Site de crafting →',
+    h2:'Fama e prata por sessão', p2:'Quanta fama e prata uma saída rendeu, contado sozinho enquanto você joga. Zere e uma nova sessão começa do zero.',
+    h3:'Mapa comum das Estradas de Avalon', p3:'O mapa é feito pelos próprios jogadores: as estradas chegam do Albion Journal com o tempo que resta. No site dá para achar um caminho entre zonas.', m3:'Abrir o mapa →',
+    h4:'Uma nota da estrada em um botão', p4:'Aponte para um portal e aperte um botão: o app mostra uma nota curta sobre a estrada com nome, tipo de zona e tier. Fica mais fácil planejar viagens por Avalon.',
+    h5:'Mac e Windows, grátis', p5:'Um app para os dois sistemas. Versões novas se instalam sozinhas.',
+    a1:'Albion Journal no Mac: aba com seus preços', a2:'Aba Sessão: fama, prata e carteira de uma saída', a3:'Mapa comum das Estradas de Avalon no site', a4:'Nota de zona de Avalon no Albion Journal', a5:'Albion Journal no Mac e no Windows',
+    rm1:'• Mac com Apple M1 ou mais novo (Intel não é suportado)', rm2:'• macOS 13 Ventura ou mais novo', rm3:'Primeira execução: Ajustes do Sistema → Privacidade e Segurança → Abrir Mesmo Assim. Para a nota de zona, permita “Gravação de Tela”.',
+    rw1:'• Windows 10 ou 11, 64 bits', rw2:'• Permissão de administrador (o app lê o tráfego do jogo)', rw3:'SmartScreen: Mais informações → Executar assim mesmo. A nota de zona precisa do Microsoft Visual C++ Redistributable x64 (geralmente já instalado; se não, o app avisa).',
+    mac:'para Mac', win:'para Windows', ver:'versão ', title:'Albion Journal para Mac e Windows'},
+   it:{sub:'Assistente gratuito per Albion Online · Mac e Windows', dl:'Scarica', site:'Sito di crafting', disc:'Supporto su Discord',
+    fan:'Progetto di fan, non affiliato a Sandbox Interactive.', started:'Download avviato. Se no, premi il pulsante sopra.',
+    h1:'I tuoi prezzi e crafting redditizio', p1:'L\'app legge i prezzi direttamente dal client di gioco. Il sito di crafting mostra numeri freschi e i tuoi ordini: cosa conviene creare e dove vendere.', m1:'Sito di crafting →',
+    h2:'Fama e argento per sessione', p2:'Quanta fama e argento ha reso un\'uscita, contati da soli mentre giochi. Azzera e una nuova sessione parte da zero.',
+    h3:'Mappa comune delle Strade di Avalon', p3:'La mappa la costruiscono i giocatori stessi: le strade arrivano da Albion Journal con il tempo rimasto. Sul sito puoi trovare un percorso tra le zone.', m3:'Apri la mappa →',
+    h4:'Una nota sulla strada con un tasto', p4:'Punta un portale e premi un tasto: l\'app mostra una breve nota sulla strada con nome, tipo di zona e tier. Pianificare i viaggi in Avalon diventa più facile.',
+    h5:'Mac e Windows, gratis', p5:'Un\'app per entrambi i sistemi. Le nuove versioni si installano da sole.',
+    a1:'Albion Journal su Mac: scheda con i tuoi prezzi', a2:'Scheda Sessione: fama, argento e portafoglio di un\'uscita', a3:'Mappa comune delle Strade di Avalon sul sito', a4:'Nota di zona di Avalon in Albion Journal', a5:'Albion Journal su Mac e Windows',
+    rm1:'• Mac con Apple M1 o successivo (Intel non supportato)', rm2:'• macOS 13 Ventura o successivo', rm3:'Primo avvio: Impostazioni di Sistema → Privacy e sicurezza → Apri comunque. Per la nota di zona consenti “Registrazione schermo”.',
+    rw1:'• Windows 10 o 11, 64 bit', rw2:'• Permessi di amministratore (l\'app legge il traffico del gioco)', rw3:'SmartScreen: Ulteriori informazioni → Esegui comunque. La nota di zona richiede Microsoft Visual C++ Redistributable x64 (di solito già installato; altrimenti l\'app lo segnala).',
+    mac:'per Mac', win:'per Windows', ver:'versione ', title:'Albion Journal per Mac e Windows'}
+  };
+  var T = L[lang];
+  if (T) {
+    document.documentElement.lang = lang;
     document.querySelectorAll('[data-t]').forEach(function(e){ if (T[e.dataset.t]) e.textContent = T[e.dataset.t]; });
     document.querySelectorAll('[data-ta]').forEach(function(e){ if (T[e.dataset.ta]) e.alt = T[e.dataset.ta]; });
-    document.title = 'Albion Journal — for Mac & Windows';
+    document.title = T.title;
   }
+  var RU = {mac:'для Mac', win:'для Windows', ver:'версия '};
+  var W = T || RU;
   var OS = {
     mac: {repo:'albion-craft-profit', ext:/\.dmg$/i, ru:'для Mac', en:'for Mac'},
     win: {repo:'albion-zone-fix', ext:/Setup.*\.exe$/i, ru:'для Windows', en:'for Windows'}
@@ -216,7 +291,7 @@ footer a{color:var(--muted)}
       if (k !== os) return;
       if (f) {
         main.href = main2.href = f.url;
-        document.getElementById('ver').textContent = (en ? 'version ' : 'версия ') + f.ver;
+        document.getElementById('ver').textContent = W.ver + f.ver;
         if (auto) { location.href = f.url; document.getElementById('started').style.display = 'block'; }
       } else if (auto) {
         location.href = main.href; // API недоступен — хотя бы страница выпуска
@@ -225,7 +300,7 @@ footer a{color:var(--muted)}
   });
   if (!os) return; // телефон и прочее: две кнопки ниже
   main.href = main2.href = 'https://github.com/VAnatoliyV/' + OS[os].repo + '/releases/latest';
-  document.getElementById('os').textContent = document.getElementById('os2').textContent = en ? OS[os].en : OS[os].ru;
+  document.getElementById('os').textContent = document.getElementById('os2').textContent = W[os];
 })();
 </script>
 </body>
