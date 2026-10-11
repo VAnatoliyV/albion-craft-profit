@@ -6935,9 +6935,13 @@ function mapRelayout(){
   mapMeasureCtx=mapMeasureCtx||document.createElement('canvas').getContext('2d');
   mapMeasureCtx.font='600 12px system-ui, -apple-system, sans-serif';
   const W=new Map(nodes.map(c=>{ const z=MAP.zones&&MAP.zones.get(c); return [c, Math.ceil(mapMeasureCtx.measureText((z&&z.t?'T'+z.t+' ':'')+mapName(c)).width)]; }));
-  MAP.pos=first ? AvalonCore.settle(nodes, MAP.edges, 8, 400, W) : AvalonCore.simNodes(nodes, MAP.edges, MAP.pos, 0, W);
-  // Дороги не пересекаются там, где этого можно избежать.
-  AvalonCore.untangle(MAP.pos, MAP.edges);
+  MAP.pos=first ? AvalonCore.settle(nodes, MAP.edges, 8, nodes.length>200?200:400, W) : AvalonCore.simNodes(nodes, MAP.edges, MAP.pos, 0, W);
+  // Дороги не пересекаются там, где этого можно избежать. На большой карте
+  // распутывание не успевает всё — даём ему полсекунды, а не вешаем вкладку.
+  AvalonCore.untangle(MAP.pos, MAP.edges, 40, 500);
+  // …и сразу стягиваем обратно: иначе при загрузке сеть разбросана, а
+  // собирается, только когда тронешь любую зону.
+  if(first) AvalonCore.compact(MAP.pos, MAP.edges, 500);
   MAP.deg=new Map(nodes.map(c=>[c,0]));
   for(const [x,y] of MAP.edges){ MAP.deg.set(x,MAP.deg.get(x)+1); MAP.deg.set(y,MAP.deg.get(y)+1); }
   MAP.alpha=first ? .05 : Math.max(MAP.alpha,.5);
@@ -6960,7 +6964,7 @@ function mapRun(){
     if(MAP.alpha>0.004 || MAP.held) MAP.raf=requestAnimationFrame(tick);
     // Успокоился — проверить, не легли ли дороги крест-накрест (после
     // перетаскивания или новых дорог), и распутать.
-    else if(AvalonCore.crossings(MAP.pos, MAP.edges||[])){ AvalonCore.untangle(MAP.pos, MAP.edges); mapPaint(); }
+    else if(AvalonCore.crossings(MAP.pos, MAP.edges||[])){ AvalonCore.untangle(MAP.pos, MAP.edges, 40, 200); mapPaint(); }
   };
   MAP.raf=requestAnimationFrame(tick);
 }

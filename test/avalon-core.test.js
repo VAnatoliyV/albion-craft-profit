@@ -224,3 +224,30 @@ test('untangle: дороги не проходят через чужие зон�
   }
   assert.deepEqual(bad, []);
 });
+
+// Размер сети по рамке: ширина × высота.
+const area=N=>{ let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  for(const p of N.values()){ x0=Math.min(x0,p.x); x1=Math.max(x1,p.x); y0=Math.min(y0,p.y); y1=Math.max(y1,p.y); }
+  return (x1-x0)*(y1-y0); };
+
+test('compact: карта 10 октября при открытии уже собрана — перетаскивание её не стягивает', ()=>{
+  const edges=require('./roads-2026-10-10.json'), nodes=[...new Set(edges.flat())].sort();
+  const W=new Map(nodes.map(c=>[c, 120]));
+  const N=C.settle(nodes, edges, 8, 400, W); C.untangle(N, edges, 40, 500); C.compact(N, edges, 500);
+  const open=area(N);
+  // Как при перетаскивании: физику разогрели до 0.3 и дали остыть.
+  let a=.3; while(a>0.004) a=C.step(N, edges, a, null);
+  assert.ok(open < area(N)*1.15, `при открытии ${Math.round(open)}, после перетаскивания ${Math.round(area(N))}`);
+  assert.equal(C.crossings(N, edges), 0);
+});
+
+test('settle+untangle: большая сеть-дерево (150 дорог) ложится без пересечений и быстро', ()=>{
+  // Цепочки с ветками, как настоящие дороги: каждая новая зона — к случайной прежней.
+  let s=7; const R=()=>(s=(s*16807)%2147483647)/2147483647;
+  const nodes=['Z0'], edges=[];
+  for(let i=1;i<=150;i++){ const a=nodes[Math.floor(R()*nodes.length)], b='Z'+i; nodes.push(b); edges.push([a,b]); }
+  const W=new Map(nodes.map(c=>[c, 120]));
+  const t=Date.now(), N=C.untangle(C.settle(nodes, edges, 8, 400, W), edges, 40, 500);
+  assert.equal(C.crossings(N, edges), 0);
+  assert.ok(Date.now()-t < 3000, `раскладка ${Date.now()-t} мс`);
+});

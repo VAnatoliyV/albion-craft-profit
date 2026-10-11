@@ -171,11 +171,24 @@
   // Препятствия зоны для чужих дорог: кружок и подпись под ним (oy — сдвиг
   // центра вверх от подписи к кружку, sx — сжатие по горизонтали).
   const AVOID=[{oy:0, sx:1, gap:26}, {oy:-24, sx:5.5, gap:15}];
+  // Сетка ячеек со стороной CELL: все силы между узлами действуют ближе
+  // 400 px, поэтому узлу хватает соседей из своей и восьми окрестных ячеек.
+  // Без неё большая карта считала бы каждую пару и каждую дорогу с каждой
+  // зоной — на 600 дорогах это сотни тысяч проверок на кадр.
+  const CELL=400, cellOf=v=>Math.floor(v/CELL);
+  function grid(A){
+    const G=new Map();
+    A.forEach(([,p],i)=>{ const k=cellOf(p.x)*65536+cellOf(p.y); let c=G.get(k); if(!c) G.set(k,c=[]); c.push(i); });
+    return G;
+  }
   function step(N, edges, alpha, held){
-    const A=[...N.entries()];
+    const A=[...N.entries()], G=grid(A);
     for(let i=0;i<A.length;i++){
-      const a=A[i][1];
-      for(let j=i+1;j<A.length;j++){
+      const a=A[i][1], cx=cellOf(a.x), cy=cellOf(a.y);
+      for(let gx0=cx-1;gx0<=cx+1;gx0++) for(let gy0=cy-1;gy0<=cy+1;gy0++){
+      const cell=G.get(gx0*65536+gy0); if(!cell) continue;
+      for(const j of cell){
+        if(j<=i) continue;
         const b=A[j][1]; let dx=b.x-a.x, dy=b.y-a.y, d2=dx*dx+dy*dy;
         if(d2<1e-6){ dx=(i-j)*0.01; dy=0.01; d2=dx*dx+dy*dy; }
         if(d2<400*400){
@@ -193,6 +206,7 @@
           else { const m=(dy>=0?1:-1)*oy*0.25; a.vy-=m; b.vy+=m; }
         }
       }
+      }
     }
     for(const [x,y] of edges){
       const a=N.get(x), b=N.get(y); if(!a||!b||a===b) continue;
@@ -207,7 +221,10 @@
     // alpha: правило держится и когда граф уже успокоился.
     for(const [x,y] of edges){
       const a=N.get(x), b=N.get(y); if(!a||!b||a===b) continue;
-      for(const [c,p] of A){
+      const gx1=cellOf(Math.max(a.x,b.x)+80), gy1=cellOf(Math.max(a.y,b.y)+80);
+      for(let gx0=cellOf(Math.min(a.x,b.x)-80);gx0<=gx1;gx0++) for(let gy0=cellOf(Math.min(a.y,b.y)-80);gy0<=gy1;gy0++)
+      for(const i of G.get(gx0*65536+gy0)||[]){
+        const [c,p]=A[i];
         if(c===x||c===y || outBox(p,a,b,80)) continue;
         for(const o of AVOID){
           const P={x:p.x/o.sx, y:p.y+o.oy}, sa={x:a.x/o.sx, y:a.y}, sb={x:b.x/o.sx, y:b.y};
@@ -234,6 +251,41 @@
     // Разные зёрна — разный порядок и поворот спирали: разные стартовые раскладки.
     if(seed){ const R=rnd(seed); nodes=nodes.map(n=>[R(),n]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]); k=Math.floor(R()*7); }
     for(const n of nodes) if(prev && prev.has(n)){ const p=prev.get(n); N.set(n,{x:p.x,y:p.y,vx:0,vy:0}); }
+    // Первая раскладка: каждую сеть ставим радиальным деревом — корень в
+    // центре, уровни кольцами через длину дороги, ветке сектор по числу её
+    // листьев. Так дороги не пересекаются ещё до физики и ей нечего
+    // распутывать; а если бросить зоны кучей, большая сеть разлетается и
+    // ветки ложатся крест-накрест. Сети — по спирали, каждой своё место.
+    if(!prev || !prev.size){
+      const adj=new Map(nodes.map(n=>[n,[]]));
+      for(const [a,b] of edges) if(adj.has(a)&&adj.has(b)&&a!==b){ adj.get(a).push(b); adj.get(b).push(a); }
+      let area=0;
+      for(const n0 of nodes){
+        if(N.has(n0)) continue;
+        // Сеть целиком; корень — зона с наибольшим числом дорог (с зерном —
+        // первая в перемешанном порядке: разные старты дают разные раскладки).
+        const seen=new Set([n0]), q=[n0];
+        for(let i=0;i<q.length;i++) for(const u of adj.get(q[i])) if(!seen.has(u)){ seen.add(u); q.push(u); }
+        const root=seed ? n0 : q.reduce((m,v)=>adj.get(v).length>adj.get(m).length?v:m, n0);
+        // Дерево обхода в ширину: дети, глубина, число листьев.
+        const kids=new Map(), dep=new Map([[root,0]]), order=[root];
+        for(let i=0;i<order.length;i++){
+          const v=order[i], ks=adj.get(v).filter(u=>!dep.has(u));
+          ks.forEach(u=>{ dep.set(u,dep.get(v)+1); order.push(u); }); kids.set(v,ks);
+        }
+        const leaves=new Map();
+        for(let i=order.length-1;i>=0;i--){ const v=order[i]; leaves.set(v, kids.get(v).reduce((t,u)=>t+leaves.get(u),0)||1); }
+        const R=(Math.max(...dep.values())+.5)*SIM.linkDist;
+        const ang=k*2.39996, rr=k ? Math.sqrt((area+(R+80)**2)/Math.PI)+R : 0; k++; area+=(2*R+160)**2;
+        const cx=Math.cos(ang)*rr, cy=Math.sin(ang)*rr*.6, span=new Map([[root,[0,2*Math.PI]]]);
+        for(const v of order){
+          const [a0,a1]=span.get(v), d=dep.get(v), mid=(a0+a1)/2;
+          N.set(v,{x:cx+Math.cos(mid)*d*SIM.linkDist, y:cy+Math.sin(mid)*d*SIM.linkDist, vx:0, vy:0});
+          let t=a0;
+          for(const u of kids.get(v)){ const w=(a1-a0)*leaves.get(u)/leaves.get(v); span.set(u,[t,t+w]); t+=w; }
+        }
+      }
+    }
     for(const n of nodes){
       if(N.has(n)) continue;
       const e=edges.find(([a,b])=>(a===n&&N.has(b))||(b===n&&N.has(a)));
@@ -277,7 +329,10 @@
   // дорог) и остаются там, где цена меньше: пересечение дорог — дорого,
   // налезшие подписи — дешевле, далеко от прежнего места — чуть-чуть.
   // Сети дорог почти всегда деревья, у них раскладка без пересечений есть.
-  function untangle(N, edges, rounds){
+  // ms — бюджет времени: на большой сети полный перебор считал бы минуты,
+  // а страница всё это время висела бы. Не успели — оставляем как есть.
+  function untangle(N, edges, rounds, ms){
+    const until=Date.now()+(ms||1000);
     const deg=new Map(), adj=new Map();
     for(const [a,b] of edges){
       for(const [x,y] of [[a,b],[b,a]]){ deg.set(x,(deg.get(x)||0)+1); if(!adj.has(x)) adj.set(x,[]); adj.get(x).push(y); }
@@ -331,11 +386,12 @@
           const sg=toSeg(p,A,B); if(sg.d<16 && sg.t>0 && sg.t<1){ out.add(a); out.add(b); out.add(c); } } }
       return out;
     };
-    for(let r=0; r<(rounds||40) && cur>=600; r++){
+    for(let r=0; r<(rounds||40) && cur>=600 && Date.now()<until; r++){
       const ps=pairs(), cs=cutters(); if(!ps.length && !cs.size) break;
       const movers=[...new Set([...ps.flat(2), ...cs])].sort((a,b)=>(deg.get(a)||0)-(deg.get(b)||0));
       let improved=false;
       for(const v of movers){
+        if(Date.now()>=until) break;
         // Ходы: (1) узел с листьями-соседями — сдвиг по кругам; (2) вся ветка
         // за дорогой u–v (то, что отвалится, если её убрать) — поворот вокруг u.
         const moves=[];
@@ -354,6 +410,7 @@
         }
         let best=null, bestC=cur;
         for(const m of moves){
+          if(Date.now()>=until) break;
           const home=m.group.map(g=>{ const q=N.get(g); return [q, q.x, q.y]; });
           let shift=0;
           for(const [q,x,y] of home){
@@ -368,6 +425,20 @@
         if(best){ for(const [q,x,y] of best){ q.x=x; q.y=y; } cur=cost(); improved=true; }
       }
       if(!improved) break;
+    }
+    for(const p of N.values()){ p.vx=0; p.vy=0; }
+    return N;
+  }
+  // Распутывание двигает зоны, не думая о тесноте, и сеть расползается.
+  // Прогреваем физику (как при перетаскивании), она стягивает сеть обратно;
+  // если при этом снова легли пересечения — распутываем ещё раз.
+  function compact(N, edges, ms){
+    const until=Date.now()+(ms||600);
+    for(let r=0; r<3; r++){
+      let a=.3; while(a>0.004) a=step(N,edges,a,null);
+      const rest=until-Date.now();
+      if(rest<=0 || !crossings(N,edges)) break;
+      untangle(N, edges, 40, rest);
     }
     for(const p of N.values()){ p.vx=0; p.vy=0; }
     return N;
@@ -397,5 +468,5 @@
   // 2 мин… но не больше 10 минут, чтобы починенный сервер подхватился сам.
   function backoff(fails){ return Math.min(600000, 15000*2**fails); }
 
-  g.AvalonCore={key, merge, path, layout, step, simNodes, crossings, settle, untangle, labels, left, soon, prune, backoff};
+  g.AvalonCore={key, merge, path, layout, step, simNodes, crossings, settle, untangle, compact, labels, left, soon, prune, backoff};
 })(typeof globalThis!=='undefined'?globalThis:this);
