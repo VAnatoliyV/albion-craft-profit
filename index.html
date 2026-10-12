@@ -2512,7 +2512,7 @@ const T_RE = [
   [/^(.*?), красные ≈(.+?)% шанс, остальные ≈(.+?)%\. Точный запуск виден только в игре\.$/, "$1, red ones ≈$2% chance, the rest ≈$3%. The exact launch is only visible in game.", "$1, las rojas ≈$2% de probabilidad, el resto ≈$3%. El inicio exacto solo se ve en el juego."],
   [/^Сейчас (.+?) UTC, это окно броска, шанс (.+?)\. Если ивент запустился, дороги кипят\.$/, "It is $1 UTC now, this is a launch window, chance $2. If the event has started, the roads are boiling.", "Ahora son las $1 UTC, esta es una ventana de inicio, probabilidad $2. Si el evento ha arrancado, los caminos hierven."],
   [/^Из всех транспортников в выборке \((.+?)\): 🖤 везли на чёрный рынок$/, "Of all haulers in the sample ($1): 🖤 hauling to the Black Market", "De todos los transportistas de la muestra ($1): 🖤 llevaban al mercado negro"],
-  [/^· 📦 ресурсы\/камни, (.+?)· ⛏ собиратели, (.+?)· ⚔ прочее, (.+?)Светофор считается по всем транспортникам, а таблица ниже, только по выбранному фильтру\.$/, "· 📦 resources/stones, $1· ⛏ gatherers, $2· ⚔ other, $3The traffic light counts every hauler, while the table below counts only the chosen filter.", "· 📦 recursos/piedras, $1· ⛏ recolectores, $2· ⚔ otros, $3El semáforo cuenta a todos los transportistas, mientras que la tabla de abajo solo el filtro elegido."],
+  [/^· 📦 ресурсы\/камни, (.+?)· ⛏ собиратели, (.+?)· ⚔ прочее, (.+?)Таблица ниже показывает только выбранный фильтр\.$/, "· 📦 resources/stones, $1· ⛏ gatherers, $2· ⚔ other, $3The table below shows only the chosen filter.", "· 📦 recursos/piedras, $1· ⛏ recolectores, $2· ⚔ otros, $3La tabla de abajo muestra solo el filtro elegido."],
   [/^Анализ последних (.+?) килов сервера \(охват ~(.+?)\), из них на транспортных маунтах: (.*)$/, "Analysis of the last $1 server kills (covering ~$2), of which on transport mounts: $3", "Análisis de las últimas $1 muertes del servidor (cobertura ~$2), de las cuales en monturas de transporte: $3"],
   [/^, много товара, (.+?) посохов это две или три тонны:$/, ", lots of goods: $1 staves is two or three tonnes:", ", mucha mercancía: $1 bastones son dos o tres toneladas:"],
   [/^, дорогое и лёгкое, на (.+?) или (.+?) миллионов в зачаровке и артефактах:$/, ", expensive and light, $1 or $2 million in enchants and artifacts:", ", caro y ligero, $1 o $2 millones en encantamientos y artefactos:"],
@@ -2757,6 +2757,8 @@ function trParts(t){
   });
   return нашли ? out.join('') : null;
 }
+Object.assign(T_UI, {"📊 Сколько убивают перевозчиков: сейчас и обычно": ["📊 How many haulers get killed: now and usually", "📊 Cuántos transportistas mueren: ahora y lo habitual"], "Наш сервер каждые две минуты забирает с киллборда Europe все новые убийства и копит историю. Перевозчик здесь: бык, мамонт или мул с грузом. Мулы новичков без груза посчитаны отдельно.": ["Our server pulls every new kill from the Europe killboard every two minutes and keeps the history. A hauler here means an ox, a mammoth or a mule with cargo. Newbie mules without cargo are counted separately.", "Nuestro servidor recoge cada dos minutos todas las muertes nuevas del killboard de Europa y guarda el historial. Aquí, transportista es un buey, un mamut o una mula con carga. Las mulas de novatos sin carga se cuentan aparte."], "Наш сервер давно не получал данных с киллборда, цифры ниже могут быть старыми.": ["Our server hasn’t received killboard data for a while, so the numbers below may be stale.", "Nuestro servidor lleva un rato sin recibir datos del killboard; las cifras de abajo pueden estar desfasadas."], "⚪ ПОКА НЕ С ЧЕМ СРАВНИТЬ": ["⚪ NOTHING TO COMPARE WITH YET", "⚪ AÚN NO HAY CON QUÉ COMPARAR"], "🔴 ОПАСНЕЕ ОБЫЧНОГО": ["🔴 MORE DANGEROUS THAN USUAL", "🔴 MÁS PELIGROSO DE LO HABITUAL"], "🟢 ТИШЕ ОБЫЧНОГО": ["🟢 QUIETER THAN USUAL", "🟢 MÁS TRANQUILO DE LO HABITUAL"], "🟡 КАК ОБЫЧНО": ["🟡 AS USUAL", "🟡 LO HABITUAL"], "перевозчиков убито за последний час:": ["haulers killed in the last hour:", "transportistas muertos en la última hora:"], "Обычно в этот час:": ["Usually at this hour:", "Lo habitual a esta hora:"], "В среднем за час:": ["Average per hour:", "Media por hora:"], "Убито перевозчиков в час, по часам суток (твоё время)": ["Haulers killed per hour, by hour of day (your time)", "Transportistas muertos por hora, según la hora del día (tu hora)"], "История копится с {} октября {}, график заполнится за сутки.": ["History is being collected since October {}, {}; the chart will fill in within a day.", "El historial se recoge desde el {} de octubre de {}; el gráfico se llenará en un día."], "{} · перевозчиков {} в час · всех убийств {} в час · дней в среднем {}": ["{} · haulers {} per hour · all kills {} per hour · days averaged {}", "{} · transportistas {} por hora · todas las muertes {} por hora · días promediados {}"], "{} · данных пока нет": ["{} · no data yet", "{} · aún no hay datos"], "Белый столбик: текущий час. Красные: вечерние окна Bandit Assault. Наведи на столбик, увидишь цифры.": ["White bar: the current hour. Red ones: the evening Bandit Assault windows. Hover a bar to see the numbers.", "Barra blanca: la hora actual. Rojas: las ventanas nocturnas de Bandit Assault. Pasa el ratón por una barra para ver las cifras."], "За последние {} ч убито перевозчиков:": ["Haulers killed in the last {} h:", "Transportistas muertos en las últimas {} h:"], ", мулов новичков без груза:": [", newbie mules without cargo:", ", mulas de novatos sin carga:"], "Сколько было ганкеров: соло": ["How many gankers: solo", "Cuántos gankers había: solo"], "· группой от {} до {}": ["· groups of {} to {}", "· en grupo de {} a {}"], "· группой от {}": ["· groups of {}+", "· en grupo de {} o más"], "Что везли: на чёрный рынок": ["What they carried: to the Black Market", "Qué llevaban: al Mercado Negro"], "· ресурсы и камни": ["· resources and stones", "· recursos y piedras"], "· собиратели": ["· gatherers", "· recolectores"], "· прочее": ["· other", "· otros"], "Чаще всего ганкают:": ["Most active gankers:", "Los que más gankean:"], "Наш сервер с историей убийств не ответил, ниже видны только последние минуты киллборда.": ["Our kill-history server didn’t respond; below are only the last minutes of the killboard.", "Nuestro servidor con el historial de muertes no respondió; abajo solo se ven los últimos minutos del killboard."], "💀 Последние убийства на транспорте (киллборд Europe, последние минуты)": ["💀 Latest kills on transport mounts (Europe killboard, last few minutes)", "💀 Últimas muertes en monturas de transporte (killboard de Europa, últimos minutos)"]});
+Object.assign(T_UI, {"Анализ последних {} килов сервера (охват ~{} мин), из них на транспортных маунтах: {}. Обновлено {}.": ["Analysis of the last {} server kills (covering ~{} min), of which on transport mounts: {}. Updated {}.", "Análisis de las últimas {} muertes del servidor (cobertura ~{} min), de ellas en monturas de transporte: {}. Actualizado {}."], "Показаны {} из {}.": ["Showing {} of {}.", "Mostrando {} de {}."]});
 function trStr(t){
   if(UI==='ru') return null;
   const k=t.trim(); if(!k) return null;
@@ -2971,7 +2973,9 @@ const icoReady=new Promise(done=>{
 });
 icoReady.then(()=>icoPump());
 const icoCopy=id=>'ico/'+enc(id)+'.webp';
-const icoSrc=(id,sz,copy)=>(icoLocal||copy) ? icoCopy(id) : ICO_RENDER+enc(id)+'.png?size='+icoStep(sz);
+// render — принудительно с render: в копии есть не всё (скины маунтов, редкие
+// вещи с киллборда), и раз копия дважды не отдала, иконки там просто нет.
+const icoSrc=(id,sz,copy,render)=>!render && (icoLocal||copy) ? icoCopy(id) : ICO_RENDER+enc(id)+'.png?size='+icoStep(sz);
 const icoKey=(id,sz)=>id+'|'+icoStep(sz);
 function icoFast(root){
   if(icoLocal===null) return;
@@ -3006,15 +3010,15 @@ function icoPump(){
       if(!ok){
         if(j.n<ICO_TRIES){
           j.el.removeAttribute('src');
-          // render дважды не отдал — дальше пробуем копию
-          if(j.n>=2) j.copy=true;
+          // render дважды не отдал — дальше пробуем копию, и наоборот
+          if(j.n>=2){ if(icoLocal) j.render=true; else j.copy=true; }
           setTimeout(()=>{ j.n++; icoQ.push(j); icoPump(); }, ICO_WAIT[Math.min(j.n-1,ICO_WAIT.length-1)]);
         } else j.el.classList.add('icoFail');
       }
       icoPump();
     };
     j.el.onload=()=>fin(true); j.el.onerror=()=>fin(false);
-    j.el.src=icoSrc(j.id,j.sz,j.copy);
+    j.el.src=icoSrc(j.id,j.sz,j.copy,j.render);
   }
 }
 // Наблюдатель видимости даёт приоритет тому, что на экране, но полагаться
@@ -5543,6 +5547,7 @@ const BANDIT_WINDOWS = [1,3,5,7,11,13,15,17,19,21,23];
 const BANDIT_HIGH = [17,19,21];
 async function loadRoads(){
   S.roads.loading=true; S.roads.err=null; render();
+  const live = loadRoadsLive();
   try{
     const bucket = Math.floor(Date.now()/3e5); // кэш 5 минут
     const pages = await Promise.all([0,51,102,153].map(off =>
@@ -5573,9 +5578,97 @@ async function loadRoads(){
     }));
     S.roads.kills = S.roads.all.filter(k=>TRANSPORT_MOUNTS.some(m=>k.mount.includes(m)));
     S.roads.loaded=true; S.roads.at=Date.now();
+    S.roads.live = await live;
   }catch(e){ S.roads.err = 'Не удалось загрузить киллборд ('+e.message+'). Возможно, API недоступен из твоей сети. Попробуй «Обновить» или включи VPN.'; }
+  if(!S.roads.loaded) S.roads.live = await live;
   S.roads.loading=false;
   if(S.tab==='roads') render();
+}
+// ─── История убийств с нашего сервера (kills.go на aj-live) ───
+// Киллборд списком отдаёт только последние ~10 минут сервера, поэтому «за час»
+// и «обычно в это время» считает наш сервер: он забирает все новые убийства
+// каждые две минуты и копит часы за месяц, а подробные записи за сутки.
+const HL_SINCE = 1791824400; // с этого часа сервер считает перевозчиков отдельно от мулов новичков
+async function loadRoadsLive(){
+  if(!LIVE_URL) return null;
+  const now=Math.floor(Date.now()/1000);
+  const ctl=new AbortController(), tm=setTimeout(()=>ctl.abort(), 8000);
+  try{
+    const r=await fetch(`${LIVE_URL}/kills.json?since=${now-30*86400}&rsince=${now-86400}`, {cache:'no-store', signal:ctl.signal});
+    return r.ok ? await r.json() : null;
+  }catch(e){ return null; }
+  finally{ clearTimeout(tm); }
+}
+// Перевозчик: бык, мамонт или мул с грузом. Стартовый мул новичка без груза не в счёт.
+const escHTML = t => String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+const isHauler = r => r.m!=='mule' || r.c==='bm' || r.c==='resources';
+function roadsLiveStats(d){
+  const now=Date.now()/1000;
+  // только полные прошедшие часы, которые сервер видел хотя бы наполовину
+  const hours=(d.hours||[]).filter(h=>h.h>=HL_SINCE && h.cov>=1800 && h.h+3600<=now);
+  const rate=(h,f)=>h[f]*3600/h.cov;
+  const byHour=Array.from({length:24},()=>({hl:0, all:0, n:0}));
+  for(const h of hours){
+    const b=byHour[new Date(h.h*1000).getHours()];
+    b.hl+=rate(h,'hl'); b.all+=rate(h,'all'); b.n++;
+  }
+  byHour.forEach(b=>{ if(b.n){ b.hl/=b.n; b.all/=b.n; } });
+  const recs=d.recs||[], haul=recs.filter(isHauler);
+  const curLH=new Date().getHours();
+  let typ=null, typHour=false;
+  if(byHour[curLH].n>=2){ typ=byHour[curLH].hl; typHour=true; }
+  else if(hours.length) typ=hours.reduce((a,h)=>a+rate(h,'hl'),0)/hours.length;
+  const party={solo:0, small:0, big:0};
+  haul.forEach(r=>{ if(r.p<=1) party.solo++; else if(r.p<=4) party.small++; else party.big++; });
+  const g={};
+  haul.forEach(r=>{ const k=r.kg ? (r.ka?`[${r.ka}] `:'')+r.kg : ''; if(k) g[k]=(g[k]||0)+1; });
+  const cats={bm:0, resources:0, gatherer:0, other:0};
+  haul.forEach(r=>{ cats[r.c]=(cats[r.c]||0)+1; });
+  const oldest=recs.length ? Math.min(...recs.map(r=>r.t)) : now;
+  return {byHour, hours, haul, newbie:recs.length-haul.length, typ, typHour, curLH, party, cats,
+    lastHour: haul.filter(r=>r.t>now-3600).length,
+    fresh: d.newest && now-d.newest<900,
+    top: Object.entries(g).sort((a,b)=>b[1]-a[1]).slice(0,6),
+    span: Math.max(1, Math.round((now-oldest)/3600))};
+}
+function roadsLiveHTML(d){
+  const s=roadsLiveStats(d);
+  let out='<div class="panel"><b>📊 Сколько убивают перевозчиков: сейчас и обычно</b> <span class="badge b-warn">бета</span><br>'+
+    '<span style="color:var(--muted);font-size:12px">Наш сервер каждые две минуты забирает с киллборда Europe все новые убийства и копит историю. Перевозчик здесь: бык, мамонт или мул с грузом. Мулы новичков без груза посчитаны отдельно.</span>';
+  if(!s.fresh) out+='<div class="neg" style="margin-top:8px">Наш сервер давно не получал данных с киллборда, цифры ниже могут быть старыми.</div>';
+  let light='⚪ ПОКА НЕ С ЧЕМ СРАВНИТЬ', cls='';
+  if(s.typ>0){
+    const k=s.lastHour/s.typ;
+    if(k>=1.3){ light='🔴 ОПАСНЕЕ ОБЫЧНОГО'; cls='neg'; }
+    else if(k<=0.75){ light='🟢 ТИШЕ ОБЫЧНОГО'; cls='pos'; }
+    else light='🟡 КАК ОБЫЧНО';
+  }
+  out+=`<div class="light-big"><b class="${cls}">${light}</b> <span style="font-size:14px;color:var(--muted)">перевозчиков убито за последний час: <b style="color:var(--text)">${s.lastHour}</b></span></div>`;
+  if(s.typ!=null) out+=`<div style="color:var(--muted);font-size:12.5px">${s.typHour?'Обычно в этот час':'В среднем за час'}: <b style="color:var(--text)">${Math.round(s.typ)}</b></div>`;
+  // график по часам суток, местное время
+  const max=Math.max(1, ...s.byHour.map(b=>b.hl));
+  const bandit=new Set(BANDIT_HIGH.map(u=>new Date(Date.UTC(2026,0,1,u)).getHours()));
+  out+='<div style="margin-top:14px"><b style="font-size:13px">Убито перевозчиков в час, по часам суток (твоё время)</b></div>';
+  if(s.hours.length<6) out+='<div style="color:var(--muted);font-size:12.5px;margin-top:4px">История копится с 12 октября 2026, график заполнится за сутки.</div>';
+  out+='<div style="display:flex;align-items:flex-end;gap:2px;height:120px;margin-top:8px">'+
+    s.byHour.map((b,h)=>{
+      const ht=b.n? Math.max(3, Math.round(b.hl/max*110)) : 0;
+      const col = h===s.curLH ? 'var(--text)' : bandit.has(h) ? 'var(--red)' : '#e8a54b';
+      const tip = b.n ? `${String(h).padStart(2,'0')}:00 · перевозчиков ${Math.round(b.hl)} в час · всех убийств ${Math.round(b.all)} в час · дней в среднем ${b.n}` : `${String(h).padStart(2,'0')}:00 · данных пока нет`;
+      return `<div title="${tip}" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;cursor:help"><div style="height:${ht}px;background:${col};border-radius:2px 2px 0 0;opacity:${b.n?1:.25}"></div></div>`;
+    }).join('')+'</div>'+
+    '<div style="display:flex;gap:2px;font-size:10px;color:var(--muted)">'+
+    s.byHour.map((b,h)=>`<div style="flex:1;text-align:center">${h%3===0?h:''}</div>`).join('')+'</div>'+
+    '<div style="color:var(--muted);font-size:11.5px;margin-top:4px">Белый столбик: текущий час. Красные: вечерние окна Bandit Assault. Наведи на столбик, увидишь цифры.</div>';
+  // сутки
+  out+=`<div style="margin-top:14px;font-size:13px;line-height:1.7">`+
+    `<div>За последние ${s.span} ч убито перевозчиков: <b>${s.haul.length}</b>, мулов новичков без груза: <b>${s.newbie}</b></div>`+
+    `<div>Сколько было ганкеров: соло <b>${s.party.solo}</b> · группой от 2 до 4 <b>${s.party.small}</b> · группой от 5 <b>${s.party.big}</b></div>`+
+    `<div>Что везли: на чёрный рынок <b>${s.cats.bm}</b> · ресурсы и камни <b>${s.cats.resources}</b> · собиратели <b>${s.cats.gatherer}</b> · прочее <b>${s.cats.other}</b></div>`+
+    (s.top.length?`<div>Чаще всего ганкают: ${s.top.map(([n,c])=>`<b>${escHTML(n)}</b> (${c})`).join(' · ')}</div>`:'')+
+    `</div>`;
+  out+='</div>';
+  return out;
 }
 // оценка стоимости груза по известным нам ценам (ресурсы, шмотки, камни)
 function anyPrice(t){
@@ -5695,6 +5788,8 @@ function banditInfo(){
 function roadsHTML(){
   const r=S.roads;
   let out='<div style="max-width:900px">';
+  if(r.loaded && r.live) out+=roadsLiveHTML(r.live);
+  else if(r.loaded) out+='<div class="panel"><span class="neg">Наш сервер с историей убийств не ответил, ниже видны только последние минуты киллборда.</span></div>';
   // Bandit Assault
   const b=banditInfo();
   out+=`<div class="panel">
@@ -5707,7 +5802,7 @@ function roadsHTML(){
   </div>`;
   // Киллборд
   out+='<div class="panel">';
-  out+='<b>💀 Убийства на дорогах (киллборд Europe, живые данные)</b> <span class="badge b-warn">бета</span> <button id="roadsReload" style="margin-left:8px;padding:3px 10px;font-size:12px">⟳ Обновить</button>'+
+  out+='<b>💀 Последние убийства на транспорте (киллборд Europe, последние минуты)</b> <span class="badge b-warn">бета</span> <button id="roadsReload" style="margin-left:8px;padding:3px 10px;font-size:12px">⟳ Обновить</button>'+
     '<br><span style="color:var(--muted);font-size:12px">Раздел в бете: классификатор «кто вёз на чёрный рынок» работает на догадках, будем дорабатывать. Видишь странную классификацию, присылай пример.</span><br>';
   if(r.loading) out+='<div class="skel" style="margin-top:10px;box-shadow:none">'+
     '<div class="skel-note">⏳ Опрашиваю киллборд Europe, последние примерно 200 убийств…</div>'+
@@ -5717,17 +5812,13 @@ function roadsHTML(){
   else {
     const now=Date.now();
     const span = r.kills.length? (now - Math.min(...r.kills.map(k=>k.t)))/3.6e6 : 0;
-    const k60 = r.kills.filter(k=>now-k.t<3.6e6).length;
-    const light = k60>=8?'🔴 ОЧЕНЬ ОПАСНО':k60>=3?'🟡 НЕСПОКОЙНО':'🟢 ОТНОСИТЕЛЬНО ТИХО';
-    const lightCls = k60>=8?'neg':k60>=3?'':'pos';
-    out+=`<div class="light-big"><b class="${lightCls}">${light}</b> <span style="font-size:14px;color:var(--muted)">транспортников убито за последний час: <b style="color:var(--text)">${k60}</b></span></div>`;
     // разбивка транспортников по классификации, чтобы светофор не путал с фильтром таблицы
     {
       const bk={bm:0,resources:0,gatherer:0,other:0};
       r.kills.forEach(k=>{ bk[classifyKill(k).cat]++; });
-      out+=`<div style="color:var(--muted);font-size:12.5px;margin:-4px 0 6px">Из всех транспортников в выборке (${r.kills.length}): 🖤 везли на чёрный рынок <b style="color:var(--text)">${bk.bm}</b> · 📦 ресурсы/камни, ${bk.resources} · ⛏ собиратели, ${bk.gatherer} · ⚔ прочее, ${bk.other}. Светофор считается по всем транспортникам, а таблица ниже, только по выбранному фильтру.</div>`;
+      out+=`<div style="color:var(--muted);font-size:12.5px;margin:-4px 0 6px">Из всех транспортников в выборке (${r.kills.length}): 🖤 везли на чёрный рынок <b style="color:var(--text)">${bk.bm}</b> · 📦 ресурсы/камни, ${bk.resources} · ⛏ собиратели, ${bk.gatherer} · ⚔ прочее, ${bk.other}. Таблица ниже показывает только выбранный фильтр.</div>`;
     }
-    out+=`<span style="color:var(--muted);font-size:12px">Анализ последних ${r.fetched} килов сервера (охват ~${span<1?'меньше часа':span.toFixed(1)+' ч'}), из них на транспортных маунтах: ${r.kills.length}. Обновлено ${new Date(r.at).toLocaleTimeString('ru-RU')}.</span>`;
+    out+=`<span style="color:var(--muted);font-size:12px">Анализ последних ${r.fetched} килов сервера (охват ~${Math.max(1,Math.round((now-Math.min(...r.all.map(k=>k.t)))/6e4))} мин), из них на транспортных маунтах: ${r.kills.length}. Обновлено ${new Date(r.at).toLocaleTimeString('ru-RU')}.</span>`;
     // фильтры: кого показываем
     const mode = S.roads.mode||'bm', minP = S.roads.minParty||1;
     out+=`<div class="secCtls" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0">
