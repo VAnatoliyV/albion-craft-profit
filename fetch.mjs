@@ -15,7 +15,13 @@ import { readFile, writeFile } from 'node:fs/promises';
 //
 // Адрес внутренний, а не обещанный API, и может пропасть при их обновлении.
 // Любая осечка — молча возвращаем null: на сайте останется ручной выбор.
-const SAGE_URL = 'https://ao-sage.com/today/__data.json';
+// С 2026-10-14 голый __data.json у них отвечает 404, нужен этот параметр.
+const SAGE_URL = 'https://ao-sage.com/today/__data.json?x-sveltekit-invalidated=11';
+// Главный путь с 2026-10-18: Cloudflare на ao-sage не пускает облака (и нас
+// из Actions, и наш сервер), поэтому ao-sage сам присылает бонус вебхуком на
+// наш сервер, а тот отдаёт последнее уведомление как есть:
+// {"event":"bonus.published","date":"2026-10-18","region":"europe","bonuses":[{"category":"bag","pct":10},...]}
+const BONUS_HOOK = 'https://129-80-180-213.sslip.io/bonus.json';
 // Запасной путь: наш сервер в Oracle отдаёт тот же ответ ao-sage как есть
 // (и последний удачный, если ao-sage закроется и для него).
 const SAGE_MIRROR = 'https://129-80-180-213.sslip.io/sage.json';
@@ -84,6 +90,27 @@ export function sageParse(raw, today, valid){
   return out;
 }
 
+// Разбор уведомления вебхука ao-sage (см. BONUS_HOOK). Правила те же, что у
+// sageParse: только Европа, только сегодняшний день, только 10 и 20%.
+export function hookParse(raw, today, valid){
+  const j = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  if(!j || j.region !== 'europe' || !Array.isArray(j.bonuses)) return null;
+  if(today && j.date !== today) return null;
+  const c = [], miss = [];
+  for(const e of j.bonuses){
+    if(!e || !e.category) continue;
+    const pct = Number(e.pct ?? e.tier);
+    if(!(pct === 10 || pct === 20)) continue;
+    const k = sageMap(e.category, valid || new Set());
+    if(!k){ miss.push(e.category); continue; }
+    if(!c.some(x => x.k === k)) c.push({ k, v: pct/100 });
+  }
+  if(!c.length && !miss.length) return null;
+  const out = { d: j.date, c, src: 'ao-sage' };
+  if(miss.length) out.miss = miss;
+  return out;
+}
+
 // Сутки бонуса начинаются в 10:00 UTC, вместе с обслуживанием серверов.
 export const bonusDay = (now=Date.now()) => new Date(now - 10*3600*1000).toISOString().slice(0,10);
 
@@ -101,9 +128,9 @@ async function fetchDailyBonus(items){
   // чем считаем «нашей» категорию: всё, что реально встречается в предметах,
   // плюс зелья с едой и пять линий переработки
   const valid = new Set([...(items.items||[]).map(i=>i.cat), 'potion','meal']);
-  for(const [name, url] of [['ao-sage', SAGE_URL], ['наш сервер', SAGE_MIRROR]]){
+  for(const [name, url, parse] of [['вебхук ao-sage', BONUS_HOOK, hookParse], ['ao-sage', SAGE_URL, sageParse], ['наш сервер', SAGE_MIRROR, sageParse]]){
     try{
-      const got = sageParse(await sageGet(url), bonusDay(), valid);
+      const got = parse(await sageGet(url), bonusDay(), valid);
       if(!got){ console.log(`дневной бонус (${name}): в ответе нет сегодняшнего опубликованного дня`); continue; }
       console.log(`дневной бонус ${got.d} (${name}): ${got.c.map(x=>x.k+' +'+Math.round(x.v*100)).join(', ')||'ничего не легло'}`);
       if(got.miss) console.log(`  не совпало с нашими категориями: ${got.miss.join(', ')}`);
