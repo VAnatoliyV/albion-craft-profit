@@ -4935,6 +4935,7 @@ function renderCore(){
       td.innerHTML='<div class="detIn">'+cfg.html(r,i)+'</div>';
       restoreDetState(td, S.open[tr.dataset.k]); // вернуть введённое количество и режим
       cfg.upd(i);
+      foldRestore(td);
     };
     tr.onclick=()=>{
       const det=tr.nextElementSibling;
@@ -4958,6 +4959,12 @@ function snapshotDetState(td){
   td.querySelectorAll('input[id],select[id]').forEach(el=>{ st[el.id.replace(/\d+$/,'')]=el.value; });
   return st;
 }
+// Раскрытые «Журналы» и «ЧР по качествам» внутри карточки. Цены обновляются сами,
+// карточка пересобирается, и без этой памяти блок сворачивался через пару секунд.
+const FOLD_OPEN={};
+function foldKey(d){ const det=d.closest('tr.det'), tr=det&&det.previousElementSibling; return tr&&tr.dataset.k ? tr.dataset.k+'|'+d.dataset.fold : null; }
+function foldMem(d){ const k=foldKey(d); if(!k) return; if(d.open) FOLD_OPEN[k]=1; else delete FOLD_OPEN[k]; }
+function foldRestore(box){ box.querySelectorAll('details[data-fold]').forEach(d=>{ const k=foldKey(d); if(k && FOLD_OPEN[k]) d.open=true; }); }
 function restoreDetState(td, st){
   if(!st) return;
   td.querySelectorAll('input[id],select[id]').forEach(el=>{
@@ -5139,7 +5146,7 @@ function detailHTML(r,idx){
      bmNormHTML(r);
   const bm = S.bm[it.id];
   if(bm){
-    m+='<br><details onclick="event.stopPropagation()"><summary class="fold">ЧР по качествам</summary><table><tr><th>Качество</th><th>Бай-ордер</th><th title="Обычная цена за месяц. Это то, за сколько вещь уходит изо дня в день. Если бай-ордер сейчас выше неё, профит считается по обычной цене.">Обычная за месяц</th><th>Средняя 7д</th><th title="Самый дешёвый выставленный на продажу ордер на чёрном рынке. По этой цене можно встать в очередь и ждать.">Ордер на продажу</th><th>Объём/д</th></tr>';
+    m+='<br><details data-fold="qual" ontoggle="foldMem(this)" onclick="event.stopPropagation()"><summary class="fold">ЧР по качествам</summary><table><tr><th>Качество</th><th>Бай-ордер</th><th title="Обычная цена за месяц. Это то, за сколько вещь уходит изо дня в день. Если бай-ордер сейчас выше неё, профит считается по обычной цене.">Обычная за месяц</th><th>Средняя 7д</th><th title="Самый дешёвый выставленный на продажу ордер на чёрном рынке. По этой цене можно встать в очередь и ждать.">Ордер на продажу</th><th>Объём/д</th></tr>';
     for(let q=1;q<=5;q++){ const d=bm.qs[q]; if(!d) continue;
       const hot = d.base && d.order && d.order>d.base ? Math.round((d.order/d.base-1)*100) : 0;
       m+=`<tr><td style="text-align:left">${QUAL_RU[q]}</td>`
@@ -5428,7 +5435,7 @@ function calcUpd(idx){
         `<span class="fresh">Цен на полные журналы на рынке не видно, поэтому в расчёт они не вошли.</span><br>` + tail;
       jSum = `<span class="fresh">цен нет, в профит не вошли</span>`;
     }
-    jHtml = `<details onclick="event.stopPropagation()"><summary class="fold">📓 Журналы: ${jSum}</summary>${jHtml}</details>`;
+    jHtml = `<details data-fold="jour" ontoggle="foldMem(this)" onclick="event.stopPropagation()"><summary class="fold">📓 Журналы: ${jSum}</summary>${jHtml}</details>`;
   }
   const invest=matTotal+feeN+ (jNet<0?0:0);
   const revenue=N*r.rev;
@@ -5439,7 +5446,7 @@ function calcUpd(idx){
     `выручка <b>${fmt(revenue)}</b> <span class="fresh">(${r.channel==='ЧР'?'ЧР':r.channel})</span> → `+
     `<b>профит <span class="${profit>=0?'pos':'neg'}">${fmt(profit)}</span></b>`+
     (r.vol?` <span class="fresh" title="Считаем, что ты забираешь 10% дневного оборота рынка, ${fmt(r.vol)}/д.">· уйдёт за ~${(N/Math.max(1,r.vol*CFG.marketShare)).toFixed(1)} дн</span>`:'');
-  const el=$('calcOut'+idx); if(el) el.innerHTML=html;
+  const el=$('calcOut'+idx); if(el){ el.innerHTML=html; foldRestore(el); }
 }
 
 // карточка ресурса на вкладке «Переработка»
