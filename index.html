@@ -1002,6 +1002,13 @@ body.pix tbody tr:last-child td{background-image:none}
     <label class="ctl toggle" id="wrapSafeCraft"><input type="checkbox" id="safeCraftChk"> 🛡 Безопасный крафт<span class="help" title="Убирает из расчёта опасные дороги.&#10;&#10;Крафт и продажа только там, куда можно дойти спокойно: пять королевских городов и Бресильен. Карлеон выключается весь. Он стоит на чёрном острове, и везти туда надо через красные и чёрные зоны. Вместе с ним выключается чёрный рынок, потому что он как раз в Карлеоне.&#10;&#10;Чем платишь за безопасность: бонус плюс 15 процентов даётся только в своём городе категории. У кастетов, посохов оборотня и всей еды такой город это Карлеон. В этом режиме ты их крафтишь без бонуса, с обычным возвратом. Зелья, плащи и сумки не страдают: их бонус в Бресильене, а туда дорога безопасная.">?</span></label>
     <label class="ctl toggle" id="wrapSafe"><input type="checkbox" id="safeChk"> Безопасные маршруты<span class="help" title="Убирает Карлеон из перевозок, потому что дорога туда идёт через красные и чёрные зоны. Бресильен остаётся, до него есть безопасный путь.&#10;&#10;Работает в Переработке на «Лучшем маршруте», во Флиппинге между городами и в Рунофикации. Там вместе с Карлеоном выключается и чёрный рынок, он стоит именно там.&#10;&#10;Не трогает локальные циклы, там ничего не возят. И не трогает продажу на чёрный рынок во Флиппинге: этот раздел как раз про него, дорогу туда ты планируешь сам. Для полного исключения Карлеона из крафта есть отдельный переключатель «Безопасный крафт».">?</span></label>
     <label class="ctl toggle proOnly" id="wrapSelfRef"><input type="checkbox" id="selfRefChk"> Сырьё сам<span class="help" title="Для каждого материала сайт считает два способа. Первый: купить готовый ресурс на рынке, например брусок или кожу. Второй: купить сырьё, например руду или шкуры, и переработать самому в городе крафта, с учётом возврата ресурсов и платы за станок. В себестоимость идёт то, что дешевле. В карточке предмета такие строки помечены значком ⚒.">?</span></label>
+    <label class="ctl proOnly" id="wrapArtMode">Артефакт<span class="help" title="У каждой артефактной вещи два рецепта. Первый: ресурсы плюс сам артефакт. Второй: те же ресурсы плюс кристалл (например, «Кристаллизованный ужас» вместо «Забрала из адской ткани»). Один кристалл подходит ко всей группе артефактов своего тира, поэтому часто он дешевле.&#10;&#10;«Что дешевле»: сайт сравнивает оба в городе крафта и берёт дешёвый. Если один есть в городе, а за другим надо ехать, берёт тот, что на месте. В карточке предмета видно, что выбрано и почём был второй вариант.&#10;&#10;«Только артефакт» и «Только кристалл»: если ты уже купил одно из двух или не хочешь возиться со вторым.">?</span>
+      <select id="artModeSel" autocomplete="off">
+        <option value="auto">Что дешевле</option>
+        <option value="art">Только артефакт</option>
+        <option value="token">Только кристалл</option>
+      </select>
+    </label>
     <label class="ctl toggle"><input type="checkbox" id="premChk" checked> Премиум (4%)</label>
     <label class="ctl" id="wrapBmMode">Продажа на ЧР<span class="help" title="Два разных способа продать на чёрном рынке, и денег они дают разное.&#10;&#10;Сдать сразу: продаёшь по живому бай-ордеру, деньги приходят в ту же секунду, гарантированно. Платится только налог с продаж. Это осторожный вариант, он и стоит по умолчанию.&#10;&#10;Выставить ордер: ставишь свой ордер на продажу по цене таких же ордеров. Денег выходит заметно больше, но исполнится он только когда чёрный рынок сам поднимет свою цену до твоей, а может и не подняться. Сверху берётся сбор за выставление 2,5%, и он не возвращается. Именно так на ЧР работают крафтеры.&#10;&#10;Цены выставленных ордеров есть не по всем вещам: их видно только когда кто-то открывал на ЧР список продаж. Если по предмету такой цены нет, в этом режиме канал ЧР для него просто не считается, останется продажа в городе.">?</span>
       <select id="bmModeSel">
@@ -2750,6 +2757,7 @@ function trParts(t){
 }
 Object.assign(T_UI, {"📊 Сколько убивают перевозчиков: сейчас и обычно": ["📊 How many haulers get killed: now and usually", "📊 Cuántos transportistas mueren: ahora y lo habitual"], "Наш сервер каждые две минуты забирает с киллборда Europe все новые убийства и копит историю. Перевозчик здесь: бык, мамонт или мул с грузом. Мулы новичков без груза посчитаны отдельно.": ["Our server pulls every new kill from the Europe killboard every two minutes and keeps the history. A hauler here means an ox, a mammoth or a mule with cargo. Newbie mules without cargo are counted separately.", "Nuestro servidor recoge cada dos minutos todas las muertes nuevas del killboard de Europa y guarda el historial. Aquí, transportista es un buey, un mamut o una mula con carga. Las mulas de novatos sin carga se cuentan aparte."], "Наш сервер давно не получал данных с киллборда, цифры ниже могут быть старыми.": ["Our server hasn’t received killboard data for a while, so the numbers below may be stale.", "Nuestro servidor lleva un rato sin recibir datos del killboard; las cifras de abajo pueden estar desfasadas."], "⚪ ПОКА НЕ С ЧЕМ СРАВНИТЬ": ["⚪ NOTHING TO COMPARE WITH YET", "⚪ AÚN NO HAY CON QUÉ COMPARAR"], "🔴 ОПАСНЕЕ ОБЫЧНОГО": ["🔴 MORE DANGEROUS THAN USUAL", "🔴 MÁS PELIGROSO DE LO HABITUAL"], "🟢 ТИШЕ ОБЫЧНОГО": ["🟢 QUIETER THAN USUAL", "🟢 MÁS TRANQUILO DE LO HABITUAL"], "🟡 КАК ОБЫЧНО": ["🟡 AS USUAL", "🟡 LO HABITUAL"], "перевозчиков убито за последний час:": ["haulers killed in the last hour:", "transportistas muertos en la última hora:"], "Обычно в этот час:": ["Usually at this hour:", "Lo habitual a esta hora:"], "В среднем за час:": ["Average per hour:", "Media por hora:"], "Убито перевозчиков в час, по часам суток (твоё время)": ["Haulers killed per hour, by hour of day (your time)", "Transportistas muertos por hora, según la hora del día (tu hora)"], "История копится с {} октября {}, график заполнится за сутки.": ["History is being collected since October {}, {}; the chart will fill in within a day.", "El historial se recoge desde el {} de octubre de {}; el gráfico se llenará en un día."], "{} · перевозчиков {} в час · всех убийств {} в час · дней в среднем {}": ["{} · haulers {} per hour · all kills {} per hour · days averaged {}", "{} · transportistas {} por hora · todas las muertes {} por hora · días promediados {}"], "{} · данных пока нет": ["{} · no data yet", "{} · aún no hay datos"], "Белый столбик: текущий час. Красные: вечерние окна Bandit Assault. Наведи на столбик, увидишь цифры.": ["White bar: the current hour. Red ones: the evening Bandit Assault windows. Hover a bar to see the numbers.", "Barra blanca: la hora actual. Rojas: las ventanas nocturnas de Bandit Assault. Pasa el ratón por una barra para ver las cifras."], "За последние {} ч убито перевозчиков:": ["Haulers killed in the last {} h:", "Transportistas muertos en las últimas {} h:"], ", мулов новичков без груза:": [", newbie mules without cargo:", ", mulas de novatos sin carga:"], "Сколько было ганкеров: соло": ["How many gankers: solo", "Cuántos gankers había: solo"], "· группой от {} до {}": ["· groups of {} to {}", "· en grupo de {} a {}"], "· группой от {}": ["· groups of {}+", "· en grupo de {} o más"], "Что везли: на чёрный рынок": ["What they carried: to the Black Market", "Qué llevaban: al Mercado Negro"], "· ресурсы и камни": ["· resources and stones", "· recursos y piedras"], "· собиратели": ["· gatherers", "· recolectores"], "· прочее": ["· other", "· otros"], "Чаще всего ганкают:": ["Most active gankers:", "Los que más gankean:"], "Наш сервер с историей убийств не ответил, ниже видны только последние минуты киллборда.": ["Our kill-history server didn’t respond; below are only the last minutes of the killboard.", "Nuestro servidor con el historial de muertes no respondió; abajo solo se ven los últimos minutos del killboard."], "💀 Последние убийства на транспорте (киллборд Europe, последние минуты)": ["💀 Latest kills on transport mounts (Europe killboard, last few minutes)", "💀 Últimas muertes en monturas de transporte (killboard de Europa, últimos minutos)"]});
 Object.assign(T_UI, {"Анализ последних {} килов сервера (охват ~{} мин), из них на транспортных маунтах: {}. Обновлено {}.": ["Analysis of the last {} server kills (covering ~{} min), of which on transport mounts: {}. Updated {}.", "Análisis de las últimas {} muertes del servidor (cobertura ~{} min), de ellas en monturas de transporte: {}. Actualizado {}."], "Показаны {} из {}.": ["Showing {} of {}.", "Mostrando {} de {}."]});
+Object.assign(T_UI, {"Что дешевле": ["Whichever is cheaper", "El más barato"], "Только артефакт": ["Artifact only", "Solo artefacto"], "Только кристалл": ["Crystal only", "Solo cristal"], "⟡ кристалл вместо артефакта": ["⟡ crystal instead of the artifact", "⟡ cristal en lugar del artefacto"], "артефакт, а не кристалл": ["artifact, not the crystal", "artefacto, no el cristal"], "кристалл": ["crystal", "cristal"], "У каждой артефактной вещи два рецепта. Первый: ресурсы плюс сам артефакт. Второй: те же ресурсы плюс кристалл (например, «Кристаллизованный ужас» вместо «Забрала из адской ткани»). Один кристалл подходит ко всей группе артефактов своего тира, поэтому часто он дешевле.\n\n«Что дешевле»: сайт сравнивает оба в городе крафта и берёт дешёвый. Если один есть в городе, а за другим надо ехать, берёт тот, что на месте. В карточке предмета видно, что выбрано и почём был второй вариант.\n\n«Только артефакт» и «Только кристалл»: если ты уже купил одно из двух или не хочешь возиться со вторым.": ["Every artifact item has two recipes. One: the resources plus the artifact itself. Two: the same resources plus a crystal (for example, “Crystallized Dread” instead of “Infernal Cloth Visor”). One crystal covers a whole group of artifacts of its tier, so it is often cheaper.\n\n“Whichever is cheaper”: the site compares both in the crafting city and takes the cheaper one. If one is in the city and you’d have to travel for the other, it takes the one on the spot. The item card shows which was picked and what the other option cost.\n\n“Artifact only” and “Crystal only”: if you’ve already bought one of the two or don’t want to bother with the other.", "Cada objeto con artefacto tiene dos recetas. Una: los recursos más el propio artefacto. Otra: los mismos recursos más un cristal (por ejemplo, «Terror cristalizado» en lugar de «Visera de tela infernal»). Un cristal sirve para todo un grupo de artefactos de su tier, así que a menudo sale más barato.\n\n«El más barato»: la web compara ambos en la ciudad de fabricación y elige el más barato. Si uno está en la ciudad y por el otro hay que viajar, elige el que está a mano. La ficha del objeto muestra cuál se eligió y cuánto costaba la otra opción.\n\n«Solo artefacto» y «Solo cristal»: si ya compraste uno de los dos o no quieres complicarte con el otro."], "У этой вещи два рецепта: с артефактом или с кристаллом, остальное одинаковое. В себестоимость идёт то, что дешевле в городе крафта. Переключить можно в шапке, «Артефакт».": ["This item has two recipes: with the artifact or with a crystal, everything else is the same. The cost uses whichever is cheaper in the crafting city. You can switch it in the header, “Artifact”.", "Este objeto tiene dos recetas: con artefacto o con cristal; lo demás es igual. En el coste entra el más barato en la ciudad de fabricación. Se puede cambiar arriba, en «Artefacto»."]});
 function trStr(t){
   if(UI==='ru') return null;
   const k=t.trim(); if(!k) return null;
@@ -3678,6 +3686,21 @@ function artBest(artId, city){
   const alt = (cheapest.city!==pick.city && cheapest.price < pick.price*0.95) ? cheapest : null;
   return {...pick, away: !here, alt};
 }
+// У артефактного предмета второй рецепт: те же ресурсы, а вместо артефакта кристалл
+// (T4_ARTEFACT_TOKEN_FAVOR_1…4, карта DATA.artAlt). Один кристалл подходит ко всей
+// группе артефактов тира, и нередко он дешевле. По умолчанию берём что дешевле, но
+// то, что лежит в городе крафта, важнее того, за чем надо ехать. other: что отвергли.
+function artPick(artId, city){
+  const tok = (DATA.artAlt||{})[artId], mode = $('artModeSel')?.value || 'auto';
+  const a = (mode==='token' && tok) ? null : artBest(artId, city);
+  const t = (tok && mode!=='art') ? artBest(tok, city) : null;
+  if(a) a.id = artId;
+  if(t) t.id = tok;
+  if(!a || !t) return a || t;
+  const pick = a.away!==t.away ? (a.away ? t : a) : (t.price < a.price ? t : a);
+  const other = pick===a ? t : a;
+  return {...pick, other:{id:other.id, price:other.price, city:other.city, away:other.away}};
+}
 function craftCostIn(item, city, focus){
   // noRet, компоненты, на которые возврат ресурсов не действует (maxreturnamount=0).
   // У фракционных плащей это вообще всё: сам плащ, герб и жетоны.
@@ -3694,7 +3717,7 @@ function craftCostIn(item, city, focus){
   // артефакт: без возврата ресурсов (maxreturnamount=0), цена, города крафта
   let artCost=0, artInfo=null;
   if(item.art){
-    const a = artBest(item.art.id, city);
+    const a = artPick(item.art.id, city);
     if(!a) return null;
     artCost = a.price*item.art.n; artInfo=a;
     worst=Math.max(worst,a.age||0);
@@ -3712,7 +3735,7 @@ function craftCostIn(item, city, focus){
     const w = p.price*c*((noRet && noRet.has(m)) ? 1 : (1-ret));
     if(w>0) parts.push([m, w, 'mat']);
   }
-  if(item.art && artCost>0) parts.push([item.art.id, artCost, 'mat']);
+  if(item.art && artCost>0) parts.push([artInfo.id, artCost, 'mat']);
   return {cost: raw*(1-ret)+rawNoRet+artCost+fee, cash: raw+rawNoRet+artCost+fee,
     bonus, ret, fee, raw, rawNoRet, artCost, artInfo, stale:worst, selfMats, parts, daily:dly};
 }
@@ -5345,18 +5368,26 @@ function calcUpd(idx){
     if(tp) html+=`<tr class="tpRow"><td colspan="5">${tp}</td></tr>`;
   }
   if(it.art && r.artInfo){
-    const a=r.artInfo, cost=N*it.art.n*a.price; matTotal+=cost;
-    const an=(DATA.matNames||{})[it.art.id]||{};
+    const a=r.artInfo, aid=a.id||it.art.id, cost=N*it.art.n*a.price; matTotal+=cost;
+    const an=(DATA.matNames||{})[aid]||{};
     const где = a.away
       ? `<span class="fresh" title="В ${r.city} этот артефакт сейчас не продаётся, цена взята из ближайшего города, где он есть. За ним придётся съездить.">в ${r.city} нет, цена из ${a.city}</span>`
       : `<span class="fresh">цена в ${r.city}</span>`
         + (a.alt ? ` <span class="fresh" style="color:var(--accent)" title="Артефакт лёгкий, съездить за ним дешевле, чем кажется. Но в себестоимости стоит цена города ${r.city}, то есть во что он обойдётся, если никуда не ехать.">дешевле в ${a.alt.city}: ${fmt(Math.round(a.alt.price))} (−${Math.round((1-a.alt.price/a.price)*100)}%)</span>` : '');
-    html+=`<tr><td class="item">${icon(it.art.id)} ${nmA(an)||'Артефакт'}${cpBtn(it.art.id)}${nmB(an)?' <span class="fresh">'+nmB(an)+'</span>':''} <i style="color:var(--muted)">без возврата</i> ${где}</td>`+
+    // Второй рецепт: кристалл вместо артефакта. Показываем, что отвергли и почём.
+    let вместо='';
+    if(a.other){
+      const on=(DATA.matNames||{})[a.other.id]||{}, tok=aid!==it.art.id;
+      const tip = 'У этой вещи два рецепта: с артефактом или с кристаллом, остальное одинаковое. В себестоимость идёт то, что дешевле в городе крафта. Переключить можно в шапке, «Артефакт».';
+      вместо = `<tr class="tpRow"><td colspan="5"><span title="${tip}">${tok?'⟡ кристалл вместо артефакта':'артефакт, а не кристалл'}</span> · `+
+        `${nmA(on)||''}: ${fmt(Math.round(a.other.price))}${a.other.away?' ('+a.other.city+')':''}</td></tr>`;
+    }
+    html+=`<tr><td class="item">${icon(aid)} ${nmA(an)||'Артефакт'}${cpBtn(aid)}${nmB(an)?' <span class="fresh">'+nmB(an)+'</span>':''} <i style="color:var(--muted)">без возврата</i> ${где}</td>`+
       `<td>${it.art.n}</td>`+
       `<td><input type="number" style="width:90px" value="${Math.round(a.price)}" placeholder="цена"
-         onclick="event.stopPropagation()" onchange="setOverride('${it.art.id}','${a.city}',this.value)"
+         onclick="event.stopPropagation()" onchange="setOverride('${aid}','${a.city}',this.value)"
          title="Своя цена артефакта в городе ${a.city}. Оставь пусто или поставь 0, чтобы вернуть цену с рынка."></td>`+
-      `<td><b>${fmt(N*it.art.n)}</b></td><td>${fmt(cost)}</td></tr>`;
+      `<td><b>${fmt(N*it.art.n)}</b></td><td>${fmt(cost)}</td></tr>`+вместо;
   }
   html+=`<tr><td class="item"><b>Итого сырья</b></td><td></td><td></td><td></td><td><b>${fmt(Math.round(matTotal))}</b></td></tr>`;
   html+='</table>';
@@ -6085,8 +6116,12 @@ function calcCost(){
   }
   let artCost=0, artId=null;
   if(it.art){
-    artId=it.art.id;
-    const px = S.calc.px[artId]!=null ? {price:S.calc.px[artId], own:true} : artBest(artId, S.calc.city);
+    // своя цена в калькуляторе сильнее рынка: вписал под артефакт или под кристалл, тот и берём
+    const tok=(DATA.artAlt||{})[it.art.id];
+    const own=[it.art.id, tok].find(id=>id && S.calc.px[id]!=null);
+    const pick=own ? null : artPick(it.art.id, S.calc.city);
+    artId=own || pick?.id || it.art.id;
+    const px = own ? {price:S.calc.px[own], own:true} : pick;
     if(px){ artCost=px.price*it.art.n; rows.push({id:artId,n:it.art.n,price:px.price,sum:artCost,own:px.own,art:true}); }
     else { miss.push(artId); rows.push({id:artId,n:it.art.n,price:null,sum:null,art:true}); }
   }
@@ -6204,7 +6239,7 @@ function calcTabHTML(){
     const nmo=(DATA.matNames&&DATA.matNames[r.id])||{};
     const label=nmA(nmo)||r.id;
     out+=`<tr><td style="width:40px"><img ${icoAttr(r.id,32)} alt="" style="width:28px;height:28px;vertical-align:middle"></td>
-      <td>${label}${r.art?' <span class="badge">артефакт</span>':''}<div class="fresh">${r.id}</div></td>
+      <td>${label}${r.art?' <span class="badge">'+(r.id.includes('_TOKEN_FAVOR_')?'кристалл':'артефакт')+'</span>':''}<div class="fresh">${r.id}</div></td>
       <td>${r.n}</td>
       <td><input type="number" class="calcPx" data-m="${r.id}" min="0" value="${r.price!=null?Math.round(r.price):''}" placeholder="нет цены" style="width:96px">${r.own?' <span class="badge">своя</span>':r.from?` <span class="badge">из ${r.from}</span>`:''}</td>
       <td class="num">${money(r.sum)}</td></tr>`;
@@ -7407,6 +7442,8 @@ function paintQualCraft(){ const w=$('wrapQualCraft'); if(w) w.style.display = $
   const pts=ls('acp_qualPts',''); if(pts!==''){ $('qualPtsInp').value=pts; $('qualPtsInp').defaultValue=pts; }
   paintQualCraft(); }
 $('qualSel').addEventListener('change', ()=>{ lsSet('acp_qual', $('qualSel').value); paintQualCraft(); });
+{ const m=ls('acp_artMode',''); if(m && [...$('artModeSel').options].some(o=>o.value===m)) $('artModeSel').value=m; }
+$('artModeSel').onchange=()=>{ lsSet('acp_artMode', $('artModeSel').value); compute(); render(); };
 $('qualPtsInp').addEventListener('change', ()=>{ lsSet('acp_qualPts', $('qualPtsInp').value); $('qualPtsInp').defaultValue=$('qualPtsInp').value; compute(); render(); });
 $('qualFoodSel').addEventListener('change', ()=>{ lsSet('acp_qualFood', $('qualFoodSel').value); compute(); render(); });
 // способ продажи на ЧР запоминаем отдельно для каждого раздела: в Крафте и Флиппинге
