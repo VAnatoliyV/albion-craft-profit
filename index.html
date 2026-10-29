@@ -5387,7 +5387,7 @@ function calcUpd(idx){
       вместо = `<tr class="tpRow"><td colspan="5"><span title="${tip}">${tok?'⟡ кристалл вместо артефакта':'артефакт, а не кристалл'}</span> · `+
         `${nmA(on)||''}: ${fmt(Math.round(a.other.price))}${a.other.away?' ('+a.other.city+')':''}</td></tr>`;
     }
-    html+=`<tr><td class="item">${icon(aid)} ${nmA(an)||'Артефакт'}${cpBtn(aid)}${nmB(an)?' <span class="fresh">'+nmB(an)+'</span>':''} <i style="color:var(--muted)">без возврата</i> ${где}</td>`+
+    html+=`<tr><td class="item">${icon(aid)} ${nmA(an)||'Артефакт'}${cpBtn(aid)}${nmB(an)?' <span class="fresh">'+nmB(an)+'</span>':''} <span class="badge">${aid!==it.art.id?'кристалл':'артефакт'}</span> <i style="color:var(--muted)">без возврата</i> ${где}</td>`+
       `<td>${it.art.n}</td>`+
       `<td><input type="number" style="width:90px" value="${Math.round(a.price)}" placeholder="цена"
          onclick="event.stopPropagation()" onchange="setOverride('${aid}','${a.city}',this.value)"
