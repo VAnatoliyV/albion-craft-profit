@@ -5388,8 +5388,9 @@ function calcUpd(idx){
       const tip = 'У этой вещи два рецепта: с артефактом или с кристаллом, остальное одинаковое. В себестоимость идёт то, что дешевле в городе крафта. Переключить можно в настройках, «Артефакт».';
       // Итог словами: дороже второй вариант или дешевле (дешевле бывает, только если выбор зажат в настройках).
       const kind = tok?'артефакт':'кристалл', d = Math.round(a.other.price)-Math.round(a.price);
-      const итог = d>0 ? `<span class="fresh">${kind} дороже на ${fmt(d)}</span>`
-        : d<0 ? `<span style="color:var(--accent)">${kind} дешевле на ${fmt(-d)}, переключи в настройках «Артефакт»</span>`
+      // Зелёный: выбрано выгодное. Красный: переплачиваешь, второй вариант дешевле.
+      const итог = d>0 ? `<b style="color:var(--green)">${kind} дороже на ${fmt(d)}</b>`
+        : d<0 ? `<b style="color:var(--red)">${kind} дешевле на ${fmt(-d)}, переключи в настройках «Артефакт»</b>`
         : `<span class="fresh">цена та же</span>`;
       вместо = `<tr class="tpRow"><td colspan="5"><span title="${tip}">${tok?'Вместо кристалла можно артефакт:':'Вместо артефакта можно кристалл:'}</span> `+
         `<img ${icoAttr(a.other.id,32)} alt="" style="width:28px;height:28px;vertical-align:middle"> ${nmA(on)||''}: <b>${fmt(Math.round(a.other.price))}</b>${a.other.away?' ('+a.other.city+')':''} · ${итог}</td></tr>`;
