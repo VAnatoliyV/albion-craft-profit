@@ -3688,8 +3688,9 @@ function bestBuy(mid, cities){
 // нестыковка: материалы «в Мартлоке», а артефакт «мин. цена: Bridgewatch», хотя за ним
 // ещё надо съездить. Если где-то дешевле, это подсказка рядом, а не молчаливое допущение.
 // Своя цена сильнее рынка: вписал руками, значит знаешь, почём он тебе достаётся.
-function artBest(artId, city){
-  const pool = [...new Set([city, ...craftCities()].filter(Boolean))];
+function artBest(artId, city, local){
+  // «На месте»: только город крафта; нет артефакта там, значит, на месте эту вещь не сделать
+  const pool = local ? [city].filter(Boolean) : [...new Set([city, ...craftCities()].filter(Boolean))];
   const priced = [];
   for(const c of pool){
     const v = matPrice(artId, c);
@@ -3709,10 +3710,10 @@ function artBest(artId, city){
 // группе артефактов тира, и нередко он дешевле. По умолчанию берём что дешевле; город
 // крафта решает только при равной цене. Артефакт лёгкий, съездить за ним не проблема,
 // а «бери то, что на месте» ставило кристалл за 8 000 вместо артефакта за 295. other: что отвергли.
-function artPick(artId, city){
+function artPick(artId, city, local){
   const tok = (DATA.artAlt||{})[artId], mode = $('artModeSel')?.value || 'auto';
   // Оба варианта считаем всегда: даже при «только артефакт» в карточке видно, почём кристалл.
-  const a = artBest(artId, city), t = tok ? artBest(tok, city) : null;
+  const a = artBest(artId, city, local), t = tok ? artBest(tok, city, local) : null;
   if(a) a.id = artId;
   if(t) t.id = tok;
   const pick = (tok && mode==='art') ? a : (tok && mode==='token') ? t
@@ -3737,7 +3738,7 @@ function craftCostIn(item, city, focus){
   // артефакт: без возврата ресурсов (maxreturnamount=0), цена, города крафта
   let artCost=0, artInfo=null;
   if(item.art){
-    const a = artPick(item.art.id, city);
+    const a = artPick(item.art.id, city, localOnly());
     if(!a) return null;
     artCost = a.price*item.art.n; artInfo=a;
     worst=Math.max(worst,a.age||0);
@@ -3949,7 +3950,7 @@ function cheaperElsewhere(mid, city){
   return mine || best;
 }
 function teleportHint(mid, need, city, unit){
-  if(unit==null || !need) return '';
+  if(unit==null || !need || localOnly()) return '';   // «На месте» всё покупаем здесь, другие города не предлагаем
   const alt=cheaperElsewhere(mid, city);
   if(!alt || (!alt.ovr && alt.price > unit*0.95)) return '';
   const px=`<input type="number" class="tpPx" value="${Math.round(alt.price)}" onclick="event.stopPropagation()"
@@ -5409,7 +5410,7 @@ function calcUpd(idx){
         : d<0 ? `<b style="color:var(--red)">${kind} дешевле на ${fmt(-d)}, переключи в настройках «Артефакт»</b>`
         : `<span class="fresh">цена та же</span>`;
       вместо = `<tr class="tpRow"><td colspan="5"><span title="${tip}">${tok?'Вместо кристалла можно артефакт:':'Вместо артефакта можно кристалл:'}</span> `+
-        `<img ${icoAttr(a.other.id,32)} alt="" style="width:28px;height:28px;vertical-align:middle"> ${nmA(on)||''}: <input type="number" class="tpPx" value="${Math.round(a.other.price)}" onclick="event.stopPropagation()" onchange="setOverride('${a.other.id}','${a.other.city}',this.value)" title="${tr('Своя цена в этом городе. Оставь пусто или поставь 0, чтобы вернуть цену с рынка.')}">${a.other.ovr?' <span style="color:var(--accent)">✎</span>':''}${a.other.away?' ('+a.other.city+')':''} · ${итог}</td></tr>`;
+        `<img ${icoAttr(a.other.id,32)} alt="" style="width:28px;height:28px;vertical-align:middle"> ${nmA(on)||''}${cpBtn(a.other.id)}: <input type="number" class="tpPx" value="${Math.round(a.other.price)}" onclick="event.stopPropagation()" onchange="setOverride('${a.other.id}','${a.other.city}',this.value)" title="${tr('Своя цена в этом городе. Оставь пусто или поставь 0, чтобы вернуть цену с рынка.')}">${a.other.ovr?' <span style="color:var(--accent)">✎</span>':''}${a.other.away?' ('+a.other.city+')':''} · ${итог}</td></tr>`;
     }
     html+=`<tr><td class="item">${icon(aid)} ${nmA(an)||'Артефакт'}${cpBtn(aid)}${nmB(an)?' <span class="fresh">'+nmB(an)+'</span>':''} <span class="badge">${aid!==it.art.id?'кристалл':'артефакт'}</span> <i style="color:var(--muted)">без возврата</i> ${где}</td>`+
       `<td>${it.art.n}</td>`+
